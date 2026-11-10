@@ -62,16 +62,13 @@ int mutex_destroy(mutex_t *mutex) {
  */
 int mutex_lock_impl(mutex_t *mutex) {
   // Track lock attempt on stack
-  mutex_stack_push_pending((uintptr_t)mutex, mutex->name);
 
   int err = pthread_mutex_lock(&mutex->impl);
   if (err == 0) {
     // Mark as successfully locked
-    mutex_stack_mark_locked((uintptr_t)mutex);
     mutex_on_lock(mutex);
   } else {
     // Lock failed, remove from stack
-    mutex_stack_pop((uintptr_t)mutex);
   }
   return err;
 }
@@ -84,20 +81,17 @@ int mutex_lock_impl(mutex_t *mutex) {
 int mutex_trylock_impl(mutex_t *mutex) {
 #ifndef NDEBUG
   // Track lock attempt on stack
-  mutex_stack_push_pending((uintptr_t)mutex, mutex->name);
 #endif
 
   int err = pthread_mutex_trylock(&mutex->impl);
   if (err == 0) {
     // Mark as successfully locked
 #ifndef NDEBUG
-    mutex_stack_mark_locked((uintptr_t)mutex);
 #endif
     mutex_on_trylock(mutex, true);
   } else {
     // Lock failed, remove from stack
 #ifndef NDEBUG
-    mutex_stack_pop((uintptr_t)mutex);
 #endif
     mutex_on_trylock(mutex, false);
   }
@@ -115,7 +109,6 @@ int mutex_unlock_impl(mutex_t *mutex) {
 
   // Pop from lock stack after successful unlock
   if (err == 0) {
-    mutex_stack_pop((uintptr_t)mutex);
   }
 
   return err;

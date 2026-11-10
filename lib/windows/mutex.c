@@ -69,11 +69,8 @@ int mutex_lock_impl(mutex_t *mutex) {
   }
   // Recursive acquisitions succeed immediately; never report them as waits.
   if (TryEnterCriticalSection(&mutex->impl)) {
-    mutex_stack_push_locked((uintptr_t)mutex, mutex->name);
   } else {
-    mutex_stack_push_pending((uintptr_t)mutex, mutex->name);
     EnterCriticalSection(&mutex->impl);
-    mutex_stack_mark_locked((uintptr_t)mutex);
   }
   mutex_on_lock(mutex);
   return 0;
@@ -87,7 +84,6 @@ int mutex_lock_impl(mutex_t *mutex) {
 int mutex_trylock_impl(mutex_t *mutex) {
   BOOL success = TryEnterCriticalSection(&mutex->impl);
   if (success)
-    mutex_stack_push_locked((uintptr_t)mutex, mutex->name);
   mutex_on_trylock(mutex, success ? true : false);
   return success ? 0 : 16; // EBUSY = 16
 }
@@ -107,7 +103,6 @@ int mutex_unlock_impl(mutex_t *mutex) {
   if (recursive)
     mutex->currently_held_by_key = owner;
 #endif
-  mutex_stack_pop((uintptr_t)mutex);
   LeaveCriticalSection(&mutex->impl);
   return 0;
 }

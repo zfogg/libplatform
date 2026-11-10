@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <ascii-chat/common.h>
-#include <ascii-chat/uthash.h> // UBSan-safe uthash wrapper
+#include <libplatform/uthash.h>
 #include <ascii-chat/log/log.h>
 #include <ascii-chat/log/format.h>
 #include <libplatform/util/string.h>

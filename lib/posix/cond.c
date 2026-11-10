@@ -82,10 +82,8 @@ int cond_destroy(cond_t *cond) {
  */
 int cond_wait_impl(cond_t *cond, mutex_t *mutex) {
   mutex_on_unlock(mutex);
-  mutex_stack_pop((uintptr_t)mutex);
   int result = pthread_cond_wait(&cond->impl, &mutex->impl);
   mutex_on_lock(mutex);
-  mutex_stack_push_locked((uintptr_t)mutex, mutex->name);
   return result;
 }
 
@@ -105,10 +103,8 @@ int cond_timedwait_impl(cond_t *cond, mutex_t *mutex, uint64_t timeout_ns) {
   uint64_t deadline_ns = (UINT64_MAX - now_ns < timeout_ns) ? UINT64_MAX : now_ns + timeout_ns;
   time_ns_to_timespec(deadline_ns, &ts);
   mutex_on_unlock(mutex);
-  mutex_stack_pop((uintptr_t)mutex);
   int result = pthread_cond_timedwait(&cond->impl, &mutex->impl, &ts);
   mutex_on_lock(mutex);
-  mutex_stack_push_locked((uintptr_t)mutex, mutex->name);
 
   return result;
 }
