@@ -16,6 +16,7 @@
 #define ASCIICHAT_OK LIBPLATFORM_OK
 #define asciichat_error_t libplatform_status_t
 #define PLATFORM_MAX_PATH_LENGTH 4096
+#define PLATFORM_BACKTRACE_FRAME_CAPACITY 64
 #define NULL_SENTINEL "[NULL]"
 #define SAFE_MALLOC(n, type) ((type)malloc((n)))
 #define SAFE_CALLOC(n, s, type) ((type)calloc((n), (s)))
