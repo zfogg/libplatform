@@ -25,7 +25,6 @@ int platform_access(const char *path, int mode) {
   int windows_mode = 0;
   if (mode & PLATFORM_ACCESS_READ) windows_mode |= 4;
   if (mode & PLATFORM_ACCESS_WRITE) windows_mode |= 2;
-  if (mode & PLATFORM_ACCESS_EXECUTE) windows_mode |= 1;
   return _access(path, windows_mode);
 }
 
