@@ -1,5 +1,7 @@
 #pragma once
 
+#include <libplatform/terminal_modes.h>
+
 /**
  * @file platform/terminal.h
  * @brief 🖥️ Cross-platform terminal interface for ascii-chat
@@ -619,19 +621,6 @@ int terminal_clear_scrollback(int fd);
  *
  * @ingroup platform_terminal
  */
-typedef enum terminal_color_mode {
-  /** @brief Auto-detect color support from terminal capabilities */
-  TERM_COLOR_AUTO = -1,
-  /** @brief No color support (monochrome terminal) */
-  TERM_COLOR_NONE = 0,
-  /** @brief 16-color support (standard ANSI colors) */
-  TERM_COLOR_16 = 1,
-  /** @brief 256-color support (extended ANSI palette) */
-  TERM_COLOR_256 = 2,
-  /** @brief 24-bit truecolor support (RGB colors) */
-  TERM_COLOR_TRUECOLOR = 3
-} terminal_color_mode_t;
-
 /**
  * @brief Monochromatic color filter enumeration
  *
@@ -694,23 +683,6 @@ typedef enum {
   /** @brief Client requests Matrix digital-rain post-processing */
   TERM_CAP_MATRIX_RAIN = 0x0020
 } terminal_capability_flags_t;
-
-/**
- * @brief Render mode preferences
- *
- * Enumeration of rendering modes for ASCII art output. Different modes
- * provide different visual effects and require different terminal capabilities.
- *
- * @ingroup platform_terminal
- */
-typedef enum render_mode {
-  /** @brief Foreground colors only (text color) */
-  RENDER_MODE_FOREGROUND = 0,
-  /** @brief Background colors (block colors) */
-  RENDER_MODE_BACKGROUND = 1,
-  /** @brief Unicode half-block characters (mixed foreground/background) */
-  RENDER_MODE_HALF_BLOCK = 2
-} render_mode_t;
 
 typedef struct terminal_options {
   terminal_color_setting_t color;
