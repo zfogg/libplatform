@@ -385,11 +385,6 @@ static void _init_terminal_cache(void) {
   g_terminal_cache.initialized = 1;
 }
 
-bool terminal_supports_utf8(void) {
-  _init_terminal_cache();
-  return g_terminal_cache.utf8_support;
-}
-
 /**
  * @brief Check if terminal supports color output
  * @return True if color is supported, false otherwise
