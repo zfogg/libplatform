@@ -134,7 +134,7 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
   } else {
     memcpy(output, display_path, required_size);
   }
-  return LIBPLATFORM_OK;
+  return 0;
 }
 
 // ============================================================================
@@ -594,7 +594,7 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
 
   char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
   bool external = false;
-  if (symbol_format_source_path(module_name, file_location, rel_path, sizeof(rel_path), &external) != LIBPLATFORM_OK) {
+  if (symbol_format_source_path(module_name, file_location, rel_path, sizeof(rel_path), &external) != 0) {
     strncpy(rel_path, "unknown", sizeof(rel_path));
   }
 
@@ -924,7 +924,7 @@ static char **run_addr2line_batch(void *const *buffer, int size) {
     exe_name = exe_name ? exe_name + 1 : exe_path;
     char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
     bool external = false;
-    if (symbol_format_source_path(exe_name, file_line, rel_path, sizeof(rel_path), &external) != LIBPLATFORM_OK) {
+    if (symbol_format_source_path(exe_name, file_line, rel_path, sizeof(rel_path), &external) != 0) {
       strncpy(rel_path, "unknown", sizeof(rel_path));
     }
 

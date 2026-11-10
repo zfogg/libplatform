@@ -194,7 +194,7 @@ char **libplatform_backtrace_symbolize(void *const *buffer, int size) {
         char source_path[PLATFORM_WINDOWS_BACKTRACE_SOURCE_PATH_BUFFER_SIZE];
         bool external = false;
         if (symbol_format_source_path(resolved_module, line_info.FileName, source_path, sizeof(source_path),
-                                      &external) != LIBPLATFORM_OK) {
+                                      &external) != 0) {
           strncpy(source_path, "unknown", sizeof(source_path));
         }
         snprintf(symbol_buffer, sizeof(symbol_buffer), "%s%s%s%s() (%s:%ld)%s", resolved_module ? "[" : "",

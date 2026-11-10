@@ -11,10 +11,8 @@
 #define PLATFORM_POSIX_FILESYSTEM_BIN_WITH_SUFFIX_BUFFER_SIZE 512
 
 #include <libplatform/filesystem.h>
-#include <libplatform/string.h>
+#include <libplatform/util/string.h>
 #include <libplatform/system.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/log/log.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -24,6 +22,10 @@
 #include <errno.h>
 #include <dirent.h>
 
+const char *platform_getenv(const char *name) {
+  return name ? getenv(name) : NULL;
+}
+
 // ============================================================================
 // Directory Management
 // ============================================================================
@@ -31,9 +33,9 @@
 /**
  * @brief Create a directory (POSIX implementation)
  */
-asciichat_error_t platform_mkdir(const char *path, int mode) {
+int platform_mkdir(const char *path, int mode) {
   if (!path) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid path");
+    return -1;
   }
 
   if (mkdir(path, mode) == -1) {
@@ -42,29 +44,29 @@ asciichat_error_t platform_mkdir(const char *path, int mode) {
       // Verify it's actually a directory (use stat() to follow symlinks)
       struct stat sb;
       if (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode)) {
-        return ASCIICHAT_OK;
+        return 0;
       }
       // Path exists but is not a directory
-      return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Path exists but is not a directory: %s", path);
+      return -1;
     }
-    return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to create directory: %s", path);
+    return -1;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * @brief Create directories recursively (POSIX implementation)
  */
-asciichat_error_t platform_mkdir_recursive(const char *path, int mode) {
+int platform_mkdir_recursive(const char *path, int mode) {
   if (!path || path[0] == '\0') {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid path");
+    return -1;
   }
 
   char tmp[PLATFORM_POSIX_FILESYSTEM_TMP_BUFFER_SIZE];
   size_t len = strlen(path);
   if (len >= sizeof(tmp)) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Path too long: %zu", len);
+    return -1;
   }
 
   strncpy(tmp, path, sizeof(tmp) - 1);
@@ -80,7 +82,7 @@ asciichat_error_t platform_mkdir_recursive(const char *path, int mode) {
       if (tmp[0] != '\0' && strcmp(tmp, ".") != 0) {
         if (mkdir(tmp, mode) != 0 && errno != EEXIST) {
           // Propagate error if not EEXIST
-          return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to create directory: %s", tmp);
+          return -1;
         }
       }
 
@@ -90,10 +92,10 @@ asciichat_error_t platform_mkdir_recursive(const char *path, int mode) {
 
   // Create the final directory
   if (mkdir(tmp, mode) != 0 && errno != EEXIST) {
-    return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to create directory: %s", tmp);
+    return -1;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 // ============================================================================
@@ -103,15 +105,14 @@ asciichat_error_t platform_mkdir_recursive(const char *path, int mode) {
 /**
  * @brief Get file statistics (POSIX implementation)
  */
-asciichat_error_t platform_stat(const char *path, platform_stat_t *stat_out) {
+int platform_stat(const char *path, platform_stat_t *stat_out) {
   if (!path || !stat_out) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters");
+    return -1;
   }
 
   struct stat sb;
   if (lstat(path, &sb) == -1) {
-    log_dev("Failed to stat file: %s", path);
-    return ERROR_FILE_NOT_FOUND;
+    return ENOENT;
   }
 
   stat_out->size = (size_t)sb.st_size;
@@ -120,7 +121,7 @@ asciichat_error_t platform_stat(const char *path, platform_stat_t *stat_out) {
   stat_out->is_directory = S_ISDIR(sb.st_mode) ? 1 : 0;
   stat_out->is_symlink = S_ISLNK(sb.st_mode) ? 1 : 0;
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -128,12 +129,12 @@ asciichat_error_t platform_stat(const char *path, platform_stat_t *stat_out) {
  */
 int platform_is_regular_file(const char *path) {
   if (!path) {
-    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: path=%p", path);
+    -1;
     return 0;
   }
 
   platform_stat_t stat_info;
-  if (platform_stat(path, &stat_info) != ASCIICHAT_OK) {
+  if (platform_stat(path, &stat_info) != 0) {
     return 0;
   }
 
@@ -145,12 +146,12 @@ int platform_is_regular_file(const char *path) {
  */
 int platform_is_directory(const char *path) {
   if (!path) {
-    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: path=%p", path);
+    -1;
     return 0;
   }
 
   platform_stat_t stat_info;
-  if (platform_stat(path, &stat_info) != ASCIICHAT_OK) {
+  if (platform_stat(path, &stat_info) != 0) {
     return 0;
   }
 
@@ -163,7 +164,7 @@ int platform_is_directory(const char *path) {
 
 int platform_create_temp_file(char *path_out, size_t path_size, const char *prefix, int *fd) {
   /* Unix temp file creation with mkstemp() - include PID for concurrent process safety */
-  int needed = safe_snprintf(path_out, path_size, "/tmp/%s_%d_XXXXXX", prefix, getpid());
+  int needed = snprintf(path_out, path_size, "/tmp/%s_%d_XXXXXX", prefix, getpid());
   if (needed < 0 || (size_t)needed >= path_size) {
     return -1;
   }
@@ -181,33 +182,33 @@ int platform_delete_temp_file(const char *path) {
   return unlink(path);
 }
 
-asciichat_error_t platform_mkdtemp(char *path_out, size_t path_size, const char *prefix) {
+int platform_mkdtemp(char *path_out, size_t path_size, const char *prefix) {
   if (!path_out || path_size < 32 || !prefix) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters");
+    return -1;
   }
 
   /* Create temp directory template with PID for concurrent process safety */
-  int needed = safe_snprintf(path_out, path_size, "/tmp/%s_%d_XXXXXX", prefix, getpid());
+  int needed = snprintf(path_out, path_size, "/tmp/%s_%d_XXXXXX", prefix, getpid());
   if (needed < 0 || (size_t)needed >= path_size) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Path buffer too small for temporary directory");
+    return -1;
   }
 
   /* mkdtemp modifies the template in-place and returns the path on success */
   if (mkdtemp(path_out) == NULL) {
-    return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to create temporary directory");
+    return -1;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t platform_dir_foreach(const char *path, platform_dir_foreach_cb callback, void *user_data) {
+int platform_dir_foreach(const char *path, platform_dir_foreach_cb callback, void *user_data) {
   if (!path || !callback) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "path or callback is NULL");
+    return -1;
   }
 
   DIR *dir = opendir(path);
   if (!dir) {
-    return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to open directory: %s", path);
+    return -1;
   }
 
   struct dirent *entry;
@@ -225,22 +226,22 @@ asciichat_error_t platform_dir_foreach(const char *path, platform_dir_foreach_cb
   }
 
   closedir(dir);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t platform_rmdir_recursive(const char *path) {
+int platform_rmdir_recursive(const char *path) {
   if (!path) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "path is NULL");
+    return -1;
   }
 
   DIR *dir = opendir(path);
   if (!dir) {
     /* Path doesn't exist or isn't a directory - treat as success (no-op) */
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   struct dirent *entry;
-  asciichat_error_t result = ASCIICHAT_OK;
+  int result = 0;
 
   while ((entry = readdir(dir)) != NULL) {
     /* Skip . and .. */
@@ -250,25 +251,23 @@ asciichat_error_t platform_rmdir_recursive(const char *path) {
 
     /* Build full path to entry */
     char full_path[PLATFORM_MAX_PATH_LENGTH];
-    int len = safe_snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
+    int len = snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
     if (len < 0 || len >= (int)sizeof(full_path)) {
-      log_warn("Path too long during directory cleanup: %s/%s", path, entry->d_name);
-      continue;
+continue;
     }
 
     /* Check if it's a directory using stat */
     struct stat st;
     if (stat(full_path, &st) == 0 && S_ISDIR(st.st_mode)) {
       /* Recursively delete subdirectory */
-      asciichat_error_t subdir_result = platform_rmdir_recursive(full_path);
-      if (subdir_result != ASCIICHAT_OK) {
+      int subdir_result = platform_rmdir_recursive(full_path);
+      if (subdir_result != 0) {
         result = subdir_result;
       }
     } else {
       /* Delete file */
       if (unlink(full_path) != 0) {
-        log_warn("Failed to delete file during cleanup: %s", full_path);
-        result = ERROR_FILE_OPERATION;
+result = EIO;
       }
     }
   }
@@ -277,7 +276,7 @@ asciichat_error_t platform_rmdir_recursive(const char *path) {
 
   /* Delete the directory itself */
   if (rmdir(path) != 0) {
-    return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to delete directory: %s", path);
+    return -1;
   }
 
   return result;
@@ -290,24 +289,23 @@ asciichat_error_t platform_rmdir_recursive(const char *path) {
 // Group and other permissions mask - keys should only be readable by owner
 #define SSH_KEY_PERMISSIONS_MASK (S_IRWXG | S_IRWXO)
 
-asciichat_error_t platform_validate_key_file_permissions(const char *key_path) {
+int platform_validate_key_file_permissions(const char *key_path) {
   if (!key_path) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: key_path=%p", key_path);
+    return -1;
   }
 
   struct stat st;
   if (stat(key_path, &st) != 0) {
-    return SET_ERRNO_SYS(ERROR_CRYPTO_KEY, "Cannot stat key file: %s", key_path);
+    return -1;
   }
 
   // Check for overly permissive permissions
   // SSH keys should only be readable by owner (permissions 0600 or 0400)
   if ((st.st_mode & SSH_KEY_PERMISSIONS_MASK) != 0) {
-    return SET_ERRNO(ERROR_CRYPTO_KEY, "Key file has overly permissive permissions: %o (recommended: 600 or 400)",
-                     st.st_mode & 0777);
+    return EACCES;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 // ============================================================================
@@ -332,7 +330,7 @@ static char *get_xdg_config_home(void) {
   }
 
   char path[PLATFORM_MAX_PATH_LENGTH];
-  int ret = safe_snprintf(path, sizeof(path), "%s/.config", home);
+  int ret = snprintf(path, sizeof(path), "%s/.config", home);
   if (ret < 0 || (size_t)ret >= sizeof(path)) {
     return NULL; // Path too long
   }
@@ -344,14 +342,14 @@ static char *get_xdg_config_home(void) {
  * @brief Parse XDG_CONFIG_DIRS (colon-separated) into array of directories
  * @param dirs_out Pointer to array (allocated by this function)
  * @param count_out Pointer to count of directories
- * @return ASCIICHAT_OK on success
+ * @return 0 on success
  *
  * Default if XDG_CONFIG_DIRS not set: /etc/xdg
  * Caller must free dirs_out array with SAFE_FREE
  */
-static asciichat_error_t get_xdg_config_dirs(char ***dirs_out, size_t *count_out) {
+static int get_xdg_config_dirs(char ***dirs_out, size_t *count_out) {
   if (!dirs_out || !count_out) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: dirs_out=%p, count_out=%p", dirs_out, count_out);
+    return -1;
   }
 
   *dirs_out = NULL;
@@ -371,16 +369,16 @@ static asciichat_error_t get_xdg_config_dirs(char ***dirs_out, size_t *count_out
   }
 
   // Allocate array of directory strings
-  char **dirs = SAFE_MALLOC(sizeof(char *) * num_dirs, char **);
+  char **dirs = malloc(sizeof(char *) * num_dirs);
   if (!dirs) {
-    return ERROR_MEMORY;
+    return ENOMEM;
   }
 
   // Parse the colon-separated list
   char *dirs_copy = platform_strdup(xdg_config_dirs);
   if (!dirs_copy) {
-    SAFE_FREE(dirs);
-    return ERROR_MEMORY;
+    free(dirs);
+    return ENOMEM;
   }
 
   size_t idx = 0;
@@ -394,22 +392,22 @@ static asciichat_error_t get_xdg_config_dirs(char ***dirs_out, size_t *count_out
       if (!dirs[idx]) {
         // Free previously allocated directories on error
         for (size_t i = 0; i < idx; i++) {
-          SAFE_FREE(dirs[i]);
+          free(dirs[i]);
         }
-        SAFE_FREE(dirs);
-        SAFE_FREE(dirs_copy);
-        return ERROR_MEMORY;
+        free(dirs);
+        free(dirs_copy);
+        return ENOMEM;
       }
       idx++;
     }
     token = strtok_r(NULL, ":", &saveptr);
   }
 
-  SAFE_FREE(dirs_copy);
+  free(dirs_copy);
 
   *dirs_out = dirs;
   *count_out = idx;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -425,9 +423,9 @@ static asciichat_error_t get_xdg_config_dirs(char ***dirs_out, size_t *count_out
  *    - /usr/local/etc/ascii-chat (Unix/Linux local)
  *    - /etc/ascii-chat (system-wide)
  */
-asciichat_error_t platform_find_config_file(const char *filename, config_file_list_t *list_out) {
+int platform_find_config_file(const char *filename, config_file_list_t *list_out) {
   if (!filename || !list_out) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters");
+    return -1;
   }
 
   // Initialize output list
@@ -438,15 +436,15 @@ asciichat_error_t platform_find_config_file(const char *filename, config_file_li
   // Get XDG directories
   char *xdg_config_home = get_xdg_config_home();
   if (!xdg_config_home) {
-    return SET_ERRNO(ERROR_MEMORY, "Failed to get XDG_CONFIG_HOME");
+    return -1;
   }
 
   char **xdg_config_dirs = NULL;
   size_t xdg_config_dirs_count = 0;
-  asciichat_error_t xdg_result = get_xdg_config_dirs(&xdg_config_dirs, &xdg_config_dirs_count);
-  if (xdg_result != ASCIICHAT_OK) {
-    SAFE_FREE(xdg_config_home);
-    return SET_ERRNO(ERROR_MEMORY, "Failed to parse XDG_CONFIG_DIRS");
+  int xdg_result = get_xdg_config_dirs(&xdg_config_dirs, &xdg_config_dirs_count);
+  if (xdg_result != 0) {
+    free(xdg_config_home);
+    return -1;
   }
 
   // Calculate total number of search directories
@@ -455,21 +453,21 @@ asciichat_error_t platform_find_config_file(const char *filename, config_file_li
 
   // Pre-allocate capacity for all possible results
   list_out->capacity = total_dirs;
-  list_out->files = SAFE_MALLOC(sizeof(config_file_result_t) * total_dirs, config_file_result_t *);
+  list_out->files = malloc(sizeof(config_file_result_t) * total_dirs);
   if (!list_out->files) {
-    SAFE_FREE(xdg_config_home);
+    free(xdg_config_home);
     for (size_t i = 0; i < xdg_config_dirs_count; i++) {
-      SAFE_FREE(xdg_config_dirs[i]);
+      free(xdg_config_dirs[i]);
     }
-    SAFE_FREE(xdg_config_dirs);
-    return SET_ERRNO(ERROR_MEMORY, "Failed to allocate config file list");
+    free(xdg_config_dirs);
+    return -1;
   }
 
   uint8_t priority = 0;
   char full_path[PLATFORM_MAX_PATH_LENGTH];
 
   // Priority 0: XDG_CONFIG_HOME/ascii-chat (highest priority, user config)
-  int ret = safe_snprintf(full_path, sizeof(full_path), "%s/ascii-chat/%s", xdg_config_home, filename);
+  int ret = snprintf(full_path, sizeof(full_path), "%s/ascii-chat/%s", xdg_config_home, filename);
   if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
     if (platform_is_regular_file(full_path)) {
       config_file_result_t *result = &list_out->files[list_out->count];
@@ -485,7 +483,7 @@ asciichat_error_t platform_find_config_file(const char *filename, config_file_li
 
   // Priorities 1+: XDG_CONFIG_DIRS/ascii-chat
   for (size_t i = 0; i < xdg_config_dirs_count; i++) {
-    ret = safe_snprintf(full_path, sizeof(full_path), "%s/ascii-chat/%s", xdg_config_dirs[i], filename);
+    ret = snprintf(full_path, sizeof(full_path), "%s/ascii-chat/%s", xdg_config_dirs[i], filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -513,7 +511,7 @@ asciichat_error_t platform_find_config_file(const char *filename, config_file_li
   const size_t num_legacy = sizeof(legacy_dirs) / sizeof(legacy_dirs[0]);
 
   for (size_t i = 0; i < num_legacy; i++) {
-    ret = safe_snprintf(full_path, sizeof(full_path), "%s/%s", legacy_dirs[i], filename);
+    ret = snprintf(full_path, sizeof(full_path), "%s/%s", legacy_dirs[i], filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -532,7 +530,7 @@ asciichat_error_t platform_find_config_file(const char *filename, config_file_li
   // Linux: Check user Linuxbrew path (~/.linuxbrew/etc/ascii-chat)
   const char *home = getenv("HOME");
   if (home && home[0] != '\0') {
-    ret = safe_snprintf(full_path, sizeof(full_path), "%s/.linuxbrew/etc/ascii-chat/%s", home, filename);
+    ret = snprintf(full_path, sizeof(full_path), "%s/.linuxbrew/etc/ascii-chat/%s", home, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -549,13 +547,13 @@ asciichat_error_t platform_find_config_file(const char *filename, config_file_li
 #endif
 
   // Cleanup
-  SAFE_FREE(xdg_config_home);
+  free(xdg_config_home);
   for (size_t i = 0; i < xdg_config_dirs_count; i++) {
-    SAFE_FREE(xdg_config_dirs[i]);
+    free(xdg_config_dirs[i]);
   }
-  SAFE_FREE(xdg_config_dirs);
+  free(xdg_config_dirs);
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -563,15 +561,15 @@ asciichat_error_t platform_find_config_file(const char *filename, config_file_li
  */
 void config_file_list_destroy(config_file_list_t *list) {
   if (!list) {
-    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: list=%p", list);
+    -1;
     return;
   }
 
   if (list->files) {
     for (size_t i = 0; i < list->count; i++) {
-      SAFE_FREE(list->files[i].path);
+      free(list->files[i].path);
     }
-    SAFE_FREE(list->files);
+    free(list->files);
   }
 
   list->count = 0;
@@ -592,11 +590,11 @@ char *platform_get_config_dir(void) {
   const char *xdg_config_home = platform_getenv("XDG_CONFIG_HOME");
   if (xdg_config_home && xdg_config_home[0] != '\0') {
     size_t len = strlen(xdg_config_home) + strlen("/ascii-chat/") + 1;
-    char *dir = SAFE_MALLOC(len, char *);
+    char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    safe_snprintf(dir, len, "%s/ascii-chat/", xdg_config_home);
+    snprintf(dir, len, "%s/ascii-chat/", xdg_config_home);
     return dir;
   }
 
@@ -604,11 +602,11 @@ char *platform_get_config_dir(void) {
   const char *home = platform_getenv("HOME");
   if (home && home[0] != '\0') {
     size_t len = strlen(home) + strlen("/.config/ascii-chat/") + 1;
-    char *dir = SAFE_MALLOC(len, char *);
+    char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    safe_snprintf(dir, len, "%s/.config/ascii-chat/", home);
+    snprintf(dir, len, "%s/.config/ascii-chat/", home);
     return dir;
   }
 
@@ -620,11 +618,11 @@ char *platform_get_data_dir(void) {
   const char *xdg_data_home = platform_getenv("XDG_DATA_HOME");
   if (xdg_data_home && xdg_data_home[0] != '\0') {
     size_t len = strlen(xdg_data_home) + strlen("/ascii-chat/") + 1;
-    char *dir = SAFE_MALLOC(len, char *);
+    char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    safe_snprintf(dir, len, "%s/ascii-chat/", xdg_data_home);
+    snprintf(dir, len, "%s/ascii-chat/", xdg_data_home);
     return dir;
   }
 
@@ -632,11 +630,11 @@ char *platform_get_data_dir(void) {
   const char *home = platform_getenv("HOME");
   if (home && home[0] != '\0') {
     size_t len = strlen(home) + strlen("/.local/share/ascii-chat/") + 1;
-    char *dir = SAFE_MALLOC(len, char *);
+    char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    safe_snprintf(dir, len, "%s/.local/share/ascii-chat/", home);
+    snprintf(dir, len, "%s/.local/share/ascii-chat/", home);
     return dir;
   }
 
@@ -652,16 +650,16 @@ char *platform_get_data_dir(void) {
  *
  * On POSIX, platform_create_temp_file already returns a valid fd, so just return it.
  */
-asciichat_error_t platform_temp_file_open(const char *name, const char *path, int *fd_out) {
+int platform_temp_file_open(const char *name, const char *path, int *fd_out) {
   if (!name || !path) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "name and path cannot be NULL");
+    return -1;
   }
   if (!fd_out) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "fd_out cannot be NULL");
+    return -1;
   }
   /* On POSIX, the caller already has the fd from platform_create_temp_file */
   /* This is a no-op wrapper for API consistency */
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -697,16 +695,16 @@ int platform_path_strcasecmp(const char *a, const char *b, size_t n) {
 /**
  * @brief Truncate file (POSIX)
  */
-asciichat_error_t platform_truncate_file(const char *path, size_t size) {
+int platform_truncate_file(const char *path, size_t size) {
   if (!path) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "path cannot be NULL");
+    return -1;
   }
 
   if (truncate(path, (off_t)size) != 0) {
-    return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to truncate file: %s", path);
+    return -1;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -730,14 +728,14 @@ char platform_path_get_separator(void) {
 /**
  * @brief Normalize path (POSIX)
  */
-asciichat_error_t platform_path_normalize(const char *input, char *output, size_t output_size) {
+int platform_path_normalize(const char *input, char *output, size_t output_size) {
   if (!input || !output || output_size == 0) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid arguments");
+    return -1;
   }
 
   size_t input_len = strlen(input);
   if (input_len >= output_size) {
-    return SET_ERRNO(ERROR_BUFFER_OVERFLOW, "Output buffer too small");
+    return -1;
   }
 
   /* POSIX: Copy and remove redundant slashes */
@@ -763,7 +761,7 @@ asciichat_error_t platform_path_normalize(const char *input, char *output, size_
   }
 
   output[output_pos] = '\0';
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 // ============================================================================
@@ -784,19 +782,19 @@ bool check_binary_in_path_uncached(const char *bin_name) {
   char bin_with_suffix[PLATFORM_POSIX_FILESYSTEM_BIN_WITH_SUFFIX_BUFFER_SIZE];
   char full_path[PLATFORM_MAX_PATH_LENGTH];
 
-  SAFE_STRNCPY(bin_with_suffix, bin_name, sizeof(bin_with_suffix));
+  strncpy(bin_with_suffix, bin_name, sizeof(bin_with_suffix));
 
-  const char *path_env = SAFE_GETENV("PATH");
+  const char *path_env = getenv("PATH");
   if (!path_env) {
     return false;
   }
 
   size_t path_len = strlen(path_env);
-  char *path_copy = SAFE_MALLOC(path_len + 1, char *);
+  char *path_copy = malloc(path_len + 1);
   if (!path_copy) {
     return false;
   }
-  SAFE_STRNCPY(path_copy, path_env, path_len + 1);
+  strncpy(path_copy, path_env, path_len + 1);
 
   bool found = false;
   char *saveptr = NULL;
@@ -810,7 +808,7 @@ bool check_binary_in_path_uncached(const char *bin_name) {
       continue;
     }
 
-    safe_snprintf(full_path, sizeof(full_path), "%s%c%s", dir, PATH_DELIM, bin_with_suffix);
+    snprintf(full_path, sizeof(full_path), "%s%c%s", dir, PATH_DELIM, bin_with_suffix);
 
     if (is_executable_file(full_path)) {
       found = true;
@@ -820,9 +818,23 @@ bool check_binary_in_path_uncached(const char *bin_name) {
     dir = platform_strtok_r(NULL, separator, &saveptr);
   }
 
-  SAFE_FREE(path_copy);
+  free(path_copy);
   return found;
 }
+
+bool platform_is_binary_in_path(const char *bin_name) {
+  return bin_name && bin_name[0] != '\0' && check_binary_in_path_uncached(bin_name);
+}
+
+#ifdef __linux__
+bool platform_get_executable_path(char *exe_path, size_t path_size) {
+  if (!exe_path || path_size < 2) return false;
+  ssize_t len = readlink("/proc/self/exe", exe_path, path_size - 1);
+  if (len < 0 || (size_t)len >= path_size - 1) return false;
+  exe_path[len] = '\0';
+  return true;
+}
+#endif
 
 /**
  * @brief Synchronize file descriptor to disk

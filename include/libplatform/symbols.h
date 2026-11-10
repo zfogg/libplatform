@@ -81,9 +81,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-typedef int libplatform_status_t;
-#define LIBPLATFORM_OK 0
-
 /**
  * @brief Check whether a module belongs to ascii-chat
  * @param module_name Module basename or path
@@ -102,8 +99,8 @@ bool symbol_module_is_project(const char *module_name);
  * Project sources use repository-relative paths. External sources retain at
  * most four parent directories and the filename.
  */
-libplatform_status_t symbol_format_source_path(const char *module_name, const char *source_path, char *output,
-                                               size_t output_size, bool *external);
+int symbol_format_source_path(const char *module_name, const char *source_path, char *output,
+                              size_t output_size, bool *external);
 
 /* ============================================================================
  * Symbol Cache Lifecycle
@@ -123,7 +120,7 @@ libplatform_status_t symbol_format_source_path(const char *module_name, const ch
  *
  * @ingroup platform
  */
-libplatform_status_t symbol_cache_init(void);
+int symbol_cache_init(void);
 
 /**
  * @brief Clean up the symbol cache and free all resources

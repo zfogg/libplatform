@@ -6,10 +6,15 @@
 
 #include <libplatform/backtrace.h>
 #include <libplatform/symbols.h>
-#include <execinfo.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+
+#if (defined(__APPLE__) || defined(__linux__) || defined(__unix__)) && \
+    (!defined(__has_include) || __has_include(<execinfo.h>))
+#include <execinfo.h>
+#define LIBPLATFORM_HAS_EXECINFO 1
+#endif
 
 /**
  * @brief Manual stack unwinding using frame pointers
@@ -53,13 +58,15 @@ static int manual_backtrace(void **buffer, int size) {
  * This wrapper checks for NULL before calling.
  */
 static inline int safe_backtrace(void **buffer, int size) {
-#ifdef USE_MUSL
+#if defined(LIBPLATFORM_HAS_EXECINFO)
   if (backtrace != NULL) {
     return backtrace(buffer, size);
   }
   return 0;
 #else
-  return backtrace(buffer, size);
+  (void)buffer;
+  (void)size;
+  return 0;
 #endif
 }
 

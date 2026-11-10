@@ -4,9 +4,13 @@
  * @brief 🐧 Linux system utilities and backtrace symbol resolution
  */
 
-#include <libplatform/abstraction.h>
-#include <libplatform/internal.h>
-#include <ascii-chat/common.h>
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#include <libplatform/system.h>
+#include <libplatform/filesystem.h>
+#include <libplatform/symbols.h>
 #include <link.h>
 #include <string.h>
 

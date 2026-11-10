@@ -6,9 +6,7 @@
 
 #ifndef _WIN32
 
-#include <libplatform/api.h>
 #include <libplatform/rwlock.h>
-#include <ascii-chat/debug/named.h>
 #include <pthread.h>
 #include <errno.h>
 
@@ -25,24 +23,7 @@ int rwlock_init_impl(rwlock_t *lock) {
 int rwlock_init(rwlock_t *lock, const char *name) {
   int err = pthread_rwlock_init(&lock->impl, NULL);
   if (err == 0) {
-#ifndef NDEBUG
-    lock->last_rdlock_time_ns = 0;
-    lock->last_wrlock_time_ns = 0;
-    lock->last_unlock_time_ns = 0;
-    lock->read_lock_count = (atomic_t){.impl = 0,
-                                       .last_store_time_ns = 0,
-                                       .last_load_time_ns = 0,
-                                       .store_count = 0,
-                                       .load_count = 0,
-                                       .cas_count = 0,
-                                       .cas_success_count = 0,
-                                       .fetch_count = 0};
-    lock->write_held_by_key = 0;
-    lock->rdlock_count = 0;
-    lock->wrlock_count = 0;
-    lock->unlock_count = 0;
-#endif
-    lock->name = NAMED_REGISTER_RWLOCK(lock, name, NULL);
+lock->name = name;
   }
   return err;
 }
@@ -57,7 +38,6 @@ int rwlock_destroy_impl(rwlock_t *lock) {
 }
 
 int rwlock_destroy(rwlock_t *lock) {
-  NAMED_UNREGISTER(lock);
   return rwlock_destroy_impl(lock);
 }
 
@@ -74,17 +54,17 @@ int rwlock_rdlock_impl(rwlock_t *lock) {
   return err;
 }
 
-asciichat_error_t rwlock_tryrdlock(rwlock_t *lock, bool *acquired) {
+int rwlock_tryrdlock(rwlock_t *lock, bool *acquired) {
   if (!lock || !acquired)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Cannot try a null rwlock");
+    return -1;
   int err = pthread_rwlock_tryrdlock(&lock->impl);
   *acquired = err == 0;
   if (err == EBUSY || err == EAGAIN)
-    return ASCIICHAT_OK;
+    return 0;
   if (err != 0)
-    return SET_ERRNO(ERROR_THREAD, "Cannot try shared rwlock: error %d", err);
+    return -1;
   rwlock_on_rdlock(lock);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**

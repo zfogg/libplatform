@@ -10,11 +10,6 @@
 #define PLATFORM_POSIX_PROCESS_LINE_BUFFER_SIZE 256
 
 #include <libplatform/process.h>
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/asciichat_errno.h>
-#include <ascii-chat/log/log.h>
-#include <ascii-chat/log/io.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
@@ -23,19 +18,19 @@
 #include <mach/mach.h>
 #endif
 
-asciichat_error_t process_utf8_arguments(int *argc, char ***argv) {
+int process_utf8_arguments(int *argc, char ***argv) {
   (void)argc;
   (void)argv;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t platform_process_stats(platform_process_stats_t *out) {
+int platform_process_stats(platform_process_stats_t *out) {
   if (!out)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Missing process stats output");
+    return -1;
   *out = (platform_process_stats_t){0};
   struct rusage usage;
   if (getrusage(RUSAGE_SELF, &usage))
-    return SET_ERRNO_SYS(ERROR_PROCESS_FAILED, "Cannot query process CPU time");
+    return -1;
   out->cpu_seconds = (double)usage.ru_utime.tv_sec + (double)usage.ru_stime.tv_sec +
                      ((double)usage.ru_utime.tv_usec + (double)usage.ru_stime.tv_usec) / 1e6;
 #ifdef __APPLE__
@@ -65,7 +60,7 @@ asciichat_error_t platform_process_stats(platform_process_stats_t *out) {
     fclose(status);
   }
 #endif
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -79,47 +74,36 @@ pid_t platform_get_pid(void) {
 /**
  * @brief Execute a command and return a file stream (POSIX implementation)
  */
-asciichat_error_t platform_popen(const char *name, const char *command, const char *mode, FILE **out_stream) {
+int platform_popen(const char *name, const char *command, const char *mode, FILE **out_stream) {
   if (!name || !command || !mode || !out_stream) {
-    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters");
-    return ERROR_INVALID_PARAM;
+    return EINVAL;
   }
-
-  FILE *stream = NULL;
-  LOG_IO(name, {
-    stream = popen(command, mode); // NOLINT(bugprone-command-processor) - intentional shell usage
-  });
+  (void)name;
+  FILE *stream = popen(command, mode);
   if (!stream) {
-    return SET_ERRNO_SYS(ERROR_PROCESS_FAILED, "Failed to execute command: %s", command);
-  }
-
-  int fd = fileno(stream);
-  if (fd >= 0) {
-    NAMED_REGISTER_FD(fd, name);
-    log_dev("Opened process pipe with file descriptor %d for %s: %s", fd, name, command);
+    return -1;
   }
 
   *out_stream = stream;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * @brief Close a process stream (POSIX implementation)
  */
-asciichat_error_t platform_pclose(FILE **stream_ptr) {
+int platform_pclose(FILE **stream_ptr) {
   if (!stream_ptr || !*stream_ptr) {
-    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid stream pointer");
-    return ERROR_INVALID_PARAM;
+    return EINVAL;
   }
 
   int status = pclose(*stream_ptr);
   *stream_ptr = NULL;
 
   if (status == -1) {
-    return SET_ERRNO_SYS(ERROR_PROCESS_FAILED, "Failed to close process stream");
+    return -1;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 #endif

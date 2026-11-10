@@ -75,6 +75,7 @@
 #define PLATFORM_TERMINAL_PALETTE_CUSTOM_BUFFER_SIZE 64
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdint.h>
 #include <stdint.h>

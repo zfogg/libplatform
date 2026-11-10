@@ -5,6 +5,7 @@ option(LIBPLATFORM_BUILD_TESTS "Build libplatform tests" ON)
 include(GNUInstallDirs)
 
 add_library(libplatform-objects OBJECT)
+set_target_properties(libplatform-objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(BUILD_SHARED_LIBS)
   add_library(libplatform SHARED $<TARGET_OBJECTS:libplatform-objects>)
 else()
