@@ -42,7 +42,7 @@
  * This function wraps user thread functions to ensure proper cleanup
  * (like mutex stack cleanup) happens before the thread terminates.
  *
- * @param arg Pointer to asciichat_thread_wrapper_t allocated by acthread_create
+ * @param arg Pointer to asciichat_thread_wrapper_t allocated by platform_thread_create
  * @return Return value from user thread function
  *
  * @internal
@@ -89,7 +89,7 @@ void *thread_wrapper_impl(void *arg) {
  * @param arg Argument to pass to thread function
  * @return 0 on success, error code on failure
  */
-int acthread_create(asciichat_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
+int platform_thread_create(platform_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
   // Allocate wrapper structure to hold user's function and argument
   asciichat_thread_wrapper_t *wrapper = SAFE_MALLOC(sizeof(asciichat_thread_wrapper_t), asciichat_thread_wrapper_t *);
   if (!wrapper) {
@@ -116,7 +116,7 @@ int acthread_create(asciichat_thread_t *thread, const char *name, void *(*func)(
  * @param retval Pointer to store thread return value (can be NULL)
  * @return 0 on success, error code on failure
  */
-int thread_join(asciichat_thread_t *thread, void **retval) {
+int thread_join(platform_thread_t *thread, void **retval) {
   int result = pthread_join(*thread, retval);
   if (result == 0) {
     // Unregister thread from debug naming registry before clearing handle
@@ -124,7 +124,7 @@ int thread_join(asciichat_thread_t *thread, void **retval) {
 
     // Clear the handle after successful join to match Windows behavior
     // This allows thread_is_initialized() to correctly return false
-    memset(thread, 0, sizeof(asciichat_thread_t));
+    memset(thread, 0, sizeof(platform_thread_t));
   }
   return result;
 }
@@ -136,7 +136,7 @@ int thread_join(asciichat_thread_t *thread, void **retval) {
  * @param timeout_ms Timeout in milliseconds
  * @return 0 on success, -2 on timeout, -1 on error
  */
-int thread_join_timeout(asciichat_thread_t *thread, void **retval, uint64_t timeout_ns) {
+int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeout_ns) {
   (void)timeout_ns; // Unused on macOS - suppress warning
 // POSIX doesn't have pthread_timedjoin_np on all systems
 // Use pthread_tryjoin_np with polling as fallback
@@ -184,7 +184,7 @@ int thread_join_timeout(asciichat_thread_t *thread, void **retval, uint64_t time
     NAMED_UNREGISTER_THREAD(*thread);
 
     // Clear the handle after successful join to match Windows behavior
-    memset(thread, 0, sizeof(asciichat_thread_t));
+    memset(thread, 0, sizeof(platform_thread_t));
   }
   return result == 0 ? 0 : -1;
 #else
@@ -200,7 +200,7 @@ int thread_join_timeout(asciichat_thread_t *thread, void **retval, uint64_t time
     NAMED_UNREGISTER_THREAD(*thread);
 
     // Clear the handle after successful join to match Windows behavior
-    memset(thread, 0, sizeof(asciichat_thread_t));
+    memset(thread, 0, sizeof(platform_thread_t));
   }
   return result == 0 ? 0 : -1;
 #endif
@@ -225,7 +225,7 @@ void thread_exit(void *retval) {
  * @param thread Pointer to thread to detach
  * @return 0 on success, error code on failure
  */
-int thread_detach(asciichat_thread_t *thread) {
+int thread_detach(platform_thread_t *thread) {
   if (!thread || !thread_is_initialized(thread)) {
     return SET_ERRNO(ERROR_THREAD, "Invalid thread handle for detach operation");
   }
@@ -262,16 +262,16 @@ uint64_t thread_current_id(void) {
   return (uint64_t)pthread_self();
 }
 
-bool thread_is_initialized(asciichat_thread_t *thread) {
+bool thread_is_initialized(platform_thread_t *thread) {
   if (!thread)
     return false;
   // On POSIX, check if thread handle is non-zero
   return (*thread != 0);
 }
 
-void thread_init(asciichat_thread_t *thread) {
+void thread_init(platform_thread_t *thread) {
   if (thread) {
-    memset(thread, 0, sizeof(asciichat_thread_t)); // On POSIX, zero-init the pthread_t
+    memset(thread, 0, sizeof(platform_thread_t)); // On POSIX, zero-init the pthread_t
   }
 }
 
@@ -355,7 +355,7 @@ asciichat_error_t thread_set_realtime_priority(void) {
 #endif
 }
 
-uintptr_t thread_to_key(asciichat_thread_t thread) {
+uintptr_t thread_to_key(platform_thread_t thread) {
   return (uintptr_t)thread;
 }
 

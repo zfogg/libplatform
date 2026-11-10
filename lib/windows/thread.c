@@ -581,7 +581,7 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
  * @param arg Argument to pass to thread function
  * @return 0 on success, -1 on failure
  */
-int acthread_create(asciichat_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
+int platform_thread_create(platform_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
   // Initialize symbol handler on first thread creation
   initialize_symbol_handler();
 
@@ -647,7 +647,7 @@ int acthread_create(asciichat_thread_t *thread, const char *name, void *(*func)(
  * @param retval Pointer to store thread return value (can be NULL)
  * @return 0 on success, -1 on failure
  */
-int thread_join(asciichat_thread_t *thread, void **retval) {
+int thread_join(platform_thread_t *thread, void **retval) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
     return -1;
     return -1;
@@ -688,7 +688,7 @@ int thread_join(asciichat_thread_t *thread, void **retval) {
  * @param timeout_ns Timeout in nanoseconds
  * @return 0 on success, -2 on timeout, -1 on error
  */
-int thread_join_timeout(asciichat_thread_t *thread, void **retval, uint64_t timeout_ns) {
+int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeout_ns) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
     return -1;
   }
@@ -745,7 +745,7 @@ void thread_exit(void *retval) {
  * @param thread Pointer to thread to detach
  * @return 0 on success, -1 on failure
  */
-int thread_detach(asciichat_thread_t *thread) {
+int thread_detach(platform_thread_t *thread) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
     return -1;
     return -1;
@@ -783,14 +783,14 @@ uint64_t thread_current_id(void) {
   return (uint64_t)GetCurrentThreadId();
 }
 
-bool thread_is_initialized(asciichat_thread_t *thread) {
+bool thread_is_initialized(platform_thread_t *thread) {
   if (!thread)
     return false;
   // On Windows, check if thread handle is valid (not NULL and not INVALID_HANDLE_VALUE)
   return (*thread != NULL && *thread != INVALID_HANDLE_VALUE);
 }
 
-void thread_init(asciichat_thread_t *thread) {
+void thread_init(platform_thread_t *thread) {
   if (thread) {
     *thread = NULL; // On Windows, NULL is the uninitialized state
   }
