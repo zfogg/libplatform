@@ -23,6 +23,10 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdint.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 const char *platform_getenv(const char *name) {
   return name ? getenv(name) : NULL;
@@ -848,6 +852,14 @@ bool platform_get_executable_path(char *exe_path, size_t path_size) {
   ssize_t len = readlink("/proc/self/exe", exe_path, path_size - 1);
   if (len < 0 || (size_t)len >= path_size - 1) return false;
   exe_path[len] = '\0';
+  return true;
+}
+#elif defined(__APPLE__)
+bool platform_get_executable_path(char *exe_path, size_t path_size) {
+  if (!exe_path || path_size < 2 || path_size > UINT32_MAX) return false;
+  uint32_t length = (uint32_t)path_size;
+  if (_NSGetExecutablePath(exe_path, &length) != 0 || length >= path_size) return false;
+  exe_path[length] = '\0';
   return true;
 }
 #endif
