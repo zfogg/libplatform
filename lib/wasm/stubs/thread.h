@@ -18,7 +18,7 @@ typedef void *thread_id_t;
 typedef void *tls_key_t;
 
 /* Stub functions that do nothing in WASM */
-#define platform_thread_create(thread_ptr, attr, start_routine, arg) ASCIICHAT_OK
+#define platform_thread_create(thread_ptr, attr, start_routine, arg) 0
 #define thread_join(thread, timeout_ms) ASCIICHAT_OK
 #define thread_detach(thread) ASCIICHAT_OK
 #define thread_self() ((platform_thread_t)NULL)
