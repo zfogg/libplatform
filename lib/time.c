@@ -9,7 +9,8 @@ uint64_t time_get_ns(void) { struct timespec v; clock_gettime(CLOCK_MONOTONIC,&v
 uint64_t time_get_realtime_ns(void) { struct timespec v; clock_gettime(CLOCK_REALTIME,&v); return (uint64_t)v.tv_sec*1000000000ULL+(uint64_t)v.tv_nsec; }
 #endif
 void time_ns_to_timespec(uint64_t ns, struct timespec *out) { out->tv_sec=(time_t)(ns/1000000000ULL); out->tv_nsec=(long)(ns%1000000000ULL); }
-void time_pretty(uint64_t ns, int precision, char *out, size_t cap) {
+int time_pretty(uint64_t ns, int precision, char *out, size_t cap) {
   (void)precision;
-  if (cap) (void)snprintf(out, cap, "%lluns", (unsigned long long)ns);
+  if (!cap) return 0;
+  return snprintf(out, cap, "%lluns", (unsigned long long)ns);
 }
