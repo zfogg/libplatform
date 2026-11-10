@@ -12,12 +12,13 @@
 #define PLATFORM_WINDOWS_THREAD_STACK_BUFFER_SIZE 16384
 
 #include <windows.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/asciichat_errno.h> // For asciichat_errno system
-#include <ascii-chat/platform/thread.h>
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/util/path.h>
-#include <ascii-chat/util/time.h>
+#include <libplatform/system.h>
+#include <libplatform/util/string.h>
+#include <libplatform/named.h>
+#include <libplatform/thread.h>
+#include <libplatform/named.h>
+#include <libplatform/util/path.h>
+#include <libplatform/time.h>
 #include <process.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -57,7 +58,7 @@ static void initialize_symbol_handler(void) {
         }
       }
       g_thread_symbols_initialized = TRUE;
-      log_dev("Symbol handler initialized at startup");
+
     }
   }
 }
@@ -394,7 +395,7 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
   thread_wrapper_t *wrapper = (thread_wrapper_t *)param;
 
   if (!wrapper) {
-    log_error("THREAD_WRAPPER: NULL wrapper");
+
     return 1;
   }
 
@@ -405,13 +406,13 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
   __try {
     // Test if wrapper is readable by accessing a field
     if (!wrapper->posix_func) {
-      log_error("THREAD_WRAPPER: NULL function pointer!");
-      SAFE_FREE(wrapper);
+
+      free(wrapper);
       return 1;
     }
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     // Wrapper is invalid or corrupted - exit immediately
-    log_error("THREAD_WRAPPER: Invalid or corrupted wrapper structure");
+
     return 1;
   }
 
@@ -558,7 +559,7 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
 #undef free
     free(wrapper);
 #else
-    SAFE_FREE(wrapper);
+    free(wrapper);
 #endif
     // Reset the recursive exception flag
     g_in_exception_handler = 0;
@@ -570,12 +571,10 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
 #undef free
   free(wrapper);
 #else
-  SAFE_FREE(wrapper);
+  free(wrapper);
 #endif
 
   // Clean up thread-local error context to prevent leaks
-  errno_destroy();
-
   return (DWORD)(uintptr_t)result;
 }
 
@@ -587,13 +586,13 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
  * @param arg Argument to pass to thread function
  * @return 0 on success, -1 on failure
  */
-int acthread_create(asciichat_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
+int platform_thread_create(platform_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
   // Initialize symbol handler on first thread creation
   initialize_symbol_handler();
 
 #ifdef DEBUG_THREADS
-  log_debug("thread=%p, func=%p, arg=%p", thread, func, arg);
-  log_debug("About to malloc wrapper (size=%zu)", sizeof(thread_wrapper_t));
+
+
 #endif
 
   // Use raw malloc for the thread wrapper, not debug_malloc.
@@ -609,41 +608,40 @@ int acthread_create(asciichat_thread_t *thread, const char *name, void *(*func)(
 #undef malloc
   thread_wrapper_t *wrapper = malloc(sizeof(thread_wrapper_t));
 #else
-  thread_wrapper_t *wrapper = SAFE_MALLOC(sizeof(thread_wrapper_t), thread_wrapper_t *);
+  thread_wrapper_t *wrapper = malloc(sizeof(thread_wrapper_t));
 #endif
 
 #ifdef DEBUG_THREADS
-  log_debug("malloc returned wrapper=%p", wrapper);
+
 #endif
 
   if (!wrapper) {
-    log_error("malloc failed for thread wrapper");
+
     return -1;
   }
 
   wrapper->posix_func = func;
   wrapper->arg = arg;
-  SAFE_STRNCPY(wrapper->name, name ? name : "worker", sizeof(wrapper->name));
+  platform_strcpy(wrapper->name, sizeof(wrapper->name), name ? name : "worker");
 
   DWORD thread_id;
 
 #ifdef DEBUG_THREADS
-  log_debug("CREATE_THREAD: Before CreateThread: wrapper=%p, func=%p, arg=%p", wrapper, wrapper->posix_func,
-            wrapper->arg);
+
 #endif
   (*thread) = CreateThread(NULL, 0, windows_thread_wrapper, wrapper, 0, &thread_id);
 #ifdef DEBUG_THREADS
-  log_debug("CREATE_THREAD: After CreateThread: handle=%p, thread_id=%lu", *thread, thread_id);
+
 #endif
 
   if (*thread == NULL) {
-    SET_ERRNO_SYS(ERROR_THREAD, "CreateThread failed");
+
     // Use raw free - matches raw SAFE_MALLOC(see allocation comment for rationale, void *)
 #ifdef DEBUG_MEMORY
 #undef free
     free(wrapper);
 #else
-    SAFE_FREE(wrapper);
+    free(wrapper);
 #endif
     return -1;
   }
@@ -660,9 +658,9 @@ int acthread_create(asciichat_thread_t *thread, const char *name, void *(*func)(
  * @param retval Pointer to store thread return value (can be NULL)
  * @return 0 on success, -1 on failure
  */
-int thread_join(asciichat_thread_t *thread, void **retval) {
+int thread_join(platform_thread_t *thread, void **retval) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
-    SET_ERRNO(ERROR_THREAD, "Invalid thread handle for join operation");
+
     return -1;
   }
 
@@ -690,7 +688,7 @@ int thread_join(asciichat_thread_t *thread, void **retval) {
 
   CloseHandle((*thread));
   *thread = NULL;
-  SET_ERRNO(ERROR_THREAD, "WaitForSingleObject failed with result %lu", result);
+
   return -1;
 }
 
@@ -701,12 +699,12 @@ int thread_join(asciichat_thread_t *thread, void **retval) {
  * @param timeout_ns Timeout in nanoseconds
  * @return 0 on success, -2 on timeout, -1 on error
  */
-int thread_join_timeout(asciichat_thread_t *thread, void **retval, uint64_t timeout_ns) {
+int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeout_ns) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
     return -1;
   }
 
-  DWORD timeout_ms = (DWORD)time_ns_to_ms(timeout_ns);
+  DWORD timeout_ms = (DWORD)((timeout_ns + 999999ULL) / 1000000ULL);
   DWORD result = WaitForSingleObject((*thread), timeout_ms);
 
   if (result == WAIT_OBJECT_0) {
@@ -736,7 +734,7 @@ int thread_join_timeout(asciichat_thread_t *thread, void **retval, uint64_t time
   NAMED_UNREGISTER_THREAD(*thread);
   CloseHandle((*thread));
   *thread = NULL;
-  SET_ERRNO(ERROR_THREAD, "WaitForSingleObject failed with result %lu", result);
+
   return -1;
 }
 
@@ -749,8 +747,6 @@ int thread_join_timeout(asciichat_thread_t *thread, void **retval, uint64_t time
  */
 void thread_exit(void *retval) {
   // Clean up thread-local error context to prevent leaks
-  errno_destroy();
-
   ExitThread((DWORD)(uintptr_t)retval);
 }
 
@@ -759,9 +755,9 @@ void thread_exit(void *retval) {
  * @param thread Pointer to thread to detach
  * @return 0 on success, -1 on failure
  */
-int thread_detach(asciichat_thread_t *thread) {
+int thread_detach(platform_thread_t *thread) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
-    SET_ERRNO(ERROR_THREAD, "Invalid thread handle for detach operation");
+
     return -1;
   }
   CloseHandle((*thread));
@@ -797,14 +793,14 @@ uint64_t thread_current_id(void) {
   return (uint64_t)GetCurrentThreadId();
 }
 
-bool thread_is_initialized(asciichat_thread_t *thread) {
+bool thread_is_initialized(platform_thread_t *thread) {
   if (!thread)
     return false;
   // On Windows, check if thread handle is valid (not NULL and not INVALID_HANDLE_VALUE)
   return (*thread != NULL && *thread != INVALID_HANDLE_VALUE);
 }
 
-void thread_init(asciichat_thread_t *thread) {
+void thread_init(platform_thread_t *thread) {
   if (thread) {
     *thread = NULL; // On Windows, NULL is the uninitialized state
   }
@@ -880,16 +876,16 @@ int ascii_tls_set(tls_key_t key, void *value) {
  * Uses SetThreadPriority with THREAD_PRIORITY_TIME_CRITICAL priority class.
  * Does not require elevated privileges on Windows.
  */
-asciichat_error_t thread_set_realtime_priority(void) {
+int thread_set_realtime_priority(void) {
   HANDLE current_thread = GetCurrentThread();
   if (!SetThreadPriority(current_thread, THREAD_PRIORITY_TIME_CRITICAL)) {
-    return SET_ERRNO_SYS(ERROR_THREAD, "Failed to set audio thread priority on Windows");
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-uintptr_t thread_to_key(asciichat_thread_t thread) {
-  return (uintptr_t)GetThreadId(thread);
+uintptr_t thread_to_key(uintptr_t thread) {
+  return (uintptr_t)GetThreadId((HANDLE)thread);
 }
 
 #endif // _WIN32

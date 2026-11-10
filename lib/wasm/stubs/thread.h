@@ -13,15 +13,15 @@
 #include <stdint.h>
 
 /* WASM doesn't have real threads, so we use void* placeholders */
-typedef void *asciichat_thread_t;
+typedef void *platform_thread_t;
 typedef void *thread_id_t;
 typedef void *tls_key_t;
 
 /* Stub functions that do nothing in WASM */
-#define acthread_create(thread_ptr, attr, start_routine, arg) ASCIICHAT_OK
+#define platform_thread_create(thread_ptr, attr, start_routine, arg) 0
 #define thread_join(thread, timeout_ms) ASCIICHAT_OK
 #define thread_detach(thread) ASCIICHAT_OK
-#define thread_self() ((asciichat_thread_t)NULL)
+#define thread_self() ((platform_thread_t)NULL)
 #define thread_equal(t1, t2) (t1 == t2)
 #define thread_exit(status) ((void)0)
 #define thread_initialized(thread) false
