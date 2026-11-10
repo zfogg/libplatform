@@ -4,13 +4,12 @@
  * @brief Lock-free module lifecycle state machine implementation
  *
  * Implements concurrent init/shutdown synchronization using atomic compare-and-swap.
- * See include/ascii-chat/util/lifecycle.h for API documentation and usage patterns.
+ * See include/libplatform/lifecycle.h for API documentation and usage patterns.
  */
 
 #include <libplatform/lifecycle.h>
-#include <stddef.h>
-#include <stdint.h>
-
+#include <libplatform/mutex.h>
+#include <libplatform/cond.h>
 #define lifecycle_log_dev(...) ((void)0)
 #define log_dev(...) ((void)0)
 
@@ -19,11 +18,15 @@ bool lifecycle_init(lifecycle_t *lc, const char *name) {
     lifecycle_log_dev("NULL lifecycle pointer");
     return false;
   }
-  uint_fast64_t expected = LIFECYCLE_UNINITIALIZED;
+  uint64_t expected = LIFECYCLE_UNINITIALIZED;
   if (!atomic_compare_exchange_strong(&lc->state, &expected, LIFECYCLE_INITIALIZED)) {
     lifecycle_log_dev("%s already initialized (current state: %llu)", name ? name : "<unnamed>", expected);
     return false; // Already initialized or in INITIALIZING/DEAD state
   }
+
+  if (lc->sync_type == LIFECYCLE_SYNC_MUTEX && lc->sync.mutex) mutex_init(lc->sync.mutex, name);
+  else if (lc->sync_type == LIFECYCLE_SYNC_RWLOCK && lc->sync.rwlock) rwlock_init(lc->sync.rwlock, name);
+  else if (lc->sync_type == LIFECYCLE_SYNC_COND && lc->sync.cond) cond_init(lc->sync.cond, name);
 
   return true;
 }
@@ -34,7 +37,7 @@ bool lifecycle_init_once(lifecycle_t *lc) {
     return false;
   }
 
-  uint_fast64_t expected = LIFECYCLE_UNINITIALIZED;
+  uint64_t expected = LIFECYCLE_UNINITIALIZED;
   if (!atomic_compare_exchange_strong(&lc->state, &expected, LIFECYCLE_INITIALIZING)) {
     // If already initialized, just return false (no work needed)
     if (expected == LIFECYCLE_INITIALIZED) {
@@ -89,11 +92,15 @@ bool lifecycle_shutdown(lifecycle_t *lc) {
     lifecycle_log_dev("NULL lifecycle pointer");
     return false;
   }
-  uint_fast64_t expected = LIFECYCLE_INITIALIZED;
+  uint64_t expected = LIFECYCLE_INITIALIZED;
   if (!atomic_compare_exchange_strong(&lc->state, &expected, LIFECYCLE_UNINITIALIZED)) {
     lifecycle_log_dev("not in INITIALIZED state (current: %d)", expected);
     return false; // Not initialized or in unexpected state
   }
+
+  if (lc->sync_type == LIFECYCLE_SYNC_MUTEX && lc->sync.mutex) mutex_destroy(lc->sync.mutex);
+  else if (lc->sync_type == LIFECYCLE_SYNC_RWLOCK && lc->sync.rwlock) rwlock_destroy(lc->sync.rwlock);
+  else if (lc->sync_type == LIFECYCLE_SYNC_COND && lc->sync.cond) cond_destroy(lc->sync.cond);
 
   return true;
 }
@@ -104,7 +111,7 @@ bool lifecycle_shutdown_forever(lifecycle_t *lc) {
     return false;
   }
 
-  uint_fast64_t current;
+  uint64_t current;
   do {
     current = atomic_load(&lc->state);
     if (current == LIFECYCLE_DEAD) {
@@ -138,7 +145,7 @@ bool lifecycle_reset(lifecycle_t *lc) {
     return false;
   }
 
-  uint_fast64_t expected = LIFECYCLE_INITIALIZED;
+  uint64_t expected = LIFECYCLE_INITIALIZED;
   if (!atomic_compare_exchange_strong(&lc->state, &expected, LIFECYCLE_UNINITIALIZED)) {
     log_dev("not in INITIALIZED state (current: %d)", expected);
     return false; // Not in INITIALIZED state
@@ -153,7 +160,7 @@ bool lifecycle_destroy_once(lifecycle_t *lc) {
     return false;
   }
 
-  uint_fast64_t expected = LIFECYCLE_INITIALIZED;
+  uint64_t expected = LIFECYCLE_INITIALIZED;
   if (!atomic_compare_exchange_strong(&lc->state, &expected, LIFECYCLE_DESTROYING)) {
     // If not initialized, nothing to destroy
     if (expected == LIFECYCLE_UNINITIALIZED) {

@@ -1,7 +1,12 @@
 #pragma once
 
-#include <stdbool.h>
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <libplatform/rwlock.h>
+
+typedef struct mutex_t mutex_t;
+typedef struct cond_t cond_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,17 +48,38 @@ typedef enum {
   LIFECYCLE_DESTROYING = 4,    ///< destroy_once winner in progress; losers skip
 } lifecycle_state_t;
 
+typedef enum {
+  LIFECYCLE_SYNC_NONE = 0,   ///< No sync primitive
+  LIFECYCLE_SYNC_MUTEX = 1,  ///< Contains mutex_t pointer
+  LIFECYCLE_SYNC_RWLOCK = 2, ///< Contains rwlock_t pointer
+  LIFECYCLE_SYNC_COND = 3,   ///< Contains cond_t pointer
+} lifecycle_sync_type_t;
+
 /**
  * @brief When code needs to work with lifecycle, it keeps `[union].sync`, `state`, `sync_type`, `sync` here instead of scattering it across globals. Initialization establishes the handles and sizes; teardown must release any allocation, lock, thread, or callback context recorded in those fields.
  * Lock-free module lifecycle state machine with optional sync primitive.
  * Combines init/shutdown state with mutex or rwlock initialization.
  */
 typedef struct {
-  atomic_uint_fast64_t state;
+  atomic_uint_fast64_t state;      ///< lifecycle_state_t enum value
+  lifecycle_sync_type_t sync_type; ///< Type of sync primitive (if any)
+  union {
+    mutex_t *mutex;   ///< Pointer to mutex (if sync_type == LIFECYCLE_SYNC_MUTEX)
+    rwlock_t *rwlock; ///< Pointer to rwlock (if sync_type == LIFECYCLE_SYNC_RWLOCK)
+    cond_t *cond;     ///< Pointer to condition variable (if sync_type == LIFECYCLE_SYNC_COND)
+  } sync;
 } lifecycle_t;
 
 /// Static initializer for module-global lifecycle variables (no sync primitive)
-#define LIFECYCLE_INIT {0}
+#define LIFECYCLE_INIT { .state = LIFECYCLE_UNINITIALIZED, .sync_type = LIFECYCLE_SYNC_NONE, .sync = {0} }
+
+/// Static initializer for lifecycle with mutex
+#define LIFECYCLE_INIT_MUTEX(m)                                                                                        \
+  { .state = LIFECYCLE_UNINITIALIZED, .sync_type = LIFECYCLE_SYNC_MUTEX, .sync = {.mutex = (m)} }
+
+/// Static initializer for lifecycle with rwlock
+#define LIFECYCLE_INIT_RWLOCK(r)                                                                                       \
+  { .state = LIFECYCLE_UNINITIALIZED, .sync_type = LIFECYCLE_SYNC_RWLOCK, .sync = {.rwlock = (r)} }
 
 /**
  * CAS-based initialization: UNINIT → INITIALIZED.
