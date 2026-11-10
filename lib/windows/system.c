@@ -1,5 +1,57 @@
 #ifdef _WIN32
 
+#include <stdint.h>
+#include <windows.h>
+#include <errno.h>
+#include <io.h>
+#include <direct.h>
+#include <libplatform/filesystem.h>
+#include <libplatform/system.h>
+
+int platform_get_last_error(void) { return (int)GetLastError(); }
+
+bool platform_get_temp_dir(char *temp_dir, size_t path_size) {
+  if (!temp_dir || path_size == 0) return false;
+  DWORD length = GetTempPathA((DWORD)path_size, temp_dir);
+  return length != 0 && length < path_size;
+}
+
+bool platform_get_cwd(char *cwd, size_t path_size) {
+  if (!cwd || path_size == 0) return false;
+  return GetCurrentDirectoryA((DWORD)path_size, cwd) != 0;
+}
+
+int platform_access(const char *path, int mode) {
+  int windows_mode = 0;
+  if (mode & PLATFORM_ACCESS_READ) windows_mode |= 4;
+  if (mode & PLATFORM_ACCESS_WRITE) windows_mode |= 2;
+  if (mode & PLATFORM_ACCESS_EXECUTE) windows_mode |= 1;
+  return _access(path, windows_mode);
+}
+
+void platform_sleep_us(unsigned int us) {
+  DWORD timeout_ms = (DWORD)((us + 999U) / 1000U);
+  if (timeout_ms < 1)
+    timeout_ms = 1;
+  Sleep(timeout_ms);
+}
+
+void platform_sleep_ns(uint64_t ns) {
+  if (ns == 0)
+    return;
+  HANDLE timer = CreateWaitableTimerW(NULL, TRUE, NULL);
+  if (!timer) {
+    platform_sleep_us((unsigned int)((ns + 999U) / 1000U));
+    return;
+  }
+  uint64_t units = (ns + 99U) / 100U;
+  LARGE_INTEGER due_time;
+  due_time.QuadPart = -(units > (uint64_t)INT64_MAX ? INT64_MAX : (int64_t)units);
+  if (SetWaitableTimer(timer, &due_time, 0, NULL, NULL, FALSE))
+    WaitForSingleObject(timer, INFINITE);
+  CloseHandle(timer);
+}
+
 #include <libplatform/system.h>
 #include <windows.h>
 #include <psapi.h>
