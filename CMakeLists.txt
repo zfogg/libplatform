@@ -12,20 +12,24 @@ else()
   add_library(libplatform STATIC $<TARGET_OBJECTS:libplatform-objects>)
 endif()
 add_library(libplatform::libplatform ALIAS libplatform)
+if(PROJECT_IS_TOP_LEVEL)
+  target_compile_definitions(libplatform-objects PRIVATE LIBPLATFORM_STANDALONE=1)
+endif()
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c lib/lifecycle.c lib/mutex.c lib/cond.c lib/system_common.c lib/terminal.c lib/util/path.c lib/util/string.c
 )
+target_sources(libplatform-objects PRIVATE lib/thread.c lib/time.c)
 if(WIN32)
     target_sources(libplatform-objects PRIVATE
       lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c
-      lib/windows/process.c lib/windows/rwlock.c lib/windows/system.c
+      lib/windows/process.c lib/windows/rwlock.c lib/windows/mutex.c lib/windows/cond.c lib/windows/system.c
     )
 elseif(EMSCRIPTEN)
     target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/terminal.c)
 else()
     target_sources(libplatform-objects PRIVATE
       lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_sync.c lib/posix/terminal_capabilities.c
-      lib/posix/process.c lib/posix/rwlock.c
+      lib/posix/process.c lib/posix/rwlock.c lib/posix/mutex.c lib/posix/cond.c
     )
 endif()
 

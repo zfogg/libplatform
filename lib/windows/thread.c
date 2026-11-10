@@ -14,9 +14,9 @@
 #include <windows.h>
 #include <ascii-chat/common.h>
 #include <ascii-chat/asciichat_errno.h> // For asciichat_errno system
-#include <libplatform/thread.h>
+#include <ascii-chat/platform/thread.h>
 #include <ascii-chat/debug/named.h>
-#include <libplatform/util/path.h>
+#include <ascii-chat/util/path.h>
 #include <ascii-chat/util/time.h>
 #include <process.h>
 #include <stdint.h>

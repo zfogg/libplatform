@@ -6,11 +6,11 @@
 
 #ifndef _WIN32
 
-#include <libplatform/api.h>
+#include <ascii-chat/platform/api.h>
 #include <ascii-chat/asciichat_errno.h>
 #include <ascii-chat/util/time.h>
-#include <libplatform/util/path.h>
-#include <libplatform/util/string.h>
+#include <ascii-chat/util/path.h>
+#include <ascii-chat/util/string.h>
 #include <ascii-chat/debug/named.h>
 #include <ascii-chat/debug/mutex.h>
 #include <pthread.h>

@@ -4,9 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <libplatform/rwlock.h>
-
-typedef struct mutex_t mutex_t;
-typedef struct cond_t cond_t;
+#include <libplatform/mutex.h>
+#include <libplatform/cond.h>
 
 #ifdef __cplusplus
 extern "C" {

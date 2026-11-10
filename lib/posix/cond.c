@@ -1,4 +1,13 @@
+#include <libplatform/cond.h>
+#ifdef LIBPLATFORM_STANDALONE
+#define NAMED_REGISTER_COND(m, n, x) (n)
+#define NAMED_UNREGISTER(m) ((void)0)
+#define mutex_stack_pop(...) ((void)0)
+#define mutex_stack_push_locked(...) ((void)0)
+#else
+#include <ascii-chat/debug/named.h>
 #include <ascii-chat/debug/mutex.h>
+#endif
 /**
  * @file platform/posix/cond.c
  * @ingroup platform
@@ -7,9 +16,9 @@
 
 #ifndef _WIN32
 
-#include <libplatform/api.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/debug/named.h>
+#include <libplatform/cond.h>
+#include <time.h>
+#include <stddef.h>
 #include <pthread.h>
 #include <time.h>
 #include <ascii-chat/atomic.h> // For atomic_fetch_sub

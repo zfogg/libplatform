@@ -6,11 +6,22 @@
 
 #ifdef _WIN32
 
-#include <libplatform/api.h>
-#include <libplatform/windows_compat.h>
+#include <libplatform/mutex.h>
+#ifdef LIBPLATFORM_STANDALONE
+#define NAMED_REGISTER_MUTEX(m, n, x) (n)
+#define NAMED_UNREGISTER(m) ((void)0)
+#define mutex_stack_push_pending(...) ((void)0)
+#define mutex_stack_mark_locked(...) ((void)0)
+#define mutex_stack_push_locked(...) ((void)0)
+#define mutex_stack_pop(...) ((void)0)
+#else
 #include <ascii-chat/debug/named.h>
 #include <ascii-chat/debug/mutex.h>
-#include <ascii-chat/asciichat_errno.h>
+#endif
+#include <windows.h>
+#include <stddef.h>
+#include <stddef.h>
+#include <errno.h>
 
 /**
  * @brief Initialize a mutex with a name

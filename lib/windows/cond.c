@@ -6,13 +6,25 @@
 
 #ifdef _WIN32
 
-#include <libplatform/api.h>
-#include <libplatform/windows_compat.h>
-#include <ascii-chat/util/time.h>
+#include <libplatform/cond.h>
+#ifdef LIBPLATFORM_STANDALONE
+#define NAMED_REGISTER_COND(m, n, x) (n)
+#define NAMED_UNREGISTER(m) ((void)0)
+#define mutex_stack_pop(...) ((void)0)
+#define mutex_stack_push_locked(...) ((void)0)
+#else
 #include <ascii-chat/debug/named.h>
 #include <ascii-chat/debug/mutex.h>
+#endif
+#include <windows.h>
+#include <time.h>
+#include <stddef.h>
+#include <stddef.h>
 #include <errno.h>             // For ETIMEDOUT
-#include <ascii-chat/atomic.h> // For atomic_fetch_sub
+
+#ifdef LIBPLATFORM_STANDALONE
+static uint64_t time_ns_to_ms(uint64_t ns) { return (ns + 999999ULL) / 1000000ULL; }
+#endif
 
 /**
  * @brief Initialize a condition variable with a name
@@ -26,14 +38,7 @@ int cond_init(cond_t *cond, const char *name) {
   cond->last_signal_time_ns = 0;
   cond->last_broadcast_time_ns = 0;
   cond->last_wait_time_ns = 0;
-  cond->waiting_count = (atomic_t){.impl = 0,
-                                   .last_store_time_ns = 0,
-                                   .last_load_time_ns = 0,
-                                   .store_count = 0,
-                                   .load_count = 0,
-                                   .cas_count = 0,
-                                   .cas_success_count = 0,
-                                   .fetch_count = 0};
+  atomic_init(&cond->waiting_count, 0);
   cond->last_waiting_key = 0;
   cond->last_wait_mutex = NULL;
   cond->last_wait_file = NULL;
