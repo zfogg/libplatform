@@ -12,7 +12,7 @@
 #define DEBUG_NAMED_FINAL_BASE_NAME_BUFFER_SIZE 256
 
 #include <libplatform/named.h>
-#include "libplatform/named.h"
+
 #include <libplatform/rwlock.h>
 #include <libplatform/uthash.h>
 #include <libplatform/lifecycle.h>
@@ -34,7 +34,7 @@
 extern int platform_vasprintf(char **strp, const char *format, va_list ap);
 
 // Hash table growth runs under entries_lock. Memory tracking looks up names
-// under the same lock, so registry metadata must use untracked allocations.
+// under the same lock, so registry metaadata must use untracked allocations.
 #undef uthash_malloc
 #undef uthash_free
 #define uthash_malloc(sz) malloc(sz)

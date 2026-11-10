@@ -131,6 +131,12 @@ void platform_force_exit(int exit_code);
  */
 void platform_sleep_ms(unsigned int ms);
 
+/** Sleep for a specified number of microseconds. */
+void platform_sleep_us(unsigned int us);
+
+/** Sleep for a specified number of nanoseconds. */
+void platform_sleep_ns(uint64_t ns);
+
 /**
  * @brief Get monotonic time in microseconds
  * @return Current monotonic time in microseconds

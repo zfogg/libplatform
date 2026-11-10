@@ -25,7 +25,7 @@
 #include <ascii-chat/debug/named.h>
 
 // Socket implementation (mostly pass-through for POSIX)
-asciichat_error_t socket_init(void) {
+int socket_init(void) {
   // POSIX doesn't need socket initialization
   return ASCIICHAT_OK;
 }

@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include <ascii-chat/common.h>
+
 #include <libplatform/pipe.h>
 
 pipe_t platform_pipe_connect(const char *path) {
@@ -24,9 +24,6 @@ pipe_t platform_pipe_connect(const char *path) {
   HANDLE pipe = CreateFileA(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
 
   if (pipe != INVALID_HANDLE_VALUE) {
-    log_debug("Connected to agent via Windows named pipe: %s", path);
-  } else {
-    log_debug("Failed to connect to named pipe %s: error %lu", path, GetLastError());
   }
 
   return pipe;
@@ -40,12 +37,11 @@ int platform_pipe_close(pipe_t pipe) {
   if (CloseHandle(pipe)) {
     return 0;
   } else {
-    log_debug("Failed to close pipe: error %lu", GetLastError());
     return -1;
   }
 }
 
-ssize_t platform_pipe_read(pipe_t pipe, void *buf, size_t len) {
+libplatform_ssize_t platform_pipe_read(pipe_t pipe, void *buf, size_t len) {
   if (pipe == INVALID_PIPE_VALUE || !buf || len == 0) {
     return -1;
   }
@@ -59,15 +55,14 @@ ssize_t platform_pipe_read(pipe_t pipe, void *buf, size_t len) {
   if (!ReadFile(pipe, buf, (DWORD)len, &bytes_read, NULL)) {
     DWORD error = GetLastError();
     if (error != ERROR_MORE_DATA && error != ERROR_BROKEN_PIPE) {
-      log_debug("Failed to read from pipe: error %lu", error);
     }
     return -1;
   }
 
-  return (ssize_t)bytes_read;
+  return (libplatform_ssize_t)bytes_read;
 }
 
-ssize_t platform_pipe_write(pipe_t pipe, const void *buf, size_t len) {
+libplatform_ssize_t platform_pipe_write(pipe_t pipe, const void *buf, size_t len) {
   if (pipe == INVALID_PIPE_VALUE || !buf || len == 0) {
     return -1;
   }
@@ -79,11 +74,10 @@ ssize_t platform_pipe_write(pipe_t pipe, const void *buf, size_t len) {
 
   DWORD bytes_written = 0;
   if (!WriteFile(pipe, buf, (DWORD)len, &bytes_written, NULL)) {
-    log_debug("Failed to write to pipe: error %lu", GetLastError());
     return -1;
   }
 
-  return (ssize_t)bytes_written;
+  return (libplatform_ssize_t)bytes_written;
 }
 
 bool platform_pipe_is_valid(pipe_t pipe) {

@@ -8,14 +8,13 @@
 
 #include <libplatform/filesystem.h>
 #include <libplatform/mutex.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/asciichat_errno.h>
+#include <libplatform/lifecycle.h>
+#include <libplatform/uthash.h>
 #include <libplatform/util/string.h>
-#include <ascii-chat/util/lifecycle.h>
-#include <ascii-chat/log/log.h>
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 void platform_directory_list_destroy(platform_directory_list_t *list) {
   if (!list) {
@@ -23,9 +22,9 @@ void platform_directory_list_destroy(platform_directory_list_t *list) {
   }
 
   for (size_t i = 0; i < list->count; i++) {
-    SAFE_FREE(list->candidates[i].path);
+    free(list->candidates[i].path);
   }
-  SAFE_FREE(list->candidates);
+  free(list->candidates);
   list->count = 0;
 }
 
@@ -109,7 +108,6 @@ static void init_cache_once(void) {
   g_bin_path_cache = NULL;
 
   if (rwlock_init(&g_cache_rwlock, "binary_cache") != 0) {
-    log_error("Failed to initialize binary PATH cache rwlock");
     lifecycle_init_abort(&g_cache_lc);
   }
 }
@@ -120,9 +118,9 @@ static void init_cache_once(void) {
 static void free_cache_entry(bin_cache_entry_t *entry) {
   if (entry) {
     if (entry->bin_name) {
-      SAFE_FREE(entry->bin_name);
+      free(entry->bin_name);
     }
-    SAFE_FREE(entry);
+    free(entry);
   }
 }
 
@@ -153,7 +151,6 @@ bool platform_is_binary_in_path(const char *bin_name) {
 
   init_cache_once();
   if (!lifecycle_is_initialized(&g_cache_lc)) {
-    SET_ERRNO(ERROR_INVALID_STATE, "Binary PATH cache not initialized, checking directly (this should never happen)");
     return check_binary_in_path_uncached(bin_name);
   }
 
@@ -163,23 +160,19 @@ bool platform_is_binary_in_path(const char *bin_name) {
   rwlock_rdunlock(&g_cache_rwlock);
 
   if (entry) {
-    log_dev("Binary '%s' %s in PATH (%s)", bin_name, colored_string(LOG_COLOR_INFO, "found"),
-            colored_string(LOG_COLOR_WARN, "cached"));
     return entry->in_path;
   }
 
   bool found = check_binary_in_path_uncached(bin_name);
 
-  entry = SAFE_MALLOC(sizeof(bin_cache_entry_t), bin_cache_entry_t *);
+  entry = malloc(sizeof(bin_cache_entry_t));
   if (!entry) {
-    SET_ERRNO(ERROR_MEMORY, "Failed to allocate cache entry");
     return found;
   }
 
   entry->bin_name = platform_strdup(bin_name);
   if (!entry->bin_name) {
-    SET_ERRNO(ERROR_MEMORY, "Failed to duplicate binary name");
-    SAFE_FREE(entry);
+    free(entry);
     return found;
   }
 
@@ -188,10 +181,6 @@ bool platform_is_binary_in_path(const char *bin_name) {
   rwlock_wrlock(&g_cache_rwlock);
   HASH_ADD_KEYPTR(hh, g_bin_path_cache, entry->bin_name, strlen(entry->bin_name), entry);
   rwlock_wrunlock(&g_cache_rwlock);
-
-  char *found_notfound_str =
-      found ? colored_string(LOG_COLOR_INFO, "found") : colored_string(LOG_COLOR_ERROR, "NOT found");
-  log_dev("Binary '%s' %s in PATH", bin_name, found_notfound_str);
 
   return found;
 }

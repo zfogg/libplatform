@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h> /* fixed-width socket timeout types */
+
 /**
  * @file platform/socket.h
  * @brief Cross-platform socket interface for ascii-chat

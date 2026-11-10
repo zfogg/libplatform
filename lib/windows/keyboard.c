@@ -4,13 +4,9 @@
  * @ingroup platform
  */
 
-#include <ascii-chat/common/buffer_sizes.h>
 #include <libplatform/keyboard.h>
 #include <libplatform/system.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/common.h>
 #include <libplatform/lifecycle.h>
-#include <ascii-chat/util/lifecycle.h>
 
 #include <windows.h>
 #include <string.h>
@@ -44,15 +40,15 @@ static lifecycle_t g_keyboard_lc = LIFECYCLE_INIT;
  * Keyboard Functions
  * ============================================================================ */
 
-asciichat_error_t keyboard_init(void) {
+int keyboard_init(void) {
   // If already initialized, return success
   if (lifecycle_is_initialized(&g_keyboard_lc)) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // CAS to claim initialization
   if (!lifecycle_init(&g_keyboard_lc, "keyboard")) {
-    return ASCIICHAT_OK; // Already initialized
+    return 0; // Already initialized
   }
 
   // We won the init race - do the actual work
@@ -61,13 +57,13 @@ asciichat_error_t keyboard_init(void) {
   g_console_input = GetStdHandle(STD_INPUT_HANDLE);
   if (g_console_input == INVALID_HANDLE_VALUE) {
     lifecycle_init_abort(&g_keyboard_lc);
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "Failed to get console input handle");
+    return -1;
   }
 
   // Get current console mode
   if (!GetConsoleMode(g_console_input, &g_original_console_mode)) {
     lifecycle_init_abort(&g_keyboard_lc);
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "Failed to get console mode");
+    return -1;
   }
 
   // Disable line input buffering mode
@@ -81,14 +77,13 @@ asciichat_error_t keyboard_init(void) {
 
   if (!SetConsoleMode(g_console_input, new_mode)) {
     lifecycle_init_abort(&g_keyboard_lc);
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "Failed to set console mode");
+    return -1;
   }
 
   keyboard_stream_reset();
   reset_console_input();
-  log_debug("Windows keyboard initialized: console=%p", g_console_input);
   platform_write_all(STDERR_FILENO, "\033[?2004h", 8);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 void keyboard_destroy(void) {
@@ -102,7 +97,6 @@ void keyboard_destroy(void) {
   // Restore console mode
   if (g_console_input != NULL && g_console_input != INVALID_HANDLE_VALUE) {
     if (!SetConsoleMode(g_console_input, g_original_console_mode)) {
-      log_error("Failed to restore console mode");
     }
   }
 }

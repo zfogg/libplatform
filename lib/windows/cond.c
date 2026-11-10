@@ -13,8 +13,7 @@
 #define mutex_stack_pop(...) ((void)0)
 #define mutex_stack_push_locked(...) ((void)0)
 #else
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/debug/mutex.h>
+#include <libplatform/named.h>
 #endif
 #include <windows.h>
 #include <time.h>
@@ -22,9 +21,7 @@
 #include <stddef.h>
 #include <errno.h>             // For ETIMEDOUT
 
-#ifdef LIBPLATFORM_STANDALONE
 static uint64_t time_ns_to_ms(uint64_t ns) { return (ns + 999999ULL) / 1000000ULL; }
-#endif
 
 /**
  * @brief Initialize a condition variable with a name

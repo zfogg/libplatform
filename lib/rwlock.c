@@ -19,9 +19,9 @@
 
 #include <libplatform/rwlock.h>
 #include <libplatform/thread.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/atomic.h>
-#include <ascii-chat/log/log.h>
+#include <libplatform/time.h>
+#include <stdatomic.h>
+
 #include <stdio.h>
 
 #ifndef NDEBUG
@@ -39,7 +39,7 @@ void rwlock_on_rdlock(rwlock_t *rwlock) {
   if (!rwlock)
     return;
   rwlock->last_rdlock_time_ns = time_get_ns();
-  atomic_fetch_add_u64(&rwlock->read_lock_count, 1);
+  atomic_fetch_add(&rwlock->read_lock_count, 1);
   rwlock->rdlock_count++;
 }
 
@@ -77,8 +77,8 @@ void rwlock_on_unlock(rwlock_t *rwlock) {
   uintptr_t current_key = (uintptr_t)thread_current_id();
   if (rwlock->write_held_by_key == current_key) {
     rwlock->write_held_by_key = 0;
-  } else if (atomic_load_u64(&rwlock->read_lock_count) > 0) {
-    atomic_fetch_sub_u64(&rwlock->read_lock_count, 1);
+  } else if (atomic_load(&rwlock->read_lock_count) > 0) {
+    atomic_fetch_sub(&rwlock->read_lock_count, 1);
   }
 }
 
@@ -109,23 +109,23 @@ int rwlock_format_state(const rwlock_t *rwlock, char *buffer, size_t size) {
 
   if (rwlock->last_rdlock_time_ns > 0 && rwlock->last_rdlock_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_RWLOCK_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - rwlock->last_rdlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - rwlock->last_rdlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(rdlock_str, sizeof(rdlock_str), "rdlock=%s", elapsed_str);
   }
 
   if (rwlock->last_wrlock_time_ns > 0 && rwlock->last_wrlock_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_RWLOCK_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - rwlock->last_wrlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - rwlock->last_wrlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(wrlock_str, sizeof(wrlock_str), "wrlock=%s", elapsed_str);
   }
 
   if (rwlock->last_unlock_time_ns > 0 && rwlock->last_unlock_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_RWLOCK_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - rwlock->last_unlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - rwlock->last_unlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(unlock_str, sizeof(unlock_str), "unlock=%s", elapsed_str);
   }
 
-  uint64_t read_count = atomic_load_u64(&rwlock->read_lock_count);
+  uint64_t read_count = atomic_load(&rwlock->read_lock_count);
   if (rwlock->write_held_by_key != 0) {
     snprintf(held_str, sizeof(held_str), "[WRITE_LOCKED_BY=thread.%lu]", (unsigned long)rwlock->write_held_by_key);
   } else if (read_count > 0) {
@@ -159,7 +159,7 @@ void rwlock_log_state(const rwlock_t *rwlock, const char *file, int line, const 
     return;
   char buf[PLATFORM_RWLOCK_BUF_BUFFER_SIZE];
   rwlock_format_state(rwlock, buf, sizeof(buf));
-  log_msg(LOG_DEBUG, file, line, func, "rwlock/state %p: %s", (const void *)rwlock, buf);
+
 }
 
 #endif // !NDEBUG

@@ -15,8 +15,7 @@
 #define mutex_stack_push_locked(...) ((void)0)
 #define mutex_stack_pop(...) ((void)0)
 #else
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/debug/mutex.h>
+#include <libplatform/named.h>
 #endif
 #include <windows.h>
 #include <stddef.h>

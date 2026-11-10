@@ -8,13 +8,14 @@
 #define PLATFORM_WINDOWS_FONT_VALUE_NAME_BUFFER_SIZE 512
 
 #include <libplatform/font.h>
-#include <ascii-chat/font.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/asciichat_errno.h>
-#include <ascii-chat/log/log.h>
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
+
+extern const unsigned char g_font_matrix_resurrected[];
+extern const size_t g_font_matrix_resurrected_size;
+extern const unsigned char g_font_default[];
+extern const size_t g_font_default_size;
 
 // Default monospace fonts to try, in order of preference
 static const char *g_default_fonts[] = {"consola.ttf", // Consolas
@@ -79,10 +80,10 @@ static bool resolve_registry_font(HKEY root, const char *requested_name, const c
   return found;
 }
 
-asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
+int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
                                         const uint8_t **out_font_data, size_t *out_font_data_size) {
   if (!out || out_size == 0 || !out_is_path || !out_font_data || !out_font_data_size) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters");
+    return -1;
   }
 
   *out_font_data = NULL;
@@ -95,20 +96,20 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
     *out_is_path = false;
     *out_font_data = g_font_matrix_resurrected;
     *out_font_data_size = g_font_matrix_resurrected_size;
-    return ASCIICHAT_OK;
+    return 0;
   }
   if (_stricmp(effective_spec, "default") == 0) {
     snprintf(out, out_size, "default");
     *out_is_path = false;
     *out_font_data = g_font_default;
     *out_font_data_size = g_font_default_size;
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   char fonts_dir[MAX_PATH];
   UINT len = GetWindowsDirectoryA(fonts_dir, sizeof(fonts_dir));
   if (len == 0 || len >= sizeof(fonts_dir) - 8) {
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "Failed to get Windows directory");
+    return -1;
   }
   snprintf(fonts_dir + len, sizeof(fonts_dir) - len, "\\Fonts\\");
 
@@ -117,9 +118,9 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
     if (is_absolute_path(effective_spec) || strchr(effective_spec, '/') || strchr(effective_spec, '\\') ||
         file_exists(effective_spec)) {
       if (strlen(effective_spec) >= out_size)
-        return SET_ERRNO(ERROR_INVALID_PARAM, "render-font: path exceeds output capacity");
+        return -1;
       snprintf(out, out_size, "%s", effective_spec);
-      return file_exists(out) ? ASCIICHAT_OK : SET_ERRNO(ERROR_NOT_FOUND, "render-font: not found: %s", out);
+      return file_exists(out) ? 0 : -1;
     }
 
     // Try spec as a font filename in Windows\Fonts
@@ -127,20 +128,19 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
     snprintf(candidate, sizeof(candidate), "%s%s", fonts_dir, effective_spec);
     if (file_exists(candidate)) {
       snprintf(out, out_size, "%s", candidate);
-      return ASCIICHAT_OK;
+      return 0;
     }
 
     // Try with .ttf extension
     snprintf(candidate, sizeof(candidate), "%s%s.ttf", fonts_dir, effective_spec);
     if (file_exists(candidate)) {
       snprintf(out, out_size, "%s", candidate);
-      return ASCIICHAT_OK;
+      return 0;
     }
 
     if (resolve_registry_font(HKEY_CURRENT_USER, effective_spec, fonts_dir, out, out_size) ||
         resolve_registry_font(HKEY_LOCAL_MACHINE, effective_spec, fonts_dir, out, out_size)) {
-      log_debug("'%s' resolved to %s", effective_spec, out);
-      return ASCIICHAT_OK;
+      return 0;
     }
   }
 
@@ -150,10 +150,10 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
     snprintf(candidate, sizeof(candidate), "%s%s", fonts_dir, g_default_fonts[i]);
     if (file_exists(candidate)) {
       snprintf(out, out_size, "%s", candidate);
-      return ASCIICHAT_OK;
+      return 0;
     }
   }
 
-  return SET_ERRNO(ERROR_NOT_SUPPORTED, "No suitable monospace font found in %s", fonts_dir);
+  return -1;
 }
 #endif

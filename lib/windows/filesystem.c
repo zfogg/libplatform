@@ -26,14 +26,6 @@
 #include <errno.h>
 #include <stdlib.h>
 
-void platform_directory_list_destroy(platform_directory_list_t *list) {
-  if (!list) return;
-  for (size_t i = 0; i < list->count; i++) free(list->candidates[i].path);
-  free(list->candidates);
-  list->candidates = NULL;
-  list->count = 0;
-}
-
 // ============================================================================
 // Basic File Checks
 // ============================================================================
@@ -886,10 +878,6 @@ bool check_binary_in_path_uncached(const char *bin_name) {
 
   free(path_copy);
   return found;
-}
-
-bool platform_is_binary_in_path(const char *bin_name) {
-  return bin_name && bin_name[0] != '\0' && check_binary_in_path_uncached(bin_name);
 }
 
 /**
