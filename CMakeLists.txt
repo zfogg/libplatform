@@ -13,7 +13,7 @@ else()
 endif()
 add_library(libplatform::libplatform ALIAS libplatform)
 target_sources(libplatform-objects PRIVATE
-  lib/symbols.c lib/lifecycle.c lib/terminal.c lib/util/path.c lib/util/string.c
+  lib/symbols.c lib/lifecycle.c lib/system_common.c lib/terminal.c lib/util/path.c lib/util/string.c
 )
 if(WIN32)
     target_sources(libplatform-objects PRIVATE

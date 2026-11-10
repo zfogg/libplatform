@@ -21,9 +21,25 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <stdarg.h>
 
 const char *platform_getenv(const char *name) {
   return name ? getenv(name) : NULL;
+}
+
+int platform_open(const char *name, const char *pathname, int flags, ...) {
+  (void)name;
+  if (!pathname)
+    return -1;
+  mode_t mode = 0;
+  if (flags & O_CREAT) {
+    va_list args;
+    va_start(args, flags);
+    mode = (mode_t)va_arg(args, int);
+    va_end(args);
+  }
+  return open(pathname, flags, mode);
 }
 
 // ============================================================================
