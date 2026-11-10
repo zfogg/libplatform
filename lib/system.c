@@ -7,16 +7,11 @@
 #ifndef PLATFORM_SYSTEM_C
 #define PLATFORM_SYSTEM_C
 
-#include <ascii-chat/atomic.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <errno.h>
-#include <ascii-chat/common.h>
-#include <libplatform/uthash.h>
-#include <ascii-chat/log/log.h>
-#include <ascii-chat/log/format.h>
+#include <libplatform/system.h>
 #include <libplatform/util/string.h>
-#include <ascii-chat/util/lifecycle.h>
 #include <libplatform/filesystem.h>
 #include <time.h>
 
@@ -42,16 +37,16 @@ int platform_fileno(FILE *stream) {
 #endif
 }
 
-asciichat_error_t platform_dup2(int source_fd, int target_fd) {
+int platform_dup2(int source_fd, int target_fd) {
 #ifdef _WIN32
   int result = _dup2(source_fd, target_fd);
 #else
   int result = dup2(source_fd, target_fd);
 #endif
   if (result < 0) {
-    return SET_ERRNO_SYS(ERROR_FILE_OPERATION, "Failed to redirect descriptor %d to %d", target_fd, source_fd);
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 // Forward declaration for filesystem functions
