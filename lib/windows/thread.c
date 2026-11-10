@@ -15,10 +15,11 @@
 #include <libplatform/thread.h>
 #include <libplatform/named.h>
 #include <libplatform/util/path.h>
-#include <libplatform/util/string.h>
+#include <libplatform/time.h>
 #include <process.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <dbghelp.h>
 #pragma comment(lib, "dbghelp.lib")
 
@@ -55,7 +56,6 @@ static void initialize_symbol_handler(void) {
         }
       }
       g_thread_symbols_initialized = TRUE;
-      log_dev("Symbol handler initialized at startup");
     }
   }
 }
@@ -85,7 +85,7 @@ static void build_exception_message(char *buffer, size_t buffer_size, DWORD exce
     break;
   }
 
-  safe_snprintf(buffer, buffer_size,
+  snprintf(buffer, buffer_size,
                 "====== EXCEPTION CAUGHT! ======\n"
                 "Exception Code: 0x%lX\n"
                 "Exception Type: %s\n"
@@ -96,7 +96,7 @@ static void build_exception_message(char *buffer, size_t buffer_size, DWORD exce
 // Helper function to build stack trace message
 static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT pContext, HANDLE hProcess) {
   if (!pContext) {
-    safe_snprintf(buffer, buffer_size, "Exception occurred at: <invalid context - null pointer>");
+    snprintf(buffer, buffer_size, "Exception occurred at: <invalid context - null pointer>");
     return;
   }
 
@@ -108,10 +108,10 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
 
   // Exception location
   if (IsBadReadPtr(ctx, sizeof(CONTEXT)) == 0) {
-    offset += safe_snprintf(buffer + offset, buffer_size - offset,
+    offset += snprintf(buffer + offset, buffer_size - offset,
                             "Exception occurred at:\n  " CTX_PC_NAME ": 0x%016llX\n", (unsigned long long)CTX_PC(ctx));
   } else {
-    offset += safe_snprintf(buffer + offset, buffer_size - offset,
+    offset += snprintf(buffer + offset, buffer_size - offset,
                             "Exception occurred at:\n  " CTX_PC_NAME ": <invalid context>\n");
   }
 
@@ -124,7 +124,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
     pSymbol->MaxNameLen = MAX_SYM_NAME;
 
     if (g_thread_symbols_initialized && SymFromAddr(hProcess, CTX_PC(ctx), &dwDisplacement, pSymbol)) {
-      offset += safe_snprintf(buffer + offset, buffer_size - offset, "  Function: %s + 0x%llX\n", pSymbol->Name,
+      offset += snprintf(buffer + offset, buffer_size - offset, "  Function: %s + 0x%llX\n", pSymbol->Name,
                               dwDisplacement);
     } else {
       // Try to get module name - wrap in try/except
@@ -136,7 +136,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
           if (GetModuleFileNameA(hModule, moduleName, sizeof(moduleName))) {
             char *lastSlash = strrchr(moduleName, '\\');
             char *fileName = lastSlash ? lastSlash + 1 : moduleName;
-            offset += safe_snprintf(buffer + offset, buffer_size - offset, "  Module: %s + 0x%llX\n", fileName,
+            offset += snprintf(buffer + offset, buffer_size - offset, "  Module: %s + 0x%llX\n", fileName,
                                     CTX_PC(ctx) - (DWORD64)hModule);
           }
         }
@@ -151,7 +151,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
   // Manual stack trace from RSP
   // Note: This works with AddressSanitizer enabled - we use __try/__except to safely handle
   // any access violations when reading stack memory from the exception thread
-  offset += safe_snprintf(buffer + offset, buffer_size - offset, "\nMANUAL STACK TRACE - Walking from RSP\n");
+  offset += snprintf(buffer + offset, buffer_size - offset, "\nMANUAL STACK TRACE - Walking from RSP\n");
 
   // Validate stack pointer before attempting to read from it
   // Check if the pointer is valid and in a reasonable address range
@@ -170,7 +170,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
   }
 
   if (!canReadStack) {
-    offset += safe_snprintf(buffer + offset, buffer_size - offset, "  Invalid stack pointer: 0x%016llX\n", CTX_SP(ctx));
+    offset += snprintf(buffer + offset, buffer_size - offset, "  Invalid stack pointer: 0x%016llX\n", CTX_SP(ctx));
   } else {
     // Copy stack data to local buffer to avoid ASan stack-use-after-scope errors
     // We're reading from another thread's stack, so copy it to our stack frame first
@@ -231,11 +231,11 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
             if (hasLineInfo) {
               const char *shortName =
                   relPath ? relPath : (strrchr(line.FileName, '\\') ? strrchr(line.FileName, '\\') + 1 : line.FileName);
-              offset += safe_snprintf(buffer + offset, buffer_size - offset,
+              offset += snprintf(buffer + offset, buffer_size - offset,
                                       "%s RSP+0x%03zX: 0x%016llX %s + 0x%llX [%s:%lu]\n", prefix, (size_t)(i * 8), addr,
                                       pSymbol2->Name, displacement, shortName, line.LineNumber);
             } else {
-              offset += safe_snprintf(buffer + offset, buffer_size - offset, "%s RSP+0x%03zX: 0x%016llX %s + 0x%llX\n",
+              offset += snprintf(buffer + offset, buffer_size - offset, "%s RSP+0x%03zX: 0x%016llX %s + 0x%llX\n",
                                       prefix, (size_t)(i * 8), addr, pSymbol2->Name, displacement);
             }
           }
@@ -268,11 +268,11 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
               char *fileName = lastSlash ? lastSlash + 1 : moduleName;
               DWORD64 offsetInModule = addr - (DWORD64)(uintptr_t)hModule;
               // Show module name with offset
-              offset += safe_snprintf(buffer + offset, buffer_size - offset, "  RSP+0x%03zX: 0x%016llX %s + 0x%llX\n",
+              offset += snprintf(buffer + offset, buffer_size - offset, "  RSP+0x%03zX: 0x%016llX %s + 0x%llX\n",
                                       (size_t)(i * 8), addr, fileName, offsetInModule);
             } else {
               // Can't resolve symbol or module - still show address for manual resolution with llvm-symbolizer
-              offset += safe_snprintf(buffer + offset, buffer_size - offset, "  RSP+0x%03zX: 0x%016llX <unresolved>\n",
+              offset += snprintf(buffer + offset, buffer_size - offset, "  RSP+0x%03zX: 0x%016llX <unresolved>\n",
                                       (size_t)(i * 8), addr);
             }
           }
@@ -282,7 +282,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
   } // Close else block
 
   // StackWalk64 trace
-  offset += safe_snprintf(buffer + offset, buffer_size - offset, "\nSTACK TRACE\n");
+  offset += snprintf(buffer + offset, buffer_size - offset, "\nSTACK TRACE\n");
   STACKFRAME64 stackFrame = {0};
   stackFrame.AddrPC.Offset = CTX_PC(ctx);
   stackFrame.AddrPC.Mode = AddrModeFlat;
@@ -296,7 +296,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
   for (int frameNum = 0; frameNum < 20 && offset < buffer_size - 200; frameNum++) {
     if (stackFrame.AddrStack.Offset == 0 || stackFrame.AddrStack.Offset > 0x7FFFFFFFFFFF) {
       offset +=
-          safe_snprintf(buffer + offset, buffer_size - offset, "  #%02d [Stack corrupted or end reached]\n", frameNum);
+          snprintf(buffer + offset, buffer_size - offset, "  #%02d [Stack corrupted or end reached]\n", frameNum);
       break;
     }
 
@@ -304,7 +304,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
                      SymGetModuleBase64, NULL)) {
       DWORD error = GetLastError();
       if (error != ERROR_SUCCESS && error != ERROR_NO_MORE_ITEMS) {
-        offset += safe_snprintf(buffer + offset, buffer_size - offset, "  #%02d [StackWalk64 failed: %lu]\n", frameNum,
+        offset += snprintf(buffer + offset, buffer_size - offset, "  #%02d [StackWalk64 failed: %lu]\n", frameNum,
                                 error);
       }
       break;
@@ -327,10 +327,10 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
       if (SymGetLineFromAddr64(hProcess, stackFrame.AddrPC.Offset, &lineDisplacement, &line)) {
         const char *relPath = line.FileName ? extract_project_relative_path(line.FileName) : "unknown";
         offset +=
-            safe_snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX %s + 0x%llX [%s:%lu]\n", frameNum,
+            snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX %s + 0x%llX [%s:%lu]\n", frameNum,
                           stackFrame.AddrPC.Offset, pSym->Name, symDisplacement, relPath, line.LineNumber);
       } else {
-        offset += safe_snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX %s + 0x%llX\n", frameNum,
+        offset += snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX %s + 0x%llX\n", frameNum,
                                 stackFrame.AddrPC.Offset, pSym->Name, symDisplacement);
       }
     } else {
@@ -360,11 +360,11 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
         char *slash = strrchr(modName, '\\');
         char *name = slash ? slash + 1 : modName;
         DWORD64 offsetInModule = stackFrame.AddrPC.Offset - (DWORD64)(uintptr_t)hMod;
-        offset += safe_snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX %s!0x%llX\n", frameNum,
+        offset += snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX %s!0x%llX\n", frameNum,
                                 stackFrame.AddrPC.Offset, name, offsetInModule);
       } else {
         // Can't resolve symbol or module - still show address for manual resolution
-        offset += safe_snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX <unresolved>\n", frameNum,
+        offset += snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX <unresolved>\n", frameNum,
                                 stackFrame.AddrPC.Offset);
       }
     }
@@ -392,7 +392,6 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
   thread_wrapper_t *wrapper = (thread_wrapper_t *)param;
 
   if (!wrapper) {
-    log_error("THREAD_WRAPPER: NULL wrapper");
     return 1;
   }
 
@@ -403,13 +402,11 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
   __try {
     // Test if wrapper is readable by accessing a field
     if (!wrapper->posix_func) {
-      log_error("THREAD_WRAPPER: NULL function pointer!");
-      SAFE_FREE(wrapper);
+      free(wrapper);
       return 1;
     }
   } __except (EXCEPTION_EXECUTE_HANDLER) {
     // Wrapper is invalid or corrupted - exit immediately
-    log_error("THREAD_WRAPPER: Invalid or corrupted wrapper structure");
     return 1;
   }
 
@@ -513,11 +510,11 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
               build_stack_trace_message(stack_buffer, sizeof(stack_buffer), &contextCopy, hProcess);
             } __except (EXCEPTION_EXECUTE_HANDLER) {
               // If building the stack trace causes an exception, use minimal output
-              safe_snprintf(stack_buffer, sizeof(stack_buffer),
+              snprintf(stack_buffer, sizeof(stack_buffer),
                             "Stack trace generation failed (exception in trace builder)\n");
             }
           } else {
-            safe_snprintf(stack_buffer, sizeof(stack_buffer), "Exception context is invalid or corrupted\n");
+            snprintf(stack_buffer, sizeof(stack_buffer), "Exception context is invalid or corrupted\n");
           }
 
           // Try to print the stack trace - even this could potentially fail
@@ -556,7 +553,7 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
 #undef free
     free(wrapper);
 #else
-    SAFE_FREE(wrapper);
+    free(wrapper);
 #endif
     // Reset the recursive exception flag
     g_in_exception_handler = 0;
@@ -568,11 +565,10 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
 #undef free
   free(wrapper);
 #else
-  SAFE_FREE(wrapper);
+  free(wrapper);
 #endif
 
   // Clean up thread-local error context to prevent leaks
-  errno_destroy();
 
   return (DWORD)(uintptr_t)result;
 }
@@ -590,8 +586,6 @@ int platform_thread_create(platform_thread_t *thread, const char *name, void *(*
   initialize_symbol_handler();
 
 #ifdef DEBUG_THREADS
-  log_debug("thread=%p, func=%p, arg=%p", thread, func, arg);
-  log_debug("About to malloc wrapper (size=%zu)", sizeof(thread_wrapper_t));
 #endif
 
   // Use raw malloc for the thread wrapper, not debug_malloc.
@@ -607,41 +601,36 @@ int platform_thread_create(platform_thread_t *thread, const char *name, void *(*
 #undef malloc
   thread_wrapper_t *wrapper = malloc(sizeof(thread_wrapper_t));
 #else
-  thread_wrapper_t *wrapper = SAFE_MALLOC(sizeof(thread_wrapper_t), thread_wrapper_t *);
+  thread_wrapper_t *wrapper = malloc(sizeof(thread_wrapper_t));
 #endif
 
 #ifdef DEBUG_THREADS
-  log_debug("malloc returned wrapper=%p", wrapper);
 #endif
 
   if (!wrapper) {
-    log_error("malloc failed for thread wrapper");
     return -1;
   }
 
   wrapper->posix_func = func;
   wrapper->arg = arg;
-  SAFE_STRNCPY(wrapper->name, name ? name : "worker", sizeof(wrapper->name));
+  snprintf(wrapper->name, sizeof(wrapper->name), "%s", name ? name : "worker");
 
   DWORD thread_id;
 
 #ifdef DEBUG_THREADS
-  log_debug("CREATE_THREAD: Before CreateThread: wrapper=%p, func=%p, arg=%p", wrapper, wrapper->posix_func,
-            wrapper->arg);
 #endif
   (*thread) = CreateThread(NULL, 0, windows_thread_wrapper, wrapper, 0, &thread_id);
 #ifdef DEBUG_THREADS
-  log_debug("CREATE_THREAD: After CreateThread: handle=%p, thread_id=%lu", *thread, thread_id);
 #endif
 
   if (*thread == NULL) {
-    SET_ERRNO_SYS(ERROR_THREAD, "CreateThread failed");
+    return -1;
     // Use raw free - matches raw SAFE_MALLOC(see allocation comment for rationale, void *)
 #ifdef DEBUG_MEMORY
 #undef free
     free(wrapper);
 #else
-    SAFE_FREE(wrapper);
+    free(wrapper);
 #endif
     return -1;
   }
@@ -660,7 +649,7 @@ int platform_thread_create(platform_thread_t *thread, const char *name, void *(*
  */
 int thread_join(platform_thread_t *thread, void **retval) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
-    SET_ERRNO(ERROR_THREAD, "Invalid thread handle for join operation");
+    return -1;
     return -1;
   }
 
@@ -688,7 +677,7 @@ int thread_join(platform_thread_t *thread, void **retval) {
 
   CloseHandle((*thread));
   *thread = NULL;
-  SET_ERRNO(ERROR_THREAD, "WaitForSingleObject failed with result %lu", result);
+    return -1;
   return -1;
 }
 
@@ -704,7 +693,7 @@ int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeo
     return -1;
   }
 
-  DWORD timeout_ms = (DWORD)time_ns_to_ms(timeout_ns);
+  DWORD timeout_ms = (DWORD)(timeout_ns / 1000000ULL);
   DWORD result = WaitForSingleObject((*thread), timeout_ms);
 
   if (result == WAIT_OBJECT_0) {
@@ -734,7 +723,7 @@ int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeo
   NAMED_UNREGISTER_THREAD(*thread);
   CloseHandle((*thread));
   *thread = NULL;
-  SET_ERRNO(ERROR_THREAD, "WaitForSingleObject failed with result %lu", result);
+    return -1;
   return -1;
 }
 
@@ -747,7 +736,6 @@ int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeo
  */
 void thread_exit(void *retval) {
   // Clean up thread-local error context to prevent leaks
-  errno_destroy();
 
   ExitThread((DWORD)(uintptr_t)retval);
 }
@@ -759,7 +747,7 @@ void thread_exit(void *retval) {
  */
 int thread_detach(platform_thread_t *thread) {
   if (!thread || (*thread) == NULL || (*thread) == INVALID_HANDLE_VALUE) {
-    SET_ERRNO(ERROR_THREAD, "Invalid thread handle for detach operation");
+    return -1;
     return -1;
   }
   CloseHandle((*thread));
@@ -878,16 +866,12 @@ int ascii_tls_set(tls_key_t key, void *value) {
  * Uses SetThreadPriority with THREAD_PRIORITY_TIME_CRITICAL priority class.
  * Does not require elevated privileges on Windows.
  */
-asciichat_error_t thread_set_realtime_priority(void) {
+int thread_set_realtime_priority(void) {
   HANDLE current_thread = GetCurrentThread();
   if (!SetThreadPriority(current_thread, THREAD_PRIORITY_TIME_CRITICAL)) {
-    return SET_ERRNO_SYS(ERROR_THREAD, "Failed to set audio thread priority on Windows");
+    return -1;
   }
-  return ASCIICHAT_OK;
-}
-
-uintptr_t thread_to_key(platform_thread_t thread) {
-  return (uintptr_t)GetThreadId(thread);
+  return 0;
 }
 
 #endif // _WIN32
