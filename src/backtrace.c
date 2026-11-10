@@ -1,4 +1,5 @@
 #include <libplatform/backtrace.h>
+#include <libplatform/symbols.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +34,9 @@ int libplatform_backtrace_capture(void **frames, int capacity) {
 
 char **libplatform_backtrace_symbolize(void *const *frames, int count) {
   if (!frames || count <= 0) return NULL;
+#if !defined(__EMSCRIPTEN__)
+  if (symbol_cache_init() == LIBPLATFORM_OK) return symbol_cache_resolve_batch(frames, count);
+#endif
   char **out = (char **)calloc((size_t)count + 1, sizeof(*out));
   if (!out) return NULL;
 #if defined(__EMSCRIPTEN__)
@@ -49,6 +53,10 @@ char **libplatform_backtrace_symbolize(void *const *frames, int count) {
 
 void libplatform_backtrace_symbols_free(char **symbols) {
   if (!symbols) return;
+#if !defined(__EMSCRIPTEN__)
+  symbol_cache_free_symbols(symbols);
+  return;
+#endif
   for (size_t i = 0; symbols[i]; ++i) free(symbols[i]);
   free(symbols);
 }

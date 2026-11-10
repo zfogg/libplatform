@@ -6,7 +6,7 @@ include(GNUInstallDirs)
 
 add_library(libplatform)
 add_library(libplatform::libplatform ALIAS libplatform)
-target_sources(libplatform PRIVATE src/backtrace.c)
+target_sources(libplatform PRIVATE src/backtrace.c src/symbols.c)
 target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_features(libplatform PUBLIC c_std_11)
 set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform)
