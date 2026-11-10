@@ -31,9 +31,9 @@
 #include <stdbool.h>
 #include <string.h>
 
-asciichat_error_t platform_process_title_native_set(const char *title, const char *short_name) {
+int platform_process_title_native_set(const char *title, const char *short_name) {
   if (!pthread_main_np()) {
-    return SET_ERRNO(ERROR_INVALID_STATE, "Process title must be set by the main thread");
+    return -1;
   }
   char thread_name[PLATFORM_MACOS_PROCESS_TITLE_THREAD_NAME_BUFFER_SIZE];
   size_t length = strlen(short_name);
@@ -49,7 +49,7 @@ asciichat_error_t platform_process_title_native_set(const char *title, const cha
   void *services =
       dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", RTLD_LAZY | RTLD_LOCAL);
   if (!services) {
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "Activity Monitor naming: ApplicationServices unavailable");
+    return -1;
   }
   CFBundleRef bundle = CFBundleGetBundleWithIdentifier(CFSTR("com.apple.LaunchServices"));
   CFTypeRef (*get_asn)(void) = NULL;
@@ -67,7 +67,7 @@ asciichat_error_t platform_process_title_native_set(const char *title, const cha
   }
   if (!get_asn || !set_information || !check_in || !set_connection || !display_name || !*display_name) {
     dlclose(services);
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "Activity Monitor naming: Launch Services API unavailable");
+    return -1;
   }
   static bool checked_in;
   if (!checked_in) {
@@ -78,7 +78,7 @@ asciichat_error_t platform_process_title_native_set(const char *title, const cha
              : CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     if (!properties) {
       dlclose(services);
-      return SET_ERRNO(ERROR_MEMORY, "Activity Monitor naming: could not allocate application properties");
+      return -1;
     }
     // A terminal program must not acquire a Dock icon or activate a GUI window.
     CFDictionarySetValue(properties, CFSTR("LSUIElement"), kCFBooleanTrue);
@@ -98,10 +98,10 @@ asciichat_error_t platform_process_title_native_set(const char *title, const cha
   }
   dlclose(services);
   if (status != 0) {
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "Activity Monitor naming failed (status %d)", (int)status);
+    return -1;
   }
   if (thread_error != 0) {
-    return SET_ERRNO(ERROR_PLATFORM_INIT, "macOS main-thread naming failed (error %d)", thread_error);
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 }

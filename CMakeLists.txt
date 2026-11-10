@@ -18,7 +18,7 @@ endif()
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c lib/lifecycle.c lib/mutex.c lib/cond.c lib/system_common.c lib/terminal.c lib/util/path.c lib/util/string.c
 )
-target_sources(libplatform-objects PRIVATE lib/thread.c lib/time.c lib/named.c lib/cpu.c)
+target_sources(libplatform-objects PRIVATE lib/thread.c lib/time.c lib/named.c lib/cpu.c lib/process.c)
 if(WIN32)
     target_sources(libplatform-objects PRIVATE
       lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c lib/windows/agent.c
@@ -34,9 +34,9 @@ else()
 endif()
 
 if(APPLE)
-  target_sources(libplatform-objects PRIVATE lib/macos/system.c)
+  target_sources(libplatform-objects PRIVATE lib/macos/system.c lib/macos/process_title.c)
 elseif(UNIX)
-  target_sources(libplatform-objects PRIVATE lib/linux/system.c lib/linux/systemd.c)
+  target_sources(libplatform-objects PRIVATE lib/linux/system.c lib/linux/systemd.c lib/linux/process_title.c)
 endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)

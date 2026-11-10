@@ -7,9 +7,9 @@
 #define PLATFORM_PROCESS_TITLE_SHORT_NAME_BUFFER_SIZE 64
 
 #include <libplatform/process.h>
-#include <ascii-chat/common.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include "process_title_internal.h"
@@ -32,19 +32,19 @@ static char **saved_argv;
 static char **original_argv;
 static int original_argc;
 
-asciichat_error_t platform_process_title_init(int argc, char ***argv) {
+int platform_process_title_init(int argc, char ***argv) {
   if (argc < 1 || !argv || !*argv || !(*argv)[0]) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid process title arguments");
+    return -1;
   }
   if (title_area) {
-    return SET_ERRNO(ERROR_INVALID_STATE, "Process title already initialized");
+    return -1;
   }
 
   char *start = (*argv)[0];
   char *end = start;
   for (int i = 0; i < argc; ++i) {
     if ((*argv)[i] != end) {
-      return SET_ERRNO(ERROR_INVALID_STATE, "Process arguments are not contiguous");
+      return -1;
     }
     end += strlen(end) + 1;
   }
@@ -55,9 +55,9 @@ asciichat_error_t platform_process_title_init(int argc, char ***argv) {
   }
 
   title_capacity = (size_t)(end - start);
-  saved_area = SAFE_MALLOC(title_capacity, char *);
+  saved_area = malloc(title_capacity);
   memcpy(saved_area, start, title_capacity);
-  saved_argv = SAFE_CALLOC((size_t)argc + 1, sizeof(char *), char **);
+  saved_argv = calloc((size_t)argc + 1, sizeof(char *));
   for (int i = 0; i < argc; ++i) {
     saved_argv[i] = saved_area + ((*argv)[i] - start);
   }
@@ -76,19 +76,19 @@ asciichat_error_t platform_process_title_init(int argc, char ***argv) {
 #ifdef __APPLE__
   *_NSGetArgv() = saved_argv;
 #endif
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-static asciichat_error_t process_title_apply(const char *title, const char *short_name) {
+static int process_title_apply(const char *title, const char *short_name) {
   if (!title) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Process title must not be NULL");
+    return -1;
   }
   if (!title_area) {
-    return SET_ERRNO(ERROR_INVALID_STATE, "Process title is not initialized");
+    return -1;
   }
   size_t length = strlen(title);
   if (length >= title_capacity) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Process title exceeds available argument storage");
+    return -1;
   }
   memcpy(title_area, title, length);
   memset(title_area + length, 0, title_capacity - length);
@@ -112,14 +112,11 @@ void platform_process_title_destroy(void) {
   for (int i = 0; i < original_argc; ++i) {
     original_argv[i] = title_area + (saved_argv[i] - saved_area);
   }
-  if (g_argv == saved_argv) {
-    g_argv = original_argv;
-  }
 #ifdef __APPLE__
   *_NSGetArgv() = original_argv;
 #endif
-  SAFE_FREE(saved_argv);
-  SAFE_FREE(saved_area);
+  free(saved_argv);
+  free(saved_area);
   saved_argv = NULL;
   saved_area = NULL;
   title_area = NULL;
@@ -128,26 +125,26 @@ void platform_process_title_destroy(void) {
   original_argc = 0;
 }
 #else
-asciichat_error_t platform_process_title_init(int argc, char ***argv) {
+int platform_process_title_init(int argc, char ***argv) {
   if (argc < 1 || !argv || !*argv || !(*argv)[0]) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid process title arguments");
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-static asciichat_error_t process_title_apply(const char *title, const char *short_name) {
+static int process_title_apply(const char *title, const char *short_name) {
   (void)short_name;
   if (!title) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Process title must not be NULL");
+    return -1;
   }
   // Terminal titles are managed separately by the UI controller.
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 void platform_process_title_destroy(void) {}
 #endif
 
-asciichat_error_t platform_process_title_set(const char *title) {
+int platform_process_title_set(const char *title) {
   return process_title_apply(title, title);
 }
 
@@ -217,25 +214,25 @@ static size_t title_secret_option_length(const char *argument) {
   return 0;
 }
 
-asciichat_error_t platform_process_title_set_args(const char *mode, int argc, char **argv, int mode_arg_index) {
+int platform_process_title_set_args(const char *mode, int argc, char **argv, int mode_arg_index) {
   if (!mode || argc < 1 || !argv || !argv[0] || mode_arg_index < -1 || mode_arg_index >= argc) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid process title arguments");
+    return -1;
   }
   for (int i = 1; i < argc; ++i) {
     if (!argv[i]) {
-      return SET_ERRNO(ERROR_INVALID_PARAM, "NULL process title argument");
+      return -1;
     }
   }
   size_t capacity = PROCESS_TITLE_MAX;
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
   if (!title_area) {
-    return SET_ERRNO(ERROR_INVALID_STATE, "Process title is not initialized");
+    return -1;
   }
   if (title_capacity < capacity) {
     capacity = title_capacity;
   }
 #endif
-  char *title = SAFE_MALLOC(capacity, char *);
+  char *title = malloc(capacity);
   title_writer_t writer = {.data = title, .length = 0, .capacity = capacity};
   title[0] = '\0';
   title_append(&writer, "ascii-chat: ");
@@ -275,7 +272,7 @@ asciichat_error_t platform_process_title_set_args(const char *mode, int argc, ch
   title_writer_t short_writer = {.data = short_name, .length = 0, .capacity = sizeof(short_name)};
   title_append(&short_writer, "ascii:");
   title_append(&short_writer, strcmp(mode, "discovery-service") == 0 ? "acds" : mode);
-  asciichat_error_t result = process_title_apply(title, short_name);
-  SAFE_FREE(title);
+  int result = process_title_apply(title, short_name);
+  free(title);
   return result;
 }
