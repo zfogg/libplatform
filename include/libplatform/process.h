@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 /**
  * @file platform/process.h
  * @brief Cross-platform process types and execution utilities

@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <time.h>
 #ifdef _WIN32
 #include <basetsd.h>
