@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 char *platform_strdup(const char *s);
+size_t platform_strlcpy(char *dst, const char *src, size_t size);
+int platform_strncpy(char *dst, size_t dst_size, const char *src, size_t count);
 char *platform_strtok_r(char *str, const char *delim, char **saveptr);
 
 /**
