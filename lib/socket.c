@@ -6,8 +6,7 @@
  */
 
 #include <libplatform/socket.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/util/time.h>
+#include <libplatform/time.h>
 
 // Platform-specific TCP header (included by socket.h above)
 // Windows: ws2tcpip.h (included by winsock2.h)
@@ -39,12 +38,12 @@ void socket_optimize_for_streaming(socket_t sock) {
   // TCP_NODELAY ensures data is sent immediately without waiting for ACKs
   int nodelay = 1;
   if (socket_setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay)) != 0) {
-    log_warn("Failed to disable Nagle's algorithm (TCP_NODELAY) on socket");
+    (void)0;
   }
 
   // 2. Increase send buffer for video streaming (2MB with fallbacks)
   // Large buffers reduce packet drops during bursty frame transmission
-  int send_buffer = MAX_FRAME_BUFFER_SIZE; // 2MB
+  int send_buffer = 2 * 1024 * 1024;
   if (socket_setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &send_buffer, sizeof(send_buffer)) != 0) {
     send_buffer = 512 * 1024; // 512KB fallback
     if (socket_setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &send_buffer, sizeof(send_buffer)) != 0) {
@@ -55,7 +54,7 @@ void socket_optimize_for_streaming(socket_t sock) {
 
   // 3. Increase receive buffer (2MB with fallbacks)
   // Allows buffering of multiple incoming frames before processing
-  int recv_buffer = MAX_FRAME_BUFFER_SIZE; // 2MB
+  int recv_buffer = 2 * 1024 * 1024;
   if (socket_setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &recv_buffer, sizeof(recv_buffer)) != 0) {
     recv_buffer = 512 * 1024; // 512KB fallback
     if (socket_setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &recv_buffer, sizeof(recv_buffer)) != 0) {
@@ -82,7 +81,7 @@ void socket_optimize_for_streaming(socket_t sock) {
 int socket_set_timeout(socket_t sock, uint64_t timeout_ns) {
 #ifdef _WIN32
   // Windows: SO_RCVTIMEO and SO_SNDTIMEO use DWORD (milliseconds)
-  DWORD timeout_val = (DWORD)time_ns_to_ms(timeout_ns);
+  DWORD timeout_val = (DWORD)((timeout_ns + 999999ULL) / 1000000ULL);
   if (socket_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout_val, sizeof(timeout_val)) != 0) {
     return -1;
   }
@@ -92,9 +91,9 @@ int socket_set_timeout(socket_t sock, uint64_t timeout_ns) {
 #else
   // POSIX: SO_RCVTIMEO and SO_SNDTIMEO use struct timeval (seconds + microseconds)
   struct timeval tv;
-  uint64_t us = time_ns_to_us(timeout_ns);
-  tv.tv_sec = (time_t)(us / US_PER_SEC_INT);
-  tv.tv_usec = (suseconds_t)(us % US_PER_SEC_INT);
+  uint64_t us = (timeout_ns + 999ULL) / 1000ULL;
+  tv.tv_sec = (time_t)(us / 1000000ULL);
+  tv.tv_usec = (suseconds_t)(us % 1000000ULL);
   if (socket_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0) {
     return -1;
   }
