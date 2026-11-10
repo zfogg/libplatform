@@ -36,7 +36,7 @@ jobs:
                 DEBIAN_FRONTEND=noninteractive apt-get install -y cmake ninja-build gcc musl-tools zip
                 for linkage in static shared; do
                   shared=OFF; [ "$linkage" = shared ] && shared=ON
-                  cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON -DCMAKE_C_COMPILER=musl-gcc
+                  cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON -DCMAKE_C_COMPILER=musl-gcc -DCMAKE_C_FLAGS=-mno-outline-atomics
                   cmake --build "build-$linkage"
                   ctest --test-dir "build-$linkage" --output-on-failure
                   cmake --install "build-$linkage" --prefix "stage-$linkage"
