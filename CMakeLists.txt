@@ -16,22 +16,24 @@ if(PROJECT_IS_TOP_LEVEL)
   target_compile_definitions(libplatform-objects PRIVATE LIBPLATFORM_STANDALONE=1)
 endif()
 target_sources(libplatform-objects PRIVATE
-  lib/symbols.c lib/lifecycle.c lib/mutex.c lib/cond.c lib/system_common.c lib/terminal.c lib/util/path.c lib/util/string.c
+  lib/symbols.c lib/lifecycle.c lib/mutex.c lib/cond.c lib/system_common.c lib/terminal.c lib/socket.c lib/socket_io.c lib/util/path.c lib/util/string.c
 )
 target_sources(libplatform-objects PRIVATE lib/time.c lib/named.c lib/cpu.c lib/process.c)
 if(WIN32)
     target_sources(libplatform-objects PRIVATE
       lib/windows/thread.c
-      lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c lib/windows/agent.c
-      lib/windows/process.c lib/windows/rwlock.c lib/windows/mutex.c lib/windows/cond.c lib/windows/system.c lib/windows/question.c
+      lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c lib/windows/agent.c lib/windows/socket.c
+      lib/windows/process.c lib/windows/rwlock.c lib/windows/mutex.c lib/windows/cond.c lib/windows/system.c
+      lib/windows/pipe.c lib/windows/question.c lib/windows/keyboard.c lib/windows/font.c
     )
 elseif(EMSCRIPTEN)
     target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/terminal.c)
 else()
     target_sources(libplatform-objects PRIVATE
       lib/posix/thread.c
-      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_sync.c lib/posix/terminal_capabilities.c lib/posix/agent.c
+      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_sync.c lib/posix/terminal_capabilities.c lib/posix/agent.c lib/posix/socket.c
       lib/posix/process.c lib/posix/rwlock.c lib/posix/mutex.c lib/posix/cond.c
+      lib/posix/pipe.c lib/posix/question.c lib/posix/keyboard.c
     )
 endif()
 
