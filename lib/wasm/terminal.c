@@ -7,8 +7,8 @@
 /* Storage capacities in elements; text buffers include the terminating NUL. */
 #define PLATFORM_WASM_TERMINAL_BUF_BUFFER_SIZE 32
 
-#include <libplatform/abstraction.h>
-#include <libplatform/terminal.h>
+#include <ascii-chat/platform/abstraction.h>
+#include <ascii-chat/platform/terminal.h>
 #include <ascii-chat/asciichat_errno.h>
 #include <ascii-chat/common/limits.h>
 #include <ascii-chat/options/options.h>
@@ -86,18 +86,20 @@ asciichat_error_t terminal_cursor_show(void) {
   return ASCIICHAT_OK;
 }
 
-unsigned short int terminal_get_effective_width(int width, unsigned short fallback_width) {
+unsigned short int terminal_get_effective_width(void) {
+  int width = GET_OPTION(width);
   if (width > 0) {
     return (unsigned short int)width;
   }
-  return fallback_width;
+  return OPT_WIDTH_DEFAULT;
 }
 
-unsigned short int terminal_get_effective_height(int height, unsigned short fallback_height) {
+unsigned short int terminal_get_effective_height(void) {
+  int height = GET_OPTION(height);
   if (height > 0) {
     return (unsigned short int)height;
   }
-  return fallback_height;
+  return OPT_HEIGHT_DEFAULT;
 }
 
 // Color mode detection - not needed for WASM mirror mode
@@ -152,8 +154,8 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
 }
 
 // Terminal UTF-8 support detection
-bool terminal_should_use_utf8(int user_setting) {
-  return user_setting != -1;
+bool terminal_should_use_utf8(void) {
+  return GET_OPTION(force_utf8) != UTF8_SETTING_FALSE;
 }
 
 bool terminal_supports_utf8(void) {
@@ -166,16 +168,17 @@ bool terminal_is_piped_output(void) {
 }
 
 // Color output detection
-bool terminal_should_color_output(int fd, const terminal_options_t *options) {
-  (void)fd;
+bool terminal_should_color_output(int fd, terminal_options_t options) {
   (void)options;
+  (void)fd;
   return true; // WASM mirror mode supports color
 }
 
 terminal_color_mode_t terminal_get_effective_color_mode(const terminal_options_t *options) {
+  (void)options;
   // Browser output supports color; retain the explicit option or AUTO so the
   // caller can resolve it using the JavaScript-managed terminal capabilities.
-  return options ? (terminal_color_mode_t)options->color_mode : TERM_COLOR_AUTO;
+  return GET_OPTION(color_mode);
 }
 
 // TTY detection stubs
@@ -199,8 +202,7 @@ bool terminal_should_force_stderr(void) {
   return false; // Don't force stderr in WASM
 }
 
-bool terminal_can_prompt_user(bool user_setting) {
-  (void)user_setting;
+bool terminal_can_prompt_user(void) {
   return false; // Cannot prompt in WASM
 }
 
@@ -264,9 +266,8 @@ asciichat_error_t terminal_set_echo(bool enabled) {
   return ASCIICHAT_OK;
 }
 
-bool terminal_should_use_control_sequences(int fd, bool user_setting) {
+bool terminal_should_use_control_sequences(int fd) {
   (void)fd;
-  (void)user_setting;
   return true; // Always use ANSI sequences in browser
 }
 

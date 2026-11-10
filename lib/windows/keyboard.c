@@ -9,7 +9,7 @@
 #include <libplatform/system.h>
 #include <ascii-chat/util/time.h>
 #include <ascii-chat/common.h>
-#include <libplatform/init.h>
+#include <libplatform/lifecycle.h>
 #include <ascii-chat/util/lifecycle.h>
 
 #include <windows.h>

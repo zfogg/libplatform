@@ -3,7 +3,6 @@
 #define PLATFORM_WINDOWS_TERMINAL_SUMMARY_BUFFER_SIZE 256
 #define PLATFORM_WINDOWS_TERMINAL_RESPONSE_BUFFER_SIZE 256
 
-#include <libplatform/keyboard.h>
 /**
  * @file platform/windows/terminal.c
  * @ingroup platform
@@ -13,12 +12,9 @@
 #ifdef _WIN32
 
 #include <libplatform/terminal.h>
-#include <ascii-chat/options/options.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/asciichat_errno.h>
-#include <ascii-chat/util/parsing.h>
-#include <libplatform/windows/getopt.h>
-#include <ascii-chat/log/log.h>
+#include <libplatform/filesystem.h>
+#include <libplatform/system.h>
+#include <libplatform/util/string.h>
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +23,10 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
-#include <ascii-chat/atomic.h>
+#include <stdatomic.h>
+#ifndef STDOUT_FILENO
+#define STDOUT_FILENO 1
+#endif
 
 /**
  * @brief Check if file descriptor is a TTY
@@ -76,13 +75,13 @@ typedef void (*terminal_resize_callback_t)(int cols, int rows);
 static terminal_resize_callback_t g_resize_callback = NULL;
 
 /** Thread handle for resize detection */
-static asciichat_thread_t g_resize_thread = {0};
+static HANDLE g_resize_thread = NULL;
 
 /** Flag to signal resize thread should exit */
-static atomic_t g_resize_thread_should_exit = {0};
+static atomic_bool g_resize_thread_should_exit = false;
 
 /** Flag indicating if resize detection is active */
-static atomic_t g_resize_detection_active = {0};
+static atomic_bool g_resize_detection_active = false;
 
 /**
  * Background thread that monitors for Windows console resize events
@@ -94,38 +93,32 @@ static atomic_t g_resize_detection_active = {0};
  * @param arg Unused thread argument
  * @return NULL on exit
  */
-static void *resize_detection_thread(void *arg) {
+static DWORD WINAPI resize_detection_thread(void *arg) {
   (void)arg;
   HANDLE hConsoleInput = GetStdHandle(STD_INPUT_HANDLE);
   if (hConsoleInput == INVALID_HANDLE_VALUE) {
-    log_error("Failed to get console input handle for resize detection");
-    return NULL;
+    return 0;
   }
 
   // Enable window input events
   DWORD console_mode;
   if (!GetConsoleMode(hConsoleInput, &console_mode)) {
-    log_error("Failed to get console mode for resize detection");
-    return NULL;
+    return 0;
   }
 
   // Add WINDOW_INPUT flag to enable window buffer size events
   console_mode |= ENABLE_WINDOW_INPUT;
   if (!SetConsoleMode(hConsoleInput, console_mode)) {
-    log_error("Failed to enable window input events for resize detection");
-    return NULL;
+    return 0;
   }
 
-  log_dev("Windows console resize detection thread started");
 
   // Store last known size to detect actual changes
   CONSOLE_SCREEN_BUFFER_INFO last_csbi = {0};
   if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &last_csbi)) {
-    log_dev("Initial console size: %dx%d", last_csbi.srWindow.Right - last_csbi.srWindow.Left + 1,
-            last_csbi.srWindow.Bottom - last_csbi.srWindow.Top + 1);
   }
 
-  while (!atomic_load_bool(&g_resize_thread_should_exit)) {
+  while (!atomic_load(&g_resize_thread_should_exit)) {
     INPUT_RECORD input_record;
     DWORD events_read = 0;
 
@@ -161,8 +154,6 @@ static void *resize_detection_thread(void *arg) {
         int old_rows = last_csbi.srWindow.Bottom - last_csbi.srWindow.Top + 1;
 
         if (new_cols != old_cols || new_rows != old_rows) {
-          log_dev("Console resized: %dx%d -> %dx%d", old_cols, old_rows, new_cols, new_rows);
-
           // Update last known size
           last_csbi = csbi;
 
@@ -175,8 +166,7 @@ static void *resize_detection_thread(void *arg) {
     }
   }
 
-  log_dev("Windows console resize detection thread exiting");
-  return NULL;
+  return 0;
 }
 
 /**
@@ -189,27 +179,24 @@ static void *resize_detection_thread(void *arg) {
  * @return 0 on success, -1 on failure
  */
 int terminal_start_resize_detection(terminal_resize_callback_t callback) {
-  if (atomic_load_bool(&g_resize_detection_active)) {
-    log_warn("Resize detection already active");
+  if (atomic_load(&g_resize_detection_active)) {
     return 0; // Already running
   }
 
   if (callback == NULL) {
-    log_error("Cannot start resize detection with NULL callback");
     return -1;
   }
 
   g_resize_callback = callback;
-  atomic_store_bool(&g_resize_thread_should_exit, false);
+  atomic_store(&g_resize_thread_should_exit, false);
 
-  if (acthread_create(&g_resize_thread, "resize_detect", resize_detection_thread, NULL) != 0) {
-    log_error("Failed to create resize detection thread");
+  g_resize_thread = CreateThread(NULL, 0, resize_detection_thread, NULL, 0, NULL);
+  if (!g_resize_thread) {
     g_resize_callback = NULL;
     return -1;
   }
 
-  atomic_store_bool(&g_resize_detection_active, true);
-  log_info("Windows console resize detection started");
+  atomic_store(&g_resize_detection_active, true);
   return 0;
 }
 
@@ -219,14 +206,15 @@ int terminal_start_resize_detection(terminal_resize_callback_t callback) {
  * Signals the resize detection thread to exit and waits for it to complete.
  */
 void terminal_stop_resize_detection(void) {
-  if (!atomic_load_bool(&g_resize_detection_active)) {
+  if (!atomic_load(&g_resize_detection_active)) {
     return; // Not running
   }
 
-  atomic_store_bool(&g_resize_thread_should_exit, true);
-  // Wait for thread to exit
-  thread_join(&g_resize_thread, NULL);
-  atomic_store_bool(&g_resize_detection_active, false);
+  atomic_store(&g_resize_thread_should_exit, true);
+  WaitForSingleObject(g_resize_thread, INFINITE);
+  CloseHandle(g_resize_thread);
+  g_resize_thread = NULL;
+  atomic_store(&g_resize_detection_active, false);
   g_resize_callback = NULL;
 }
 
@@ -235,34 +223,33 @@ void terminal_stop_resize_detection(void) {
  * @param size Pointer to terminal_size_t structure to fill
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_get_size_fd(int fd, terminal_size_t *size) {
+int terminal_get_size_fd(int fd, terminal_size_t *size) {
   if (!size)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Terminal size output is NULL");
+    return -1;
   *size = (terminal_size_t){0};
   CONSOLE_SCREEN_BUFFER_INFO info;
   HANDLE handle = (HANDLE)_get_osfhandle(fd);
   if (!GetConsoleScreenBufferInfo(handle, &info))
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Cannot query terminal descriptor %d", fd);
+    return -1;
   size->cols = info.srWindow.Right - info.srWindow.Left + 1;
   size->rows = info.srWindow.Bottom - info.srWindow.Top + 1;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t terminal_get_size(terminal_size_t *size) {
+int terminal_get_size(terminal_size_t *size) {
   CONSOLE_SCREEN_BUFFER_INFO csbi;
   HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
 
   if (h == INVALID_HANDLE_VALUE) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
 
   if (GetConsoleScreenBufferInfo(h, &csbi)) {
     size->cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
     size->rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-    return ASCIICHAT_OK;
+    return 0;
   }
-
-  return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
 }
 
 /**
@@ -278,15 +265,15 @@ const char *get_tty_path(void) {
  * @param enable True to enable raw mode, false to restore normal mode
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_set_raw_mode(bool enable) {
+int terminal_set_raw_mode(bool enable) {
   HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
   if (hStdin == INVALID_HANDLE_VALUE) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
 
   DWORD mode;
   if (!GetConsoleMode(hStdin, &mode)) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
 
   if (enable) {
@@ -296,7 +283,7 @@ asciichat_error_t terminal_set_raw_mode(bool enable) {
   }
 
   if (!SetConsoleMode(hStdin, mode)) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
   return 0;
 }
@@ -306,15 +293,15 @@ asciichat_error_t terminal_set_raw_mode(bool enable) {
  * @param enable True to enable echo, false to disable
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_set_echo(bool enable) {
+int terminal_set_echo(bool enable) {
   HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
   if (hStdin == INVALID_HANDLE_VALUE) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
 
   DWORD mode;
   if (!GetConsoleMode(hStdin, &mode)) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
 
   if (enable) {
@@ -325,7 +312,7 @@ asciichat_error_t terminal_set_echo(bool enable) {
   }
 
   if (!SetConsoleMode(hStdin, mode)) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
   return 0;
 }
@@ -367,12 +354,12 @@ static void _init_terminal_cache(void) {
     g_terminal_cache.utf8_support = 1;
   } else {
     // Check for Windows Terminal via environment variable
-    const char *wt_session = SAFE_GETENV("WT_SESSION");
+    const char *wt_session = platform_getenv("WT_SESSION");
     if (wt_session != NULL) {
       g_terminal_cache.utf8_support = 1;
     } else {
       // Check for ConEmu
-      const char *conemu = SAFE_GETENV("ConEmuPID");
+      const char *conemu = platform_getenv("ConEmuPID");
       if (conemu != NULL) {
         g_terminal_cache.utf8_support = 1;
       } else {
@@ -427,9 +414,9 @@ bool terminal_supports_unicode(void) {
  * @brief Clear the terminal screen
  * @return 0 on success, non-zero on failure
  */
-asciichat_error_t terminal_clear_screen(void) {
+int terminal_clear_screen(void) {
   system("cls");
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -438,11 +425,10 @@ asciichat_error_t terminal_clear_screen(void) {
  * @param col Column position (0-based)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_move_cursor(int row, int col) {
+int terminal_move_cursor(int row, int col) {
   HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   if (hConsole == INVALID_HANDLE_VALUE)
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
-
+    return -1;
   COORD coord;
   coord.X = (SHORT)col;
   coord.Y = (SHORT)row;
@@ -453,23 +439,22 @@ asciichat_error_t terminal_move_cursor(int row, int col) {
 /**
  * @brief Move cursor relative to current position
  * @param offset Relative movement: positive = right, negative = left
- * @return ASCIICHAT_OK on success, error code on failure
+ * @return 0 on success, error code on failure
  *
  * Gets current cursor position, adds offset, and moves to new position
  */
-asciichat_error_t terminal_move_cursor_relative(int offset) {
+int terminal_move_cursor_relative(int offset) {
   if (offset == 0) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   if (hConsole == INVALID_HANDLE_VALUE)
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
-
+    return -1;
   // Get current cursor position
   CONSOLE_SCREEN_BUFFER_INFO csbi;
   if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to get cursor position");
+    return -1;
   }
 
   // Calculate new position
@@ -487,8 +472,8 @@ asciichat_error_t terminal_move_cursor_relative(int offset) {
   newCoord.X = newX;
   newCoord.Y = csbi.dwCursorPosition.Y;
 
-  return SetConsoleCursorPosition(hConsole, newCoord) ? ASCIICHAT_OK
-                                                      : SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to move cursor");
+  return SetConsoleCursorPosition(hConsole, newCoord) ? 0
+                                                      : -1;
 }
 
 /**
@@ -516,7 +501,7 @@ void terminal_enable_ansi(void) {
  * @param line_buffered True for line buffering, false for no buffering
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_set_buffering(bool line_buffered) {
+int terminal_set_buffering(bool line_buffered) {
   // Windows console doesn't have direct line buffering control
   // This is typically handled at the C runtime level
   if (line_buffered) {
@@ -524,7 +509,7 @@ asciichat_error_t terminal_set_buffering(bool line_buffered) {
   } else {
     (void)setvbuf(stdout, NULL, _IONBF, 0);
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -532,17 +517,17 @@ asciichat_error_t terminal_set_buffering(bool line_buffered) {
  * @param fd File descriptor (ignored on Windows - console APIs use stdout)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_flush(int fd) {
+int terminal_flush(int fd) {
   HANDLE output = (HANDLE)_get_osfhandle(fd);
   DWORD mode;
   if (output == INVALID_HANDLE_VALUE || !GetConsoleMode(output, &mode))
-    return ASCIICHAT_OK;
+    return 0;
   // A synchronous console query is ordered after preceding output writes.
   // fflush(stdout) cannot drain writes made through a retained descriptor.
   CONSOLE_SCREEN_BUFFER_INFO info;
   if (!GetConsoleScreenBufferInfo(output, &info))
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Cannot drain terminal output");
-  return ASCIICHAT_OK;
+    return -1;
+  return 0;
 }
 
 /**
@@ -551,16 +536,16 @@ asciichat_error_t terminal_flush(int fd) {
  * @param col Pointer to store column position
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_get_cursor_position(int *row, int *col) {
+int terminal_get_cursor_position(int *row, int *col) {
   CONSOLE_SCREEN_BUFFER_INFO csbi;
   HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 
   if (hOut == INVALID_HANDLE_VALUE) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
 
   if (!GetConsoleScreenBufferInfo(hOut, &csbi)) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Terminal operation failed");
+    return -1;
   }
 
   if (row)
@@ -575,18 +560,18 @@ asciichat_error_t terminal_get_cursor_position(int *row, int *col) {
  * @brief Save cursor position (using ANSI if available)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_save_cursor(void) {
+int terminal_save_cursor(void) {
   // Try ANSI escape sequence first (Windows 10+)
   printf("\033[s");
   (void)fflush(stdout);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * @brief Restore cursor position (using ANSI if available)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_restore_cursor(void) {
+int terminal_restore_cursor(void) {
   // Try ANSI escape sequence first (Windows 10+)
   printf("\033[u");
   (void)fflush(stdout);
@@ -596,54 +581,54 @@ asciichat_error_t terminal_restore_cursor(void) {
 /**
  * @brief Set terminal window title
  * @param title New window title
- * @return ASCIICHAT_OK on success, an error for NULL titles or console failures
+ * @return 0 on success, an error for NULL titles or console failures
  */
 static WCHAR saved_terminal_title[1024];
 static bool terminal_title_saved;
 
-asciichat_error_t terminal_set_title_fd(int fd, const char *title) {
+int terminal_set_title_fd(int fd, const char *title) {
   if (!title)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Terminal title must not be NULL");
+    return -1;
   if (!platform_isatty(fd))
-    return ASCIICHAT_OK;
+    return 0;
   WCHAR wide[1024];
   if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, title, -1, wide, 1024))
-    return SET_ERRNO(ERROR_TERMINAL, "Invalid or oversized UTF-8 terminal title");
+    return -1;
   for (WCHAR *p = wide; *p; ++p)
     if (*p < 0x20 || *p == 0x7f)
       *p = L' ';
   if (SetConsoleTitleW(wide))
-    return ASCIICHAT_OK;
-  return SET_ERRNO(ERROR_TERMINAL, "Cannot set console title (Windows error %lu)", (unsigned long)GetLastError());
+    return 0;
+    return -1;
 }
-asciichat_error_t terminal_set_title(const char *title) {
+int terminal_set_title(const char *title) {
   return terminal_set_title_fd(STDOUT_FILENO, title);
 }
-asciichat_error_t terminal_title_save(int fd) {
+int terminal_title_save(int fd) {
   if (platform_isatty(fd)) {
     SetLastError(ERROR_SUCCESS);
     DWORD count = GetConsoleTitleW(saved_terminal_title, 1024);
     terminal_title_saved = count < 1023 && (count > 0 || GetLastError() == ERROR_SUCCESS);
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
-asciichat_error_t terminal_title_restore(int fd) {
+int terminal_title_restore(int fd) {
   if (terminal_title_saved && platform_isatty(fd)) {
     terminal_title_saved = false;
     if (!SetConsoleTitleW(saved_terminal_title))
-      return SET_ERRNO(ERROR_TERMINAL, "Cannot restore console title");
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * @brief Ring terminal bell
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_ring_bell(void) {
+int terminal_ring_bell(void) {
   // Use Windows beep
   Beep(800, 200); // 800Hz for 200ms
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -667,15 +652,15 @@ static bool windows_try_enable_vt_processing(HANDLE hOut) {
 
 /**
  * @brief Hide terminal cursor
- * @return ASCIICHAT_OK on success, error code on failure
+ * @return 0 on success, error code on failure
  *
  * Hides the cursor on stdout if interactive. On Windows, tries VT processing
  * first (modern Windows 10+), falls back to SetConsoleCursorInfo for older versions.
  */
-asciichat_error_t terminal_cursor_hide(void) {
+int terminal_cursor_hide(void) {
   // Only operate in interactive mode
   if (!terminal_is_interactive()) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -684,7 +669,7 @@ asciichat_error_t terminal_cursor_hide(void) {
   if (windows_try_enable_vt_processing(hOut)) {
     printf("\033[?25l");
     (void)fflush(stdout);
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // Fallback to console API for older Windows
@@ -692,24 +677,24 @@ asciichat_error_t terminal_cursor_hide(void) {
   if (hOut != INVALID_HANDLE_VALUE && GetConsoleCursorInfo(hOut, &cursorInfo)) {
     cursorInfo.bVisible = FALSE;
     if (SetConsoleCursorInfo(hOut, &cursorInfo)) {
-      return ASCIICHAT_OK;
+      return 0;
     }
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * @brief Show terminal cursor
- * @return ASCIICHAT_OK on success, error code on failure
+ * @return 0 on success, error code on failure
  *
  * Shows the cursor on stdout if interactive. On Windows, tries VT processing
  * first, falls back to SetConsoleCursorInfo for older versions.
  */
-asciichat_error_t terminal_cursor_show(void) {
+int terminal_cursor_show(void) {
   // Only operate in interactive mode
   if (!terminal_is_interactive()) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -718,7 +703,7 @@ asciichat_error_t terminal_cursor_show(void) {
   if (windows_try_enable_vt_processing(hOut)) {
     printf("\033[?25h");
     (void)fflush(stdout);
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // Fallback to console API for older Windows
@@ -726,11 +711,11 @@ asciichat_error_t terminal_cursor_show(void) {
   if (hOut != INVALID_HANDLE_VALUE && GetConsoleCursorInfo(hOut, &cursorInfo)) {
     cursorInfo.bVisible = TRUE;
     if (SetConsoleCursorInfo(hOut, &cursorInfo)) {
-      return ASCIICHAT_OK;
+      return 0;
     }
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -739,11 +724,11 @@ asciichat_error_t terminal_cursor_show(void) {
  * @param bottom Bottom line of scroll region (1-based)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_set_scroll_region(int top, int bottom) {
+int terminal_set_scroll_region(int top, int bottom) {
   // Use ANSI escape sequence (Windows 10+ with VT processing enabled)
   printf("\033[%d;%dr", top, bottom);
   (void)fflush(stdout);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -751,7 +736,7 @@ asciichat_error_t terminal_set_scroll_region(int top, int bottom) {
  * @param fd File descriptor for the terminal
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_reset(int fd) {
+int terminal_reset(int fd) {
   // Reset using ANSI escape sequence
   const char *reset_seq = "\033c"; // Full reset
   HANDLE h = (HANDLE)_get_osfhandle(fd);
@@ -771,7 +756,7 @@ asciichat_error_t terminal_reset(int fd) {
     SetConsoleTextAttribute(hOut, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -779,11 +764,11 @@ asciichat_error_t terminal_reset(int fd) {
  * @param fd File descriptor (ignored on Windows - console APIs use stdout)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_cursor_home(int fd) {
+int terminal_cursor_home(int fd) {
   (void)fd; // Windows console APIs operate on stdout, not arbitrary file descriptors
   // Use ANSI escape sequence (Windows 10+ with VT processing enabled)
   if (printf("\033[H") < 0) {
-    return SET_ERRNO(ERROR_TERMINAL, "Failed to clear screen");
+    return -1;
   }
   return fflush(stdout);
 }
@@ -793,11 +778,11 @@ asciichat_error_t terminal_cursor_home(int fd) {
  * @param fd File descriptor (ignored on Windows - console APIs use stdout)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_clear_scrollback(int fd) {
+int terminal_clear_scrollback(int fd) {
   (void)fd; // Windows console APIs operate on stdout, not arbitrary file descriptors
   // Use ANSI escape sequence (Windows 10+ with VT processing enabled)
   if (printf("\033[3J") < 0) {
-    return SET_ERRNO(ERROR_TERMINAL, "Failed to clear screen and scrollback");
+    return -1;
   }
   return fflush(stdout);
 }
@@ -809,7 +794,7 @@ asciichat_error_t terminal_clear_scrollback(int fd) {
 /**
  * Get terminal size with Windows Console API - simpler than Unix
  */
-asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short int *height) {
+int get_terminal_size(unsigned short int *width, unsigned short int *height) {
   CONSOLE_SCREEN_BUFFER_INFO csbi;
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   const char *cols_env;
@@ -823,37 +808,41 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
       // Use window size, not buffer size
       *width = (unsigned short int)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
       *height = (unsigned short int)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-      log_dev("Windows terminal size from console: %ux%u", *width, *height);
-      return ASCIICHAT_OK;
+  (void)0;
+      return 0;
     }
   }
 
   // Output is redirected (not a console) or failed to get console info
-  log_dev("Windows: output is redirected (not a console), using env or defaults");
-
+  (void)0;
   // Environment variable fallback
-  cols_env = SAFE_GETENV("COLUMNS");
-  lines_env = SAFE_GETENV("LINES");
+  cols_env = platform_getenv("COLUMNS");
+  lines_env = platform_getenv("LINES");
 
-  *width = OPT_WIDTH_DEFAULT;
-  *height = OPT_HEIGHT_DEFAULT;
+  *width = 80;
+  *height = 24;
 
   if (cols_env && lines_env) {
     env_width = 0;
     env_height = 0;
     // Parse width and height with safe range validation (1 to USHRT_MAX)
-    if (parse_uint32(cols_env, &env_width, 1, (uint32_t)USHRT_MAX) == ASCIICHAT_OK &&
-        parse_uint32(lines_env, &env_height, 1, (uint32_t)USHRT_MAX) == ASCIICHAT_OK) {
+    char *end_cols = NULL;
+    char *end_lines = NULL;
+    unsigned long parsed_cols = strtoul(cols_env, &end_cols, 10);
+    unsigned long parsed_lines = strtoul(lines_env, &end_lines, 10);
+    if (*end_cols == '\0' && *end_lines == '\0' && parsed_cols > 0 && parsed_cols <= USHRT_MAX &&
+        parsed_lines > 0 && parsed_lines <= USHRT_MAX) {
+      env_width = (uint32_t)parsed_cols;
+      env_height = (uint32_t)parsed_lines;
       *width = (unsigned short int)env_width;
       *height = (unsigned short int)env_height;
-      log_dev("Windows terminal size from env: %ux%u", *width, *height);
-      return ASCIICHAT_OK;
+  (void)0;
+      return 0;
     }
   }
-
-  log_dev("Windows terminal size fallback: %ux%u (defaults)", *width, *height);
+  (void)0;
   // Don't return error - just use default size
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -867,11 +856,10 @@ tty_info_t get_current_tty(void) {
   if (result.fd >= 0) {
     result.path = "CON";
     result.owns_fd = true;
-    log_debug("Windows TTY: CON (fd=%d)", result.fd);
+  (void)0;
     return result;
   }
-
-  log_debug("Failed to open CON device: %s", SAFE_STRERROR(errno));
+  (void)0;
   return result; // No TTY available
 }
 
@@ -903,8 +891,8 @@ static terminal_color_mode_t detect_windows_color_support(void) {
     // Don't log here - avoid color changes during detection
     // Even if we can't get console mode, modern Windows terminals support ANSI colors
     // Check for Windows Terminal or other modern terminals
-    const char *wt_session = SAFE_GETENV("WT_SESSION");
-    const char *conemu = SAFE_GETENV("ConEmuPID");
+    const char *wt_session = platform_getenv("WT_SESSION");
+    const char *conemu = platform_getenv("ConEmuPID");
     if (wt_session || conemu) {
       // Don't log here - avoid color changes during detection
       return TERM_COLOR_TRUECOLOR;
@@ -922,8 +910,8 @@ static terminal_color_mode_t detect_windows_color_support(void) {
 
   // Even if SetConsoleMode fails, modern Windows terminals still support ANSI colors
   // Check for Windows Terminal or other modern terminals
-  const char *wt_session = SAFE_GETENV("WT_SESSION");
-  const char *conemu = SAFE_GETENV("ConEmuPID");
+  const char *wt_session = platform_getenv("WT_SESSION");
+  const char *conemu = platform_getenv("ConEmuPID");
   if (wt_session || conemu) {
     // Don't log here - avoid color changes during detection
     return TERM_COLOR_TRUECOLOR;
@@ -967,7 +955,7 @@ static bool detect_windows_utf8_support(void) {
 /**
  * Detect terminal capabilities on Windows - much simpler than Unix!
  */
-terminal_capabilities_t detect_terminal_capabilities(void) {
+terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options) {
   terminal_capabilities_t caps = {0};
 
   // Detect color support level
@@ -1017,18 +1005,18 @@ terminal_capabilities_t detect_terminal_capabilities(void) {
   }
 
   // Store environment variables for debugging
-  const char *term = SAFE_GETENV("TERM");
-  const char *colorterm = SAFE_GETENV("COLORTERM");
+  const char *term = platform_getenv("TERM");
+  const char *colorterm = platform_getenv("COLORTERM");
 
-  SAFE_STRNCPY(caps.term_type, term ? term : "windows-console", sizeof(caps.term_type) - 1);
-  SAFE_STRNCPY(caps.colorterm, colorterm ? colorterm : "", sizeof(caps.colorterm) - 1);
+  strncpy(caps.term_type, term ? term : "windows-console", sizeof(caps.term_type) - 1);
+  strncpy(caps.colorterm, colorterm ? colorterm : "", sizeof(caps.colorterm) - 1);
 
   // Set default FPS for Windows terminals
-  int fps = GET_OPTION(fps);
+  int fps = options.fps;
   if (fps > 0) {
     caps.desired_fps = (uint8_t)(fps > 144 ? 144 : fps);
   } else {
-    caps.desired_fps = DEFAULT_MAX_FPS; // 60 FPS on Windows with timeBeginPeriod(1)
+    caps.desired_fps = 60;
   }
 
   // Don't log here - log after colors are initialized to avoid color changes
@@ -1098,13 +1086,13 @@ void test_terminal_output_modes(void) {
 /**
  * Apply color mode and render mode overrides to detected capabilities
  */
-terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) {
+terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, terminal_options_t options) {
 #ifndef NDEBUG
   // In debug builds, force no-color mode for Claude Code (LLM doesn't need colors, saves tokens)
   // However, respect --color=true which explicitly forces colors ON
-  if (GET_OPTION(color_mode) == COLOR_MODE_AUTO && platform_getenv("CLAUDECODE") &&
-      GET_OPTION(color) != COLOR_SETTING_TRUE) {
-    log_dev("CLAUDECODE detected: forcing no color mode");
+  if (options.color_mode == TERM_COLOR_AUTO && platform_getenv("CLAUDECODE") &&
+      options.color != TERMINAL_COLOR_SETTING_TRUE) {
+  (void)0;
     caps.color_level = TERM_COLOR_NONE;
     caps.capabilities &= ~((uint32_t)TERM_CAP_COLOR_16 | (uint32_t)TERM_CAP_COLOR_256 | (uint32_t)TERM_CAP_COLOR_TRUE);
     caps.color_count = 0;
@@ -1113,32 +1101,32 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
 #endif
 
   // Handle color mode overrides
-  switch (GET_OPTION(color_mode)) {
-  case COLOR_MODE_AUTO:
+  switch (options.color_mode) {
+  case TERM_COLOR_AUTO:
     // Use detected capabilities as-is
     break;
 
-  case COLOR_MODE_NONE:
+  case TERM_COLOR_NONE:
     caps.color_level = TERM_COLOR_NONE;
     caps.color_count = 2;
     caps.capabilities &= ~((uint32_t)TERM_CAP_COLOR_TRUE | (uint32_t)TERM_CAP_COLOR_256 | (uint32_t)TERM_CAP_COLOR_16);
     break;
 
-  case COLOR_MODE_16_COLOR:
+  case TERM_COLOR_16:
     caps.color_level = TERM_COLOR_16;
     caps.color_count = 16;
     caps.capabilities &= ~((uint32_t)TERM_CAP_COLOR_TRUE | (uint32_t)TERM_CAP_COLOR_256);
     caps.capabilities |= (uint32_t)TERM_CAP_COLOR_16;
     break;
 
-  case COLOR_MODE_256_COLOR:
+  case TERM_COLOR_256:
     caps.color_level = TERM_COLOR_256;
     caps.color_count = 256;
     caps.capabilities &= ~(uint32_t)TERM_CAP_COLOR_TRUE;
     caps.capabilities |= ((uint32_t)TERM_CAP_COLOR_256 | (uint32_t)TERM_CAP_COLOR_16);
     break;
 
-  case COLOR_MODE_TRUECOLOR:
+  case TERM_COLOR_TRUECOLOR:
     caps.color_level = TERM_COLOR_TRUECOLOR;
     caps.color_count = 16777216;
     caps.capabilities |= TERM_CAP_COLOR_TRUE | TERM_CAP_COLOR_256 | TERM_CAP_COLOR_16;
@@ -1146,7 +1134,7 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
   }
 
   // Handle render mode overrides
-  switch (GET_OPTION(render_mode)) {
+  switch (options.render_mode) {
   case RENDER_MODE_FOREGROUND:
     caps.capabilities &= ~(uint32_t)TERM_CAP_BACKGROUND;
     break;
@@ -1161,13 +1149,13 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
   }
 
   // Handle UTF-8 override (force UTF-8 ON if user specified --utf8 true)
-  if (GET_OPTION(force_utf8) == UTF8_SETTING_TRUE) {
+  if (options.force_utf8 == TERMINAL_UTF8_SETTING_TRUE) {
     caps.utf8_support = true;
     caps.capabilities |= TERM_CAP_UTF8;
   }
 
   // Include client's render mode preference
-  caps.render_mode = GET_OPTION(render_mode);
+  caps.render_mode = options.render_mode;
 
   return caps;
 }
@@ -1211,7 +1199,7 @@ bool terminal_has_dark_background(void) {
           return true; // Dark background
         }
       } else {
-        log_error("Invalid color value in COLORFGBG: %s", semicolon + 1);
+  (void)0;
       }
     }
   }
@@ -1237,8 +1225,6 @@ bool terminal_has_dark_background(void) {
  * Modern Windows terminals (Windows Terminal, ConEmu) support this
  */
 bool terminal_query_background_color(uint8_t *bg_r, uint8_t *bg_g, uint8_t *bg_b) {
-  if (keyboard_is_initialized())
-    return keyboard_query_background(bg_r, bg_g, bg_b);
   // Try to open CON device for direct terminal access
   HANDLE hConsole = CreateFileA("CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                 OPEN_EXISTING, 0, NULL);

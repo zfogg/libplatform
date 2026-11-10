@@ -1,7 +1,5 @@
 #pragma once
 
-#include <libplatform/terminal_modes.h>
-
 /**
  * @file platform/terminal.h
  * @brief 🖥️ Cross-platform terminal interface for ascii-chat
@@ -79,6 +77,20 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+typedef enum terminal_color_mode {
+  TERM_COLOR_AUTO = -1,
+  TERM_COLOR_NONE = 0,
+  TERM_COLOR_16 = 1,
+  TERM_COLOR_256 = 2,
+  TERM_COLOR_TRUECOLOR = 3
+} terminal_color_mode_t;
+
+typedef enum terminal_render_mode {
+  RENDER_MODE_FOREGROUND = 0,
+  RENDER_MODE_BACKGROUND = 1,
+  RENDER_MODE_HALF_BLOCK = 2
+} terminal_render_mode_t;
 #include <stdint.h>
 #include <stdint.h>
 
@@ -297,9 +309,6 @@ typedef enum {
   TERMINAL_COLOR_SETTING_TRUE = 1,
   TERMINAL_COLOR_SETTING_FALSE = -1
 } terminal_color_setting_t;
-
-typedef enum terminal_color_mode terminal_color_mode_t;
-typedef enum render_mode render_mode_t;
 
 bool terminal_should_use_utf8(terminal_utf8_setting_t user_setting);
 
@@ -688,7 +697,7 @@ typedef struct terminal_options {
   terminal_color_setting_t color;
   terminal_color_mode_t color_mode;
   terminal_utf8_setting_t force_utf8;
-  render_mode_t render_mode;
+  terminal_render_mode_t render_mode;
   int width;
   int height;
   int fps;
@@ -746,8 +755,8 @@ typedef struct {
   bool utf8_support;
   /** @brief True if detection is confident (reliable detection) */
   bool detection_reliable;
-  /** @brief Preferred rendering mode (render_mode_t) */
-  render_mode_t render_mode;
+  /** @brief Preferred rendering mode (terminal_render_mode_t) */
+  terminal_render_mode_t render_mode;
   int text_renderer;
   bool stabilize;
   bool palette_explicit;
@@ -822,7 +831,7 @@ typedef struct {
  *
  * @ingroup platform_terminal
  */
-terminal_capabilities_t detect_terminal_capabilities(void);
+terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options);
 
 /**
  * @brief Get current TTY information
@@ -935,7 +944,7 @@ void test_terminal_output_modes(void);
  *
  * @ingroup platform_terminal
  */
-terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, const terminal_options_t *options);
+terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, terminal_options_t options);
 
 /**
  * @brief Determine if color output should be used
@@ -952,7 +961,7 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
  *
  * @ingroup platform_terminal
  */
-bool terminal_should_color_output(int fd, const terminal_options_t *options);
+bool terminal_should_color_output(int fd, terminal_options_t options);
 
 /**
  * @brief Format a clickable, underlined OSC 8 terminal link.
@@ -1195,7 +1204,6 @@ bool terminal_is_piped_output(void);
  *
  * @ingroup platform_terminal
  */
-bool terminal_should_force_stderr(void);
 
 /**
  * @brief Choose output file descriptor for logging based on level and interactivity

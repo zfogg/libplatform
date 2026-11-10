@@ -13,18 +13,18 @@ else()
 endif()
 add_library(libplatform::libplatform ALIAS libplatform)
 target_sources(libplatform-objects PRIVATE
-  lib/symbols.c lib/lifecycle.c lib/util/path.c lib/util/string.c
+  lib/symbols.c lib/lifecycle.c lib/terminal.c lib/util/path.c lib/util/string.c
 )
 if(WIN32)
     target_sources(libplatform-objects PRIVATE
-      lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal_capabilities.c
+      lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c
       lib/windows/process.c lib/windows/rwlock.c lib/windows/system.c
     )
 elseif(EMSCRIPTEN)
-    target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/stubs/backtrace.c)
+    target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/terminal.c lib/wasm/stubs/backtrace.c)
 else()
     target_sources(libplatform-objects PRIVATE
-      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal_capabilities.c
+      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_capabilities.c
       lib/posix/process.c lib/posix/rwlock.c lib/linux/system.c
     )
 endif()

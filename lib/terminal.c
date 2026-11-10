@@ -5,34 +5,56 @@
  */
 
 #include <libplatform/terminal.h>
-#include <libplatform/abstraction.h>
-#include <ascii-chat/options/options.h>
-#include <ascii-chat/options/rcu.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/log/log.h>
+#include <libplatform/system.h>
 #ifndef _WIN32
 #include <unistd.h>
+#else
+#include <io.h>
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
 #endif
 #include <string.h>
 
-bool terminal_should_use_utf8(terminal_utf8_setting_t user_setting) {
-  return user_setting > 0 || (user_setting == 0 && terminal_supports_utf8());
+int terminal_format_hyperlink(char *buffer, size_t capacity, const char *url, const char *label, bool enabled) {
+  if (!buffer || !capacity || !url || !*url || !label)
+    return -1;
+  buffer[0] = '\0';
+  const char *parts[] = {url, label};
+  for (size_t i = 0; i < 2; ++i) {
+    for (const unsigned char *p = (const unsigned char *)parts[i]; *p; ++p) {
+      if (*p < 32 || *p == 127)
+        return -1;
+    }
+  }
+  int length = enabled ? snprintf(buffer, capacity, "\033]8;;%s\033\\\033[4m%s\033[24m\033]8;;\033\\", url, label)
+                       : snprintf(buffer, capacity, "%s", label);
+  if (length < 0 || (size_t)length >= capacity) {
+    buffer[0] = '\0';
+    return -1;
+  }
+  return length;
 }
 
-asciichat_error_t terminal_resize_poll(terminal_resize_watcher_t *watcher, int fd, bool *changed) {
+bool terminal_should_use_utf8(terminal_utf8_setting_t user_setting) {
+  return user_setting == TERMINAL_UTF8_SETTING_TRUE ||
+         (user_setting == TERMINAL_UTF8_SETTING_AUTO && terminal_supports_utf8());
+}
+
+int terminal_resize_poll(terminal_resize_watcher_t *watcher, int fd, bool *changed) {
   if (changed)
     *changed = false;
   if (!watcher || !changed)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Resize watcher and change output are required");
+    return -1;
   terminal_size_t size;
-  asciichat_error_t result = terminal_get_size_fd(fd, &size);
-  if (result != ASCIICHAT_OK)
+  int result = terminal_get_size_fd(fd, &size);
+  if (result != 0)
     return result;
   if (size.cols <= 0 || size.rows <= 0)
-    return SET_ERRNO(ERROR_TERMINAL, "Terminal dimensions must be positive");
+    return -1;
   *changed = size.cols != watcher->size.cols || size.rows != watcher->size.rows;
   watcher->size = size;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -48,34 +70,33 @@ asciichat_error_t terminal_resize_poll(terminal_resize_watcher_t *watcher, int f
  * @param fd File descriptor to check (STDOUT_FILENO or STDERR_FILENO)
  * @return true if colors should be used, false otherwise
  */
-bool terminal_should_color_output(int fd, const terminal_options_t *options) {
-  if (!options) return false;
+bool terminal_should_color_output(int fd, terminal_options_t options) {
   // Check color_mode setting - if explicitly set to NONE, disable colors
-  int color_mode = options->color_mode;
-  if (color_mode == COLOR_MODE_NONE) {
+  terminal_color_mode_t color_mode = options.color_mode;
+  if (color_mode == TERM_COLOR_NONE) {
     return false; // Color mode explicitly disabled
   }
 
   // Get current color setting (auto/true/false)
-  int color_setting = options->color;
+  int color_setting = options.color;
 
   // Priority 1: --color=true - Force colors ON (overrides everything)
-  if (color_setting == COLOR_SETTING_TRUE) {
+  if (color_setting == TERMINAL_COLOR_SETTING_TRUE) {
     return true; // ALWAYS colorize
   }
 
   // Priority 2: --color=false - Force colors OFF (overrides everything)
-  if (color_setting == COLOR_SETTING_FALSE) {
+  if (color_setting == TERMINAL_COLOR_SETTING_FALSE) {
     return false; // NEVER colorize
   }
 
   // Priority 3: --color=auto (default) - Smart detection
   // Special case: Show colors for --help and --version even if not a TTY
   // Check for help/version in global argv (set by main.c early)
-  if (options->argc > 1 && options->argv) {
-    for (int i = 1; i < options->argc; i++) {
-      if (strcmp(options->argv[i], "--help") == 0 || strcmp(options->argv[i], "-h") == 0 || strcmp(options->argv[i], "--version") == 0 ||
-          strcmp(options->argv[i], "-v") == 0 || strcmp(options->argv[i], "--show-capabilities") == 0) {
+  if (options.argc > 1 && options.argv) {
+    for (int i = 1; i < options.argc; i++) {
+      if (strcmp(options.argv[i], "--help") == 0 || strcmp(options.argv[i], "-h") == 0 || strcmp(options.argv[i], "--version") == 0 ||
+          strcmp(options.argv[i], "-v") == 0 || strcmp(options.argv[i], "--show-capabilities") == 0) {
         // For help/version/show-capabilities, use colors only if output is a TTY
         // (respect piping convention: no colors unless --color=true)
         int is_tty = platform_isatty(fd);
@@ -85,12 +106,12 @@ bool terminal_should_color_output(int fd, const terminal_options_t *options) {
         }
 
         // It's a TTY - show colors for help. Check environment overrides.
-        if (SAFE_GETENV("ASCII_CHAT_COLOR")) {
+        if (platform_getenv("ASCII_CHAT_COLOR")) {
           return true; // ASCII_CHAT_COLOR env var forces colors
         }
 
         // CLAUDECODE environment variable (LLM automation) - disable colors
-        if (SAFE_GETENV("CLAUDECODE")) {
+        if (platform_getenv("CLAUDECODE")) {
           return false; // NO colors in Claude Code environment
         }
 
@@ -101,12 +122,12 @@ bool terminal_should_color_output(int fd, const terminal_options_t *options) {
   }
 
   // Check environment variable overrides
-  if (SAFE_GETENV("ASCII_CHAT_COLOR")) {
+  if (platform_getenv("ASCII_CHAT_COLOR")) {
     return true; // ASCII_CHAT_COLOR env var forces colors
   }
 
   // CLAUDECODE environment variable (LLM automation) - disable colors
-  if (SAFE_GETENV("CLAUDECODE")) {
+  if (platform_getenv("CLAUDECODE")) {
     return false; // NO colors in Claude Code environment
   }
 
@@ -127,12 +148,12 @@ bool terminal_should_color_output(int fd, const terminal_options_t *options) {
  */
 terminal_color_mode_t terminal_get_effective_color_mode(const terminal_options_t *options) {
   // If colors are disabled entirely by terminal_should_color_output(), return NONE
-  if (!terminal_should_color_output(STDOUT_FILENO, options)) {
+  if (!options || !terminal_should_color_output(STDOUT_FILENO, *options)) {
     return TERM_COLOR_NONE;
   }
 
   // If --color-mode is set to specific value, use it
-  terminal_color_mode_t color_mode = options ? (terminal_color_mode_t)options->color_mode : TERM_COLOR_NONE;
+  terminal_color_mode_t color_mode = options ? options->color_mode : TERM_COLOR_AUTO;
   if (color_mode != TERM_COLOR_AUTO) {
     return color_mode;
   }
@@ -172,7 +193,6 @@ bool terminal_is_interactive(void) {
  * 3. OPT_WIDTH_DEFAULT fallback
  */
 unsigned short int terminal_get_effective_width(int width, unsigned short fallback_width) {
-
   // If width option is explicitly set to non-zero, use it
   if (width > 0) {
     return (unsigned short int)width;
@@ -180,7 +200,7 @@ unsigned short int terminal_get_effective_width(int width, unsigned short fallba
 
   // Try to detect actual terminal width
   terminal_size_t size;
-  if (terminal_get_size(&size) == ASCIICHAT_OK && size.cols > 0) {
+  if (terminal_get_size(&size) == 0 && size.cols > 0) {
     return (unsigned short int)size.cols;
   }
 
@@ -197,7 +217,6 @@ unsigned short int terminal_get_effective_width(int width, unsigned short fallba
  * 3. OPT_HEIGHT_DEFAULT fallback
  */
 unsigned short int terminal_get_effective_height(int height, unsigned short fallback_height) {
-
   // If height option is explicitly set to non-zero, use it
   if (height > 0) {
     return (unsigned short int)height;
@@ -205,7 +224,7 @@ unsigned short int terminal_get_effective_height(int height, unsigned short fall
 
   // Try to detect actual terminal height
   terminal_size_t size;
-  if (terminal_get_size(&size) == ASCIICHAT_OK && size.rows > 0) {
+  if (terminal_get_size(&size) == 0 && size.rows > 0) {
     return (unsigned short int)size.rows;
   }
 
@@ -217,20 +236,6 @@ bool terminal_is_piped_output(void) {
   return !terminal_is_stdout_tty();
 }
 
-bool terminal_should_force_stderr(void) {
-  // If stdout is piped/redirected, force logs to stderr to avoid corruption
-  if (terminal_is_piped_output()) {
-    // Unless in TESTING environment where test framework may capture stdout
-    const char *testing = SAFE_GETENV("TESTING");
-    if (testing && strcmp(testing, "1") == 0) {
-      // NOLINTNEXTLINE(readability-simplify-boolean-expr) - Intentional logic for test environment override
-      return false;
-    }
-    return true; // Force stderr when piped
-  }
-  return false; // stdout is TTY, no need to force stderr
-}
-
 bool terminal_can_prompt_user(bool user_setting) {
   // Must be fully interactive (stdin and stdout are TTYs)
   if (!terminal_is_interactive()) {
@@ -238,12 +243,12 @@ bool terminal_can_prompt_user(bool user_setting) {
   }
 
   // Must not be in snapshot mode (non-interactive capture)
-  if (user_setting) {
+  if (!user_setting) {
     return false;
   }
 
   // Must not have automated prompt responses configured
-  const char *auto_response = SAFE_GETENV("ASCII_CHAT_QUESTION_PROMPT_RESPONSE");
+  const char *auto_response = platform_getenv("ASCII_CHAT_QUESTION_PROMPT_RESPONSE");
   if (auto_response && *auto_response != '\0') {
     // NOLINTNEXTLINE(readability-simplify-boolean-expr) - Intentional check for configured automated responses
     return false;
@@ -251,24 +256,6 @@ bool terminal_can_prompt_user(bool user_setting) {
 
   // All checks passed, interactive prompts are appropriate
   return true;
-}
-
-int terminal_choose_log_fd(log_level_t level) {
-  // When force_stderr is enabled (client mode), send ALL logs to stderr
-  // When terminal is NOT interactive (piped/redirected), send ALL logs to stderr
-  // to keep stdout clean for piped data (JSON, frames, etc.)
-  if (log_get_force_stderr() || !terminal_is_interactive()) {
-    return STDERR_FILENO;
-  }
-
-  // In interactive mode, route based on level:
-  // WARN and above (ERROR, FATAL) go to stderr
-  // Others (DEV, DEBUG, INFO) go to stdout
-  if (level >= LOG_WARN) {
-    return STDERR_FILENO;
-  }
-
-  return STDOUT_FILENO;
 }
 
 /* ============================================================================
@@ -338,31 +325,9 @@ bool terminal_should_use_control_sequences(int fd, bool user_setting) {
   if (user_setting) {
     return false;
   }
-  const char *testing_env = SAFE_GETENV("TESTING");
+  const char *testing_env = platform_getenv("TESTING");
   if (testing_env != NULL) {
     return false;
   }
   return platform_isatty(fd) != 0;
-}
-
-int terminal_format_hyperlink(char *buffer, size_t capacity, const char *url, const char *label, bool enabled) {
-  if (!buffer || !capacity)
-    return -1;
-  buffer[0] = '\0';
-  if (!url || !*url || !label)
-    return -1;
-  const char *parts[] = {url, label};
-  for (size_t i = 0; i < 2; ++i) {
-    for (const unsigned char *p = (const unsigned char *)parts[i]; *p; ++p) {
-      if (*p < 32 || *p == 127)
-        return -1;
-    }
-  }
-  int length = enabled ? snprintf(buffer, capacity, "\033]8;;%s\033\\\033[4m%s\033[24m\033]8;;\033\\", url, label)
-                       : snprintf(buffer, capacity, "%s", label);
-  if (length < 0 || (size_t)length >= capacity) {
-    buffer[0] = '\0';
-    return -1;
-  }
-  return length;
 }

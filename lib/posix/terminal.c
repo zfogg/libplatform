@@ -4,7 +4,6 @@
 #define PLATFORM_POSIX_TERMINAL_RESPONSE_BUFFER_SIZE 256
 #define PLATFORM_POSIX_TERMINAL_SEQUENCE_BUFFER_SIZE 1024
 
-#include <libplatform/keyboard.h>
 /**
  * @file platform/posix/terminal.c
  * @ingroup platform
@@ -16,13 +15,8 @@
 #include "terminal.h"
 #include <libplatform/terminal.h>
 #include <libplatform/filesystem.h>
-#include <libplatform/internal.h>
-#include <ascii-chat/options/options.h>
-#include <ascii-chat/options/rcu.h> // For RCU-based options access
-#include <ascii-chat/common.h>
-#include <ascii-chat/asciichat_errno.h>
-#include <ascii-chat/util/parsing.h>
-#include <ascii-chat/log/log.h>
+#include <libplatform/system.h>
+#include <libplatform/util/string.h>
 #include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -63,28 +57,28 @@ const char *platform_ttyname(int fd) {
  * @param size Pointer to terminal_size_t structure to fill
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_get_size_fd(int fd, terminal_size_t *size) {
+int terminal_get_size_fd(int fd, terminal_size_t *size) {
   if (!size)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Terminal size output is NULL");
+    return -1;
   *size = (terminal_size_t){0};
   struct winsize ws = {0};
   if (ioctl(fd, TIOCGWINSZ, &ws) != 0)
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Cannot query terminal descriptor %d", fd);
+    return -1;
   size->cols = ws.ws_col;
   size->rows = ws.ws_row;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t terminal_get_size(terminal_size_t *size) {
+int terminal_get_size(terminal_size_t *size) {
   struct winsize ws;
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
     size->rows = ws.ws_row;
     size->cols = ws.ws_col;
-    return ASCIICHAT_OK;
+    return 0;
   }
-  // return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to get terminal size");
+  // return -1;
   // NOTE: this might be called from wasm or when piping in the terminal so we needn't error here.
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -100,14 +94,14 @@ const char *get_tty_path(void) {
  * @param enable True to enable raw mode, false to restore normal mode
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_set_raw_mode(bool enable) {
+int terminal_set_raw_mode(bool enable) {
   static struct termios orig_termios;
   static bool saved = false;
 
   terminal_input_lock();
   if (isatty(STDIN_FILENO) && tcgetpgrp(STDIN_FILENO) != getpgrp()) {
     terminal_input_unlock();
-    return SET_ERRNO(ERROR_TERMINAL, "Terminal input is owned by another process");
+    return -1;
   }
 
   if (enable) {
@@ -122,19 +116,19 @@ asciichat_error_t terminal_set_raw_mode(bool enable) {
     raw.c_lflag &= ~(tcflag_t)(ECHO | ICANON | IEXTEN | ISIG);
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) != 0) {
       terminal_input_unlock();
-      return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to set raw mode");
+    return -1;
     }
     terminal_input_unlock();
-    return ASCIICHAT_OK;
+    return 0;
   }
   if (saved) {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) != 0) {
       terminal_input_unlock();
-      return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to restore terminal mode");
+    return -1;
     }
   }
   terminal_input_unlock();
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -142,16 +136,16 @@ asciichat_error_t terminal_set_raw_mode(bool enable) {
  * @param enable True to enable echo, false to disable
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_set_echo(bool enable) {
+int terminal_set_echo(bool enable) {
   struct termios tty;
   terminal_input_lock();
   if (isatty(STDIN_FILENO) && tcgetpgrp(STDIN_FILENO) != getpgrp()) {
     terminal_input_unlock();
-    return SET_ERRNO(ERROR_TERMINAL, "Terminal input is owned by another process");
+    return -1;
   }
   if (tcgetattr(STDIN_FILENO, &tty) != 0) {
     terminal_input_unlock();
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to get terminal attributes");
+    return -1;
   }
 
   if (enable) {
@@ -162,11 +156,11 @@ asciichat_error_t terminal_set_echo(bool enable) {
 
   if (tcsetattr(STDIN_FILENO, TCSANOW, &tty) != 0) {
     terminal_input_unlock();
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to set echo mode");
+    return -1;
   }
 
   terminal_input_unlock();
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -253,19 +247,19 @@ bool terminal_supports_utf8(void) {
  * @brief Clear the terminal screen
  * @return 0 on success, non-zero on failure
  */
-asciichat_error_t terminal_clear_screen(void) {
+int terminal_clear_screen(void) {
   // Skip ANSI codes when not writing to a TTY (e.g., piping to file)
   if (!terminal_is_stdout_tty()) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // Use ANSI escape codes instead of system("clear") to avoid command processor
   // \033[2J clears entire screen, \033[H moves cursor to home position
   int fd = STDOUT_FILENO;
   if (dprintf(fd, "\033[2J\033[H") < 0) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to clear screen");
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -274,7 +268,7 @@ asciichat_error_t terminal_clear_screen(void) {
  * @param col Column position (0-based)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_move_cursor(int row, int col) {
+int terminal_move_cursor(int row, int col) {
   // Skip ANSI codes when not writing to a TTY (e.g., piping to file)
   if (!terminal_is_stdout_tty()) {
     return 0;
@@ -288,18 +282,18 @@ asciichat_error_t terminal_move_cursor(int row, int col) {
 /**
  * @brief Move cursor relative to current position
  * @param offset Relative movement: positive = right, negative = left
- * @return ASCIICHAT_OK on success
+ * @return 0 on success
  *
  * Uses ANSI escape sequences: \x1b[nC (right) or \x1b[nD (left)
  */
-asciichat_error_t terminal_move_cursor_relative(int offset) {
+int terminal_move_cursor_relative(int offset) {
   // Skip ANSI codes when not writing to a TTY
   if (!terminal_is_stdout_tty()) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (offset == 0) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (offset > 0) {
@@ -311,7 +305,7 @@ asciichat_error_t terminal_move_cursor_relative(int offset) {
   }
 
   (void)fflush(stdout);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -332,11 +326,11 @@ void terminal_enable_ansi(void) {
  * character devices without persistent storage. We use tcdrain() for TTYs
  * which waits until all output has been transmitted.
  */
-asciichat_error_t terminal_flush(int fd) {
+int terminal_flush(int fd) {
   // Drain output without discarding bytes queued concurrently by presentation.
   // TCOFLUSH would drop a frame written between tcdrain() and tcflush().
   if (tcdrain(fd) == 0) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // Non-terminal files may support fsync; pipes need no additional operation.
@@ -344,44 +338,44 @@ asciichat_error_t terminal_flush(int fd) {
     // ENOTSUP: not supported, EINVAL: not a regular file (pipes), EBADF: bad fd
     // These are OK - just means this fd type doesn't support flushing
     if (errno != ENOTSUP && errno != EINVAL && errno != EBADF) {
-      return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to flush terminal output");
+    return -1;
     }
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * @brief Hide terminal cursor
- * @return ASCIICHAT_OK on success, error code on failure
+ * @return 0 on success, error code on failure
  *
  * Hides the cursor on stdout if in interactive mode.
  */
-asciichat_error_t terminal_cursor_hide(void) {
+int terminal_cursor_hide(void) {
   // Only emit escape sequences in interactive mode
   if (!terminal_is_interactive()) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (dprintf(STDOUT_FILENO, "\033[?25l") < 0) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to hide cursor");
+    return -1;
   }
   return terminal_flush(STDOUT_FILENO);
 }
 
 /**
  * @brief Show terminal cursor
- * @return ASCIICHAT_OK on success, error code on failure
+ * @return 0 on success, error code on failure
  *
  * Shows the cursor on stdout if in interactive mode.
  */
-asciichat_error_t terminal_cursor_show(void) {
+int terminal_cursor_show(void) {
   // Only emit escape sequences in interactive mode
   if (!terminal_is_interactive()) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (dprintf(STDOUT_FILENO, "\033[?25h") < 0) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to show cursor");
+    return -1;
   }
   return terminal_flush(STDOUT_FILENO);
 }
@@ -391,14 +385,14 @@ asciichat_error_t terminal_cursor_show(void) {
  * @param fd File descriptor for TTY output
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_cursor_home(int fd) {
+int terminal_cursor_home(int fd) {
   // Skip ANSI codes when not writing to a TTY (e.g., piping to file)
   if (!platform_isatty(fd)) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (dprintf(fd, "\033[H") < 0) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to move cursor to home");
+    return -1;
   }
   return terminal_flush(fd);
 }
@@ -408,14 +402,14 @@ asciichat_error_t terminal_cursor_home(int fd) {
  * @param fd File descriptor for TTY output
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_clear_scrollback(int fd) {
+int terminal_clear_scrollback(int fd) {
   // Skip ANSI codes when not writing to a TTY (e.g., piping to file)
   if (!platform_isatty(fd)) {
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (dprintf(fd, "\033[3J") < 0) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to clear scrollback buffer");
+    return -1;
   }
   return terminal_flush(fd);
 }
@@ -506,9 +500,9 @@ bool is_valid_tty_path(const char *path) {
  * @param height Pointer to store terminal height
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short int *height) {
+int get_terminal_size(unsigned short int *width, unsigned short int *height) {
   if (!width || !height) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters");
+    return -1;
   }
 
   struct winsize ws = {0};
@@ -522,7 +516,7 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
     *width = ws.ws_col;
     *height = ws.ws_row;
     log_dev("POSIX terminal size from stdout ioctl: %dx%d", *width, *height);
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // When stdout is NOT a TTY (piped/redirected), skip stdin/stderr checks
@@ -534,7 +528,7 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
       *width = ws.ws_col;
       *height = ws.ws_row;
       log_dev("POSIX terminal size from stdin ioctl: %dx%d", *width, *height);
-      return ASCIICHAT_OK;
+      return 0;
     }
 
     // Method 2c: Try ioctl on stderr (only if stdout is TTY)
@@ -542,7 +536,7 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
       *width = ws.ws_col;
       *height = ws.ws_row;
       log_dev("POSIX terminal size from stderr ioctl: %dx%d", *width, *height);
-      return ASCIICHAT_OK;
+      return 0;
     }
   }
 
@@ -554,12 +548,12 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
   if (lines_env && cols_env) {
     uint32_t env_height = 0, env_width = 0;
     // Parse height and width with safe range validation (1 to USHRT_MAX)
-    if (parse_uint32(lines_env, &env_height, 1, (uint32_t)USHRT_MAX) == ASCIICHAT_OK &&
-        parse_uint32(cols_env, &env_width, 1, (uint32_t)USHRT_MAX) == ASCIICHAT_OK) {
+    if (parse_uint32(lines_env, &env_height, 1, (uint32_t)USHRT_MAX) == 0 &&
+        parse_uint32(cols_env, &env_width, 1, (uint32_t)USHRT_MAX) == 0) {
       *width = (unsigned short int)env_width;
       *height = (unsigned short int)env_height;
       log_dev("POSIX terminal size from env: %dx%d", *width, *height);
-      return ASCIICHAT_OK;
+      return 0;
     }
     log_dev("Invalid environment terminal dimensions: %s x %s", lines_env, cols_env);
   }
@@ -578,7 +572,7 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
         *height = ws.ws_row;
         close(tty_fd);
         log_dev("POSIX terminal size from /dev/tty ioctl: %dx%d", *width, *height);
-        return ASCIICHAT_OK;
+        return 0;
       }
       close(tty_fd);
     }
@@ -588,7 +582,7 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
   *width = OPT_WIDTH_DEFAULT;
   *height = OPT_HEIGHT_DEFAULT;
   log_dev("POSIX terminal size fallback: %dx%d (defaults)", *width, *height);
-  return ASCIICHAT_OK; // Fallback succeeded with defaults
+  return 0; // Fallback succeeded with defaults
 }
 
 /**
@@ -874,11 +868,11 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
  * @param fd File descriptor for the terminal (e.g., from $TTY on macOS)
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t terminal_reset(int fd) {
+int terminal_reset(int fd) {
   // Reset using ANSI escape sequence
   const char *reset_seq = "\033c"; // Full reset
   if (write(fd, reset_seq, strlen(reset_seq)) < 0) {
-    return SET_ERRNO_SYS(ERROR_TERMINAL, "Failed to reset terminal");
+    return -1;
   }
   return 0;
 }
@@ -971,8 +965,6 @@ bool terminal_has_dark_background(void) {
  * Query terminal background color using OSC 11
  */
 bool terminal_query_background_color(uint8_t *bg_r, uint8_t *bg_g, uint8_t *bg_b) {
-  if (keyboard_is_initialized())
-    return keyboard_query_background(bg_r, bg_g, bg_b);
   // Try to open /dev/tty directly (works even when stdin/stdout are redirected)
   int tty_fd = open("/dev/tty", O_RDWR);
   if (tty_fd < 0) {
@@ -1081,22 +1073,22 @@ void terminal_stop_resize_detection(void) {
   // This is a no-op stub for compatibility
 }
 
-static asciichat_error_t title_write(int fd, const char *text) {
+static int title_write(int fd, const char *text) {
   const char *term = SAFE_GETENV("TERM");
   if (!platform_isatty(fd) || (term && strcmp(term, "dumb") == 0))
-    return ASCIICHAT_OK;
+    return 0;
   size_t length = strlen(text);
-  return platform_write_all(fd, text, length) == length ? ASCIICHAT_OK
-                                                        : SET_ERRNO_SYS(ERROR_TERMINAL, "Cannot write terminal title");
+  return platform_write_all(fd, text, length) == length ? 0
+                                                        : -1;
 }
-asciichat_error_t terminal_set_title_fd(int fd, const char *title) {
+int terminal_set_title_fd(int fd, const char *title) {
   if (!title)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Terminal title must not be NULL");
+    return -1;
   char sequence[PLATFORM_POSIX_TERMINAL_SEQUENCE_BUFFER_SIZE];
   size_t used = 4, length = strlen(title);
   memcpy(sequence, "\033]0;", 4);
   if (length > sizeof(sequence) - 7)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Terminal title is too long");
+    return -1;
   for (size_t i = 0; i < length; ++i) {
     unsigned char c = (unsigned char)title[i];
     sequence[used++] = c < 0x20 || c == 0x7f ? ' ' : title[i];
@@ -1106,13 +1098,13 @@ asciichat_error_t terminal_set_title_fd(int fd, const char *title) {
   sequence[used] = '\0';
   return title_write(fd, sequence);
 }
-asciichat_error_t terminal_set_title(const char *title) {
+int terminal_set_title(const char *title) {
   return terminal_set_title_fd(STDOUT_FILENO, title);
 }
-asciichat_error_t terminal_title_save(int fd) {
+int terminal_title_save(int fd) {
   return title_write(fd, "\033[22;0t");
 }
-asciichat_error_t terminal_title_restore(int fd) {
+int terminal_title_restore(int fd) {
   return title_write(fd, "\033[23;0t");
 }
 
