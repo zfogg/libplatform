@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdarg.h>
+int platform_vsnprintf(char *str, size_t size, const char *format, va_list ap);
 char *platform_strdup(const char *s);
 int platform_strcasecmp(const char *s1, const char *s2);
 int platform_strncasecmp(const char *s1, const char *s2, size_t n);
