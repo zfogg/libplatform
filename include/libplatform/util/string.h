@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <libplatform/system.h>
 int platform_vsnprintf(char *str, size_t size, const char *format, va_list ap);
+int platform_vasprintf(char **strp, const char *format, va_list ap);
 ssize_t platform_getline(char **lineptr, size_t *n, FILE *stream);
 char *platform_strdup(const char *s);
 int platform_strcasecmp(const char *s1, const char *s2);
