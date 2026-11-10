@@ -4,6 +4,8 @@
 #if defined(_WIN32)
 #define LIBPLATFORM_WINDOWS 1
 #define LIBPLATFORM_POSIX 0
+#define PLATFORM_WINDOWS 1
+#define PLATFORM_POSIX 0
 #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))
 #define PACKED_STRUCT_END __pragma(pack(pop))
 #define PACKED_ATTR
@@ -19,6 +21,8 @@
 #else
 #define LIBPLATFORM_WINDOWS 0
 #define LIBPLATFORM_POSIX 1
+#define PLATFORM_WINDOWS 0
+#define PLATFORM_POSIX 1
 #define PACKED_STRUCT_BEGIN
 #define PACKED_STRUCT_END
 #define PACKED_ATTR __attribute__((packed))
