@@ -17,6 +17,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: Enable ARM64 emulation
+        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
       - name: Install Linux static toolchain
         if: matrix.os == 'linux'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
@@ -24,6 +29,27 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          if [ '${{ matrix.os }}' = linux ] && [ '${{ matrix.arch }}' = arm64 ]; then
+            docker run --rm --platform linux/arm64 \
+              -v "$PWD:/src" -w /src arm64v8/ubuntu:24.04 bash -euxo pipefail -c '
+                apt-get update
+                DEBIAN_FRONTEND=noninteractive apt-get install -y cmake ninja-build gcc musl-tools zip
+                for linkage in static shared; do
+                  shared=OFF; [ "$linkage" = shared ] && shared=ON
+                  cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON -DCMAKE_C_COMPILER=musl-gcc
+                  cmake --build "build-$linkage"
+                  ctest --test-dir "build-$linkage" --output-on-failure
+                  cmake --install "build-$linkage" --prefix "stage-$linkage"
+                done
+                mkdir -p package/include package/lib package/bin
+                cp -R stage-static/include/* package/include/
+                cp -R stage-static/lib/* package/lib/ || true
+                cp -R stage-shared/lib/* package/lib/ || true
+                cp -R stage-shared/bin/* package/bin/ 2>/dev/null || true
+                zip -r "libplatform-${{ matrix.os }}-${{ matrix.arch }}.zip" package
+              '
+            exit 0
+          fi
           for linkage in static shared; do
             shared=OFF; [ "$linkage" = shared ] && shared=ON
             compiler=""
