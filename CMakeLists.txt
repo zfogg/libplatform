@@ -11,10 +11,21 @@ else()
   add_library(libplatform STATIC $<TARGET_OBJECTS:libplatform-objects>)
 endif()
 add_library(libplatform::libplatform ALIAS libplatform)
-target_sources(libplatform-objects PRIVATE src/backtrace.c src/symbols.c)
+target_sources(libplatform-objects PRIVATE
+  lib/symbols.c lib/lifecycle.c lib/util/path.c lib/util/string.c
+)
 if(WIN32)
-  target_sources(libplatform-objects PRIVATE src/windows_backtrace.c)
-  set_source_files_properties(src/backtrace.c PROPERTIES HEADER_FILE_ONLY TRUE)
+    target_sources(libplatform-objects PRIVATE
+      lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal_capabilities.c
+      lib/windows/process.c lib/windows/rwlock.c lib/windows/system.c
+    )
+elseif(EMSCRIPTEN)
+    target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/stubs/backtrace.c)
+else()
+    target_sources(libplatform-objects PRIVATE
+      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal_capabilities.c
+      lib/posix/process.c lib/posix/rwlock.c lib/linux/system.c
+    )
 endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
