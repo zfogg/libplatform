@@ -7,9 +7,11 @@
 #if defined(_WIN32)
 #include <windows.h>
 #elif defined(__EMSCRIPTEN__)
-#elif defined(__APPLE__) || defined(__linux__) || defined(__unix__)
+#elif (defined(__APPLE__) || defined(__linux__) || defined(__unix__)) && \
+    (!defined(__has_include) || __has_include(<execinfo.h>) )
 #include <dlfcn.h>
 #include <execinfo.h>
+#define LIBPLATFORM_HAS_EXECINFO 1
 #endif
 
 static char *dup_string(const char *s) {
@@ -25,7 +27,7 @@ int libplatform_backtrace_capture(void **frames, int capacity) {
   return (int)CaptureStackBackTrace(1, (DWORD)capacity, frames, NULL);
 #elif defined(__EMSCRIPTEN__)
   (void)frames; (void)capacity; return 0;
-#elif defined(__APPLE__) || defined(__linux__) || defined(__unix__)
+#elif defined(LIBPLATFORM_HAS_EXECINFO)
   return backtrace(frames, capacity);
 #else
   return 0;
@@ -43,7 +45,7 @@ char **libplatform_backtrace_symbolize(void *const *frames, int count) {
   for (int i = 0; i < count; ++i) { char buf[64]; snprintf(buf, sizeof(buf), "%p", frames[i]); out[i] = dup_string(buf); }
 #elif defined(_WIN32)
   for (int i = 0; i < count; ++i) { char buf[64]; snprintf(buf, sizeof(buf), "%p", frames[i]); out[i] = dup_string(buf); }
-#elif defined(__APPLE__) || defined(__linux__) || defined(__unix__)
+#elif defined(LIBPLATFORM_HAS_EXECINFO)
   char **native = backtrace_symbols(frames, count);
   if (native) { for (int i = 0; i < count; ++i) out[i] = dup_string(native[i]); free(native); }
   else { for (int i = 0; i < count; ++i) { char buf[64]; snprintf(buf, sizeof(buf), "%p", frames[i]); out[i] = dup_string(buf); } }

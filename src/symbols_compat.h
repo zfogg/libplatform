@@ -32,6 +32,7 @@
 #endif
 #define ERROR_INVALID_PARAM 1
 #define ERROR_THREAD 2
+#define ERROR_BUFFER_OVERFLOW 3
 #define SET_ERRNO(code, ...) (code)
 
 typedef struct { atomic_uint_fast64_t value; } atomic_t;
