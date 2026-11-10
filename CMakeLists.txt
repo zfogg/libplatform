@@ -24,7 +24,7 @@ elseif(EMSCRIPTEN)
     target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/terminal.c lib/wasm/stubs/backtrace.c)
 else()
     target_sources(libplatform-objects PRIVATE
-      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_capabilities.c
+      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_sync.c lib/posix/terminal_capabilities.c
       lib/posix/process.c lib/posix/rwlock.c lib/linux/system.c
     )
 endif()

@@ -12,7 +12,10 @@
 
 #ifndef _WIN32
 
-#include "terminal.h"
+#define OPT_WIDTH_DEFAULT 110
+#define OPT_HEIGHT_DEFAULT 40
+#define DEFAULT_MAX_FPS 60
+
 #include <libplatform/terminal.h>
 #include <libplatform/filesystem.h>
 #include <libplatform/system.h>
@@ -190,7 +193,7 @@ static void _init_terminal_cache(void) {
   }
 
   // Detect color support
-  const char *term = SAFE_GETENV("TERM");
+  const char *term = platform_getenv("TERM");
   if (term && (strstr(term, "color") != NULL || strstr(term, "xterm") != NULL || strstr(term, "screen") != NULL ||
                strstr(term, "vt100") != NULL || strstr(term, "linux") != NULL)) {
     g_terminal_cache.color_support = 1;
@@ -199,9 +202,9 @@ static void _init_terminal_cache(void) {
   }
 
   // Detect unicode support
-  const char *lang = SAFE_GETENV("LANG");
-  const char *lc_all = SAFE_GETENV("LC_ALL");
-  const char *lc_ctype = SAFE_GETENV("LC_CTYPE");
+  const char *lang = platform_getenv("LANG");
+  const char *lc_all = platform_getenv("LC_ALL");
+  const char *lc_ctype = platform_getenv("LC_CTYPE");
 
   const char *check;
   if (lc_all) {
@@ -428,7 +431,7 @@ tty_info_t get_current_tty(void) {
   tty_info_t result = {-1, NULL, false};
 
   // Method 1: Check $TTY environment variable first (most specific on macOS)
-  const char *tty_env = SAFE_GETENV("TTY");
+  const char *tty_env = platform_getenv("TTY");
   if (tty_env && strlen(tty_env) > 0 && is_valid_tty_path(tty_env)) {
     // Strict validation: path must start with "/dev/", and not contain ".." or extra slashes after "/dev/"
     if (strncmp(tty_env, "/dev/", 5) == 0 && strstr(tty_env, "..") == NULL && strchr(tty_env + 5, '/') == NULL) {
@@ -436,7 +439,6 @@ tty_info_t get_current_tty(void) {
       if (result.fd >= 0) {
         result.path = tty_env;
         result.owns_fd = true;
-        log_dev("POSIX TTY from $TTY: %s (fd=%d)", tty_env, result.fd);
         return result;
       }
     }
@@ -447,7 +449,6 @@ tty_info_t get_current_tty(void) {
     result.fd = STDIN_FILENO;
     result.path = ttyname(STDIN_FILENO);
     result.owns_fd = false;
-    log_dev("POSIX TTY from stdin: %s (fd=%d)", result.path ? result.path : "unknown", result.fd);
     return result;
   }
   if (platform_isatty(STDOUT_FILENO)) {
@@ -459,8 +460,6 @@ tty_info_t get_current_tty(void) {
 
   // If stdout is not a TTY (piped/redirected), don't use stderr as a fallback
   // This respects the user's intent to pipe output without mixing ASCII art into stderr
-  // log_dev is safe to call here since logging doesn't require a TTY
-  log_dev("POSIX TTY: stdout is not a TTY - no fallback to stderr to keep piped output clean");
   return result; // No TTY available
 }
 
@@ -515,7 +514,6 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
   if (stdout_is_tty && ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 && ws.ws_row > 0) {
     *width = ws.ws_col;
     *height = ws.ws_row;
-    log_dev("POSIX terminal size from stdout ioctl: %dx%d", *width, *height);
     return 0;
   }
 
@@ -527,7 +525,6 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
     if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 && ws.ws_row > 0) {
       *width = ws.ws_col;
       *height = ws.ws_row;
-      log_dev("POSIX terminal size from stdin ioctl: %dx%d", *width, *height);
       return 0;
     }
 
@@ -535,7 +532,6 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
     if (ioctl(STDERR_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 && ws.ws_row > 0) {
       *width = ws.ws_col;
       *height = ws.ws_row;
-      log_dev("POSIX terminal size from stderr ioctl: %dx%d", *width, *height);
       return 0;
     }
   }
@@ -543,24 +539,27 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
   // Method 3: Environment variables (COLUMNS and LINES)
   // Check environment variables REGARDLESS of whether stdout is a TTY,
   // to support testing and piped/redirected output scenarios
-  lines_env = SAFE_GETENV("LINES");
-  cols_env = SAFE_GETENV("COLUMNS");
+  lines_env = platform_getenv("LINES");
+  cols_env = platform_getenv("COLUMNS");
   if (lines_env && cols_env) {
     uint32_t env_height = 0, env_width = 0;
     // Parse height and width with safe range validation (1 to USHRT_MAX)
-    if (parse_uint32(lines_env, &env_height, 1, (uint32_t)USHRT_MAX) == 0 &&
-        parse_uint32(cols_env, &env_width, 1, (uint32_t)USHRT_MAX) == 0) {
+    char *end_lines = NULL;
+    char *end_cols = NULL;
+    unsigned long parsed_lines = strtoul(lines_env, &end_lines, 10);
+    unsigned long parsed_cols = strtoul(cols_env, &end_cols, 10);
+    if (end_lines != lines_env && *end_lines == '\0' && end_cols != cols_env && *end_cols == '\0' &&
+        parsed_lines >= 1 && parsed_lines <= USHRT_MAX && parsed_cols >= 1 && parsed_cols <= USHRT_MAX) {
+      env_height = (uint32_t)parsed_lines;
+      env_width = (uint32_t)parsed_cols;
       *width = (unsigned short int)env_width;
       *height = (unsigned short int)env_height;
-      log_dev("POSIX terminal size from env: %dx%d", *width, *height);
       return 0;
     }
-    log_dev("Invalid environment terminal dimensions: %s x %s", lines_env, cols_env);
   }
 
   if (!stdout_is_tty) {
     // stdout is piped/redirected - skip /dev/tty detection and use defaults
-    log_dev("POSIX: stdout is redirected (not a TTY), skipping terminal detection and using defaults");
   }
 
   // Method 2d: Try opening /dev/tty directly (only if stdout IS a TTY - skip for piped output)
@@ -571,7 +570,6 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
         *width = ws.ws_col;
         *height = ws.ws_row;
         close(tty_fd);
-        log_dev("POSIX terminal size from /dev/tty ioctl: %dx%d", *width, *height);
         return 0;
       }
       close(tty_fd);
@@ -581,7 +579,6 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
   // Method 4: Default fallback (match OPT_WIDTH_DEFAULT and OPT_HEIGHT_DEFAULT)
   *width = OPT_WIDTH_DEFAULT;
   *height = OPT_HEIGHT_DEFAULT;
-  log_dev("POSIX terminal size fallback: %dx%d (defaults)", *width, *height);
   return 0; // Fallback succeeded with defaults
 }
 
@@ -596,15 +593,15 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
  *
  * @return Complete terminal capabilities structure
  */
-terminal_capabilities_t detect_terminal_capabilities(void) {
+terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options) {
   terminal_capabilities_t caps = {0};
 
   // Get terminal type information
-  const char *term = SAFE_GETENV("TERM");
-  const char *colorterm = SAFE_GETENV("COLORTERM");
+  const char *term = platform_getenv("TERM");
+  const char *colorterm = platform_getenv("COLORTERM");
 
-  SAFE_STRNCPY(caps.term_type, term ? term : "unknown", sizeof(caps.term_type));
-  SAFE_STRNCPY(caps.colorterm, colorterm ? colorterm : "", sizeof(caps.colorterm));
+  strncpy(caps.term_type, term ? term : "unknown", sizeof(caps.term_type));
+  strncpy(caps.colorterm, colorterm ? colorterm : "", sizeof(caps.colorterm));
 
   // Detect color support level
   caps.color_level = TERM_COLOR_NONE;
@@ -615,7 +612,6 @@ terminal_capabilities_t detect_terminal_capabilities(void) {
       caps.color_level = TERM_COLOR_TRUECOLOR;
       caps.color_count = 16777216; // 2^24
       caps.capabilities |= TERM_CAP_COLOR_TRUE | TERM_CAP_COLOR_256 | TERM_CAP_COLOR_16;
-      log_dev("POSIX color detection: truecolor from $COLORTERM");
     }
   }
 
@@ -624,21 +620,19 @@ terminal_capabilities_t detect_terminal_capabilities(void) {
       caps.color_level = TERM_COLOR_256;
       caps.color_count = 256;
       caps.capabilities |= TERM_CAP_COLOR_256 | TERM_CAP_COLOR_16;
-      log_dev("POSIX color detection: 256-color from $TERM");
     } else if (strstr(term, "color") || strstr(term, "xterm") || strstr(term, "screen") || strstr(term, "vt100") ||
                strstr(term, "linux")) {
       caps.color_level = TERM_COLOR_16;
       caps.color_count = 16;
       caps.capabilities |= TERM_CAP_COLOR_16;
-      log_dev("POSIX color detection: 16-color from $TERM");
     }
   }
 
   // Detect UTF-8 support from locale
   caps.utf8_support = false;
-  const char *lang = SAFE_GETENV("LANG");
-  const char *lc_all = SAFE_GETENV("LC_ALL");
-  const char *lc_ctype = SAFE_GETENV("LC_CTYPE");
+  const char *lang = platform_getenv("LANG");
+  const char *lc_all = platform_getenv("LC_ALL");
+  const char *lc_ctype = platform_getenv("LC_CTYPE");
 
   const char *check;
   if (lc_all) {
@@ -651,7 +645,6 @@ terminal_capabilities_t detect_terminal_capabilities(void) {
   if (check && (strstr(check, "UTF-8") || strstr(check, "utf8"))) {
     caps.utf8_support = true;
     caps.capabilities |= TERM_CAP_UTF8;
-    log_dev("POSIX UTF-8 detection: enabled from locale");
   }
 
 #ifndef __APPLE__
@@ -661,14 +654,13 @@ terminal_capabilities_t detect_terminal_capabilities(void) {
     if (codeset && (strstr(codeset, "UTF-8") || strstr(codeset, "utf8"))) {
       caps.utf8_support = true;
       caps.capabilities |= TERM_CAP_UTF8;
-      log_dev("POSIX UTF-8 detection: enabled from langinfo");
     }
   }
 #endif
 
   // Determine render mode preference - default to foreground
   // Half-block mode should only be used when explicitly requested via --render-mode
-  caps.render_mode = RENDER_MODE_FOREGROUND;
+  caps.render_mode = options.render_mode;
 
   // Check if background colors are supported for potential future use
   if (caps.color_level >= TERM_COLOR_16) {
@@ -724,7 +716,7 @@ const char *terminal_capabilities_summary(const terminal_capabilities_t *caps) {
     render_mode_str = "foreground";
   }
 
-  SAFE_SNPRINTF(summary, sizeof(summary), "%s, %s, %s, %s", terminal_color_level_name(caps->color_level),
+  snprintf(summary, sizeof(summary), "%s, %s, %s, %s", terminal_color_level_name(caps->color_level),
                 caps->utf8_support ? "UTF-8" : "ASCII", render_mode_str,
                 caps->detection_reliable ? "reliable" : "fallback");
   return summary;
@@ -737,7 +729,7 @@ const char *terminal_capabilities_summary(const terminal_capabilities_t *caps) {
  * Used for capability validation and user verification.
  */
 void test_terminal_output_modes(void) {
-  log_info("Testing terminal output modes:");
+  (void)0;
 
   // Test basic colors (16-color)
   printf("16-color test: ");
@@ -772,9 +764,9 @@ void test_terminal_output_modes(void) {
  * @param caps Original detected capabilities
  * @return Modified capabilities with overrides applied
  */
-terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) {
+terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, terminal_options_t options) {
   // Check if stdout is a TTY - disable colors when piping unless --color=true.
-  if (!terminal_is_stdout_tty() && GET_OPTION(color) != COLOR_SETTING_TRUE) {
+  if (!terminal_is_stdout_tty() && options.color != TERMINAL_COLOR_SETTING_TRUE) {
     caps.color_level = TERM_COLOR_NONE;
     caps.capabilities &= ~(uint32_t)(TERM_CAP_COLOR_16 | TERM_CAP_COLOR_256 | TERM_CAP_COLOR_TRUE);
     caps.color_count = 0;
@@ -784,9 +776,8 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
 #ifndef NDEBUG
   // In debug builds, force no-color mode for Claude Code (LLM doesn't need colors, saves tokens)
   // However, respect --color=true which explicitly forces colors ON
-  if (GET_OPTION(color_mode) == COLOR_MODE_AUTO && platform_getenv("CLAUDECODE") &&
-      GET_OPTION(color) != COLOR_SETTING_TRUE) {
-    log_debug("CLAUDECODE detected: forcing no color mode");
+  if (options.color_mode == TERM_COLOR_AUTO && platform_getenv("CLAUDECODE") &&
+      options.color != TERMINAL_COLOR_SETTING_TRUE) {
     caps.color_level = TERM_COLOR_NONE;
     caps.capabilities &= ~(uint32_t)(TERM_CAP_COLOR_16 | TERM_CAP_COLOR_256 | TERM_CAP_COLOR_TRUE);
     caps.color_count = 0;
@@ -795,20 +786,20 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
 #endif
 
   // Apply color mode override if specified in options (not auto mode)
-  if (GET_OPTION(color_mode) != COLOR_MODE_AUTO) {
+  if (options.color_mode != TERM_COLOR_AUTO) {
     // Map terminal_color_mode_t to terminal_color_mode_t (enum values don't align)
     terminal_color_mode_t override_level;
-    switch (GET_OPTION(color_mode)) {
-    case COLOR_MODE_NONE:
+    switch (options.color_mode) {
+    case TERM_COLOR_NONE:
       override_level = TERM_COLOR_NONE;
       break;
-    case COLOR_MODE_16_COLOR:
+    case TERM_COLOR_16:
       override_level = TERM_COLOR_16;
       break;
-    case COLOR_MODE_256_COLOR:
+    case TERM_COLOR_256:
       override_level = TERM_COLOR_256;
       break;
-    case COLOR_MODE_TRUECOLOR:
+    case TERM_COLOR_TRUECOLOR:
       override_level = TERM_COLOR_TRUECOLOR;
       break;
     default:
@@ -817,8 +808,6 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
     }
 
     if (override_level != caps.color_level) {
-      log_debug("Color override: %s -> %s", terminal_color_level_name(caps.color_level),
-                terminal_color_level_name(override_level));
       caps.color_level = override_level;
 
       // Update capabilities flags and count
@@ -850,10 +839,10 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps) 
 
   // Apply render mode from options (user can override via --render-mode)
   // The default render_mode is RENDER_MODE_FOREGROUND which is what we want
-  caps.render_mode = GET_OPTION(render_mode);
+  caps.render_mode = options.render_mode;
 
   // Set default FPS based on platform
-  int fps = GET_OPTION(fps);
+  int fps = options.fps;
   if (fps > 0) {
     caps.desired_fps = (uint8_t)(fps > 144 ? 144 : fps);
   } else {
@@ -896,14 +885,9 @@ bool terminal_has_dark_background(void) {
     return true;
   }
 
-  // Don't query terminal during interactive grep mode (avoids PTY state issues causing spurious ESC bytes in stdin)
-  // Use forward declaration since we can't include log_search.h here (circular dependency through
-  // session/session_log_buffer.h)
-  extern bool log_search_is_active(void);
-
   // Try to query actual terminal background color via OSC 11
   uint8_t bg_r, bg_g, bg_b;
-  if (!log_search_is_active() && terminal_query_background_color(&bg_r, &bg_g, &bg_b)) {
+  if (terminal_query_background_color(&bg_r, &bg_g, &bg_b)) {
     // Calculate luminance from actual background color
     float luminance = _calculate_luminance(bg_r, bg_g, bg_b);
     return (luminance < 0.5f); // Dark if luminance < 50%
@@ -914,7 +898,7 @@ bool terminal_has_dark_background(void) {
   // Check COLORFGBG environment variable (common in terminal emulators)
   // Format is "foreground;background" where values are color indices
   // Background >= 8 typically indicates a light background (bright colors)
-  const char *colorfgbg = SAFE_GETENV("COLORFGBG");
+  const char *colorfgbg = platform_getenv("COLORFGBG");
   if (colorfgbg) {
     // Parse background color (after semicolon)
     const char *semicolon = strchr(colorfgbg, ';');
@@ -932,13 +916,12 @@ bool terminal_has_dark_background(void) {
           return true; // Dark background
         }
       } else {
-        log_error("Invalid color value in COLORFGBG: %s", semicolon + 1);
       }
     }
   }
 
   // Check for VS Code terminal (usually has dark background by default)
-  const char *term_program = SAFE_GETENV("TERM_PROGRAM");
+  const char *term_program = platform_getenv("TERM_PROGRAM");
   if (term_program && strcmp(term_program, "vscode") == 0) {
     return true; // VS Code terminals are typically dark
   }
@@ -949,7 +932,7 @@ bool terminal_has_dark_background(void) {
   }
 
   // Check TERM variable for hints
-  const char *term = SAFE_GETENV("TERM");
+  const char *term = platform_getenv("TERM");
   if (term) {
     // Some terminal types that typically indicate dark backgrounds
     if (strstr(term, "256color") || strstr(term, "truecolor")) {
@@ -1074,7 +1057,7 @@ void terminal_stop_resize_detection(void) {
 }
 
 static int title_write(int fd, const char *text) {
-  const char *term = SAFE_GETENV("TERM");
+  const char *term = platform_getenv("TERM");
   if (!platform_isatty(fd) || (term && strcmp(term, "dumb") == 0))
     return 0;
   size_t length = strlen(text);

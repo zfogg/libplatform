@@ -149,6 +149,7 @@ extern "C" {
  *
  * @ingroup platform
  */
+#ifndef PLATFORM_MAX_PATH_LENGTH
 #ifdef _WIN32
 #define PLATFORM_MAX_PATH_LENGTH 32767
 #elif defined(__linux__)
@@ -165,6 +166,7 @@ extern "C" {
 #endif
 #else
 #define PLATFORM_MAX_PATH_LENGTH 4096
+#endif
 #endif
 
 /**

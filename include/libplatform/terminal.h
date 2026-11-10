@@ -706,6 +706,10 @@ typedef struct terminal_options {
   char *const *argv;
 } terminal_options_t;
 
+void terminal_input_lock(void);
+bool terminal_input_trylock(void);
+void terminal_input_unlock(void);
+
 /**
  * @brief Complete terminal capabilities structure
  *
