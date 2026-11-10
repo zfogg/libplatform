@@ -21,10 +21,10 @@ target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_
 target_compile_features(libplatform-objects PUBLIC c_std_11)
 target_compile_features(libplatform PUBLIC c_std_11)
 set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform)
-if(NOT WIN32 AND NOT EMSCRIPTEN)
-  target_link_libraries(libplatform PUBLIC ${CMAKE_DL_LIBS})
-else()
+if(WIN32)
   target_link_libraries(libplatform PUBLIC dbghelp)
+elseif(NOT EMSCRIPTEN)
+  target_link_libraries(libplatform PUBLIC ${CMAKE_DL_LIBS})
 endif()
 
 install(TARGETS libplatform EXPORT libplatformTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
