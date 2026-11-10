@@ -586,7 +586,7 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
  * @param arg Argument to pass to thread function
  * @return 0 on success, -1 on failure
  */
-int acthread_create(platform_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
+int platform_thread_create(platform_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
   // Initialize symbol handler on first thread creation
   initialize_symbol_handler();
 
@@ -885,7 +885,7 @@ int thread_set_realtime_priority(void) {
 }
 
 uintptr_t thread_to_key(uintptr_t thread) {
-  return (uintptr_t)GetThreadId(thread);
+  return (uintptr_t)GetThreadId((HANDLE)thread);
 }
 
 #endif // _WIN32
