@@ -13,7 +13,7 @@ jobs:
           - { os: macos, arch: x86_64, runner: macos-13 }
           - { os: macos, arch: arm64, runner: macos-14 }
           - { os: windows, arch: x86_64, runner: windows-2022 }
-          - { os: windows, arch: arm64, runner: windows-11-arm }
+          - { os: windows, arch: arm64, runner: windows-2022 }
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -54,10 +54,17 @@ jobs:
             shared=OFF; [ "$linkage" = shared ] && shared=ON
             compiler=""
             if [ '${{ matrix.os }}' = linux ] && [ "$linkage" = static ] && [ '${{ matrix.arch }}' = x86_64 ]; then compiler='-DCMAKE_C_COMPILER=musl-gcc'; fi
-            cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON $compiler
-            cmake --build "build-$linkage"
-            ctest --test-dir "build-$linkage" --output-on-failure
-            cmake --install "build-$linkage" --prefix "stage-$linkage"
+            if [ '${{ matrix.os }}' = windows ] && [ '${{ matrix.arch }}' = arm64 ]; then
+              cmake -S . -B "build-$linkage" -G "Visual Studio 17 2022" -A ARM64 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON
+              cmake --build "build-$linkage" --config Release
+              ctest --test-dir "build-$linkage" -C Release --output-on-failure
+              cmake --install "build-$linkage" --config Release --prefix "stage-$linkage"
+            else
+              cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON $compiler
+              cmake --build "build-$linkage"
+              ctest --test-dir "build-$linkage" --output-on-failure
+              cmake --install "build-$linkage" --prefix "stage-$linkage"
+            fi
           done
           mkdir -p package/include package/lib package/bin
           cp -R stage-static/include/* package/include/
