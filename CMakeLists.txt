@@ -25,8 +25,14 @@ elseif(EMSCRIPTEN)
 else()
     target_sources(libplatform-objects PRIVATE
       lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_sync.c lib/posix/terminal_capabilities.c
-      lib/posix/process.c lib/posix/rwlock.c lib/linux/system.c
+      lib/posix/process.c lib/posix/rwlock.c
     )
+endif()
+
+if(APPLE)
+  target_sources(libplatform-objects PRIVATE lib/macos/system.c)
+elseif(UNIX)
+  target_sources(libplatform-objects PRIVATE lib/linux/system.c)
 endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)

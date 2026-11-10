@@ -4,9 +4,9 @@
  * @brief 🍎 macOS system utilities and backtrace symbol resolution
  */
 
-#include <libplatform/abstraction.h>
-#include <libplatform/internal.h>
-#include <ascii-chat/common.h>
+#include <libplatform/filesystem.h>
+#include <libplatform/symbols.h>
+#include <libplatform/system.h>
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 #include <string.h>
