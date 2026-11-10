@@ -3,7 +3,31 @@
 #include <libplatform/system.h>
 #include <windows.h>
 #include <psapi.h>
+#include <fcntl.h>
+#include <io.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
+
+const char *platform_getenv(const char *name) {
+  return name && name[0] ? getenv(name) : NULL;
+}
+
+int platform_open(const char *name, const char *pathname, int flags, ...) {
+  (void)name;
+  if (!pathname)
+    return -1;
+  int mode = 0;
+  if (flags & _O_CREAT) {
+    va_list args;
+    va_start(args, flags);
+    mode = va_arg(args, int);
+    va_end(args);
+  }
+  if (!(flags & _O_TEXT))
+    flags |= _O_BINARY;
+  return _open(pathname, flags, mode);
+}
 
 int get_binary_file_address_offsets(const void *addr, platform_binary_match_t *matches, int max_matches) {
   HANDLE proc = GetCurrentProcess();

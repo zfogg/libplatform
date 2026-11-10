@@ -1046,7 +1046,7 @@ const char *terminal_color_level_name(terminal_color_mode_t level) {
 const char *terminal_capabilities_summary(const terminal_capabilities_t *caps) {
   static char summary[PLATFORM_WINDOWS_TERMINAL_SUMMARY_BUFFER_SIZE];
 
-  safe_snprintf(summary, sizeof(summary), "%s (%d colors), UTF-8: %s, TERM: %s, COLORTERM: %s",
+  snprintf(summary, sizeof(summary), "%s (%d colors), UTF-8: %s, TERM: %s, COLORTERM: %s",
                 terminal_color_level_name(caps->color_level), caps->color_count,
                 (caps->capabilities & TERM_CAP_UTF8) ? "yes" : "no", caps->term_type, caps->colorterm);
 
