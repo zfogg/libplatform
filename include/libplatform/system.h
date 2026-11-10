@@ -130,6 +130,7 @@ void platform_force_exit(int exit_code);
  * @ingroup platform_system
  */
 void platform_sleep_ms(unsigned int ms);
+void platform_sleep_ns(uint64_t ns);
 
 /** Sleep for a specified number of microseconds. */
 void platform_sleep_us(unsigned int us);
