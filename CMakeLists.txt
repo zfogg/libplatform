@@ -21,14 +21,14 @@ target_sources(libplatform-objects PRIVATE
 target_sources(libplatform-objects PRIVATE lib/thread.c lib/time.c lib/named.c lib/cpu.c)
 if(WIN32)
     target_sources(libplatform-objects PRIVATE
-      lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c
+      lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c lib/windows/agent.c
       lib/windows/process.c lib/windows/rwlock.c lib/windows/mutex.c lib/windows/cond.c lib/windows/system.c
     )
 elseif(EMSCRIPTEN)
     target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/terminal.c)
 else()
     target_sources(libplatform-objects PRIVATE
-      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_sync.c lib/posix/terminal_capabilities.c
+      lib/backtrace.c lib/posix/string.c lib/posix/filesystem.c lib/posix/terminal.c lib/posix/terminal_sync.c lib/posix/terminal_capabilities.c lib/posix/agent.c
       lib/posix/process.c lib/posix/rwlock.c lib/posix/mutex.c lib/posix/cond.c
     )
 endif()
@@ -36,7 +36,7 @@ endif()
 if(APPLE)
   target_sources(libplatform-objects PRIVATE lib/macos/system.c)
 elseif(UNIX)
-  target_sources(libplatform-objects PRIVATE lib/linux/system.c)
+  target_sources(libplatform-objects PRIVATE lib/linux/system.c lib/linux/systemd.c)
 endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)

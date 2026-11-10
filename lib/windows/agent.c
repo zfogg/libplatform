@@ -5,28 +5,32 @@
 
 #include <libplatform/agent.h>
 #include <libplatform/process.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/log/log.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+static int copy_agent_path(const char *path, char *path_out, size_t path_size) {
+  if (!path || path[0] == '\0' || !path_out || path_size == 0 || strlen(path) >= path_size) return -1;
+  memcpy(path_out, path, strlen(path) + 1);
+  return 0;
+}
 
 int platform_get_ssh_agent_socket(char *path_out, size_t path_size) {
   /* Windows: Check SSH_AUTH_SOCK first */
   const char *auth_sock = platform_getenv("SSH_AUTH_SOCK");
   if (auth_sock && strlen(auth_sock) > 0) {
-    VALIDATE_AGENT_PATH(auth_sock, path_out, path_size, "SSH_AUTH_SOCK");
+    return copy_agent_path(auth_sock, path_out, path_size);
   }
 
   /* Windows default: named pipe for openssh-ssh-agent */
   const char *default_pipe = "\\\\.\\pipe\\openssh-ssh-agent";
-  VALIDATE_AGENT_PATH(default_pipe, path_out, path_size, "Default SSH agent pipe");
+  return copy_agent_path(default_pipe, path_out, path_size);
 }
 
 int platform_get_gpg_agent_socket(char *path_out, size_t path_size) {
   /* Windows: Try gpgconf first */
   FILE *fp = NULL;
-  if (platform_popen("gpgconf", "gpgconf --list-dirs agent-socket 2>nul", "r", &fp) == ASCIICHAT_OK && fp) {
+  if (platform_popen("gpgconf", "gpgconf --list-dirs agent-socket 2>nul", "r", &fp) == 0 && fp) {
     if (fgets(path_out, path_size, fp)) {
       /* Remove trailing newline */
       size_t len = strlen(path_out);
@@ -44,13 +48,11 @@ int platform_get_gpg_agent_socket(char *path_out, size_t path_size) {
   if (appdata) {
     size_t needed = strlen(appdata) + strlen("\\gnupg\\S.gpg-agent") + 1;
     if (needed > path_size) {
-      log_error("GPG agent socket path too long");
       return -1;
     }
-    safe_snprintf(path_out, path_size, "%s\\gnupg\\S.gpg-agent", appdata);
+    snprintf(path_out, path_size, "%s\\gnupg\\S.gpg-agent", appdata);
     return 0;
   }
 
-  log_error("Could not determine APPDATA directory");
   return -1;
 }
