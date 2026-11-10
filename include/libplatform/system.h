@@ -31,6 +31,11 @@
 #include <stdbool.h>
 #include <time.h>
 #ifdef _WIN32
+#include <libplatform/windows/system.h>
+#else
+#include <libplatform/posix/system.h>
+#endif
+#ifdef _WIN32
 #include <basetsd.h>
 #ifndef _SSIZE_T_DEFINED
 typedef SSIZE_T ssize_t;
