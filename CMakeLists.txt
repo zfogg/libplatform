@@ -18,12 +18,12 @@ endif()
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c lib/lifecycle.c lib/mutex.c lib/cond.c lib/system_common.c lib/terminal.c lib/util/path.c lib/util/string.c
 )
-target_sources(libplatform-objects PRIVATE lib/named.c lib/cpu.c lib/process.c)
+target_sources(libplatform-objects PRIVATE lib/time.c lib/named.c lib/cpu.c lib/process.c)
 if(WIN32)
     target_sources(libplatform-objects PRIVATE
       lib/windows/thread.c
       lib/windows/backtrace.c lib/windows/string.c lib/windows/filesystem.c lib/windows/terminal.c lib/windows/terminal_capabilities.c lib/windows/agent.c
-      lib/windows/process.c lib/windows/rwlock.c lib/windows/mutex.c lib/windows/cond.c lib/windows/system.c
+      lib/windows/process.c lib/windows/rwlock.c lib/windows/mutex.c lib/windows/cond.c lib/windows/system.c lib/windows/question.c
     )
 elseif(EMSCRIPTEN)
     target_sources(libplatform-objects PRIVATE lib/wasm/backtrace.c lib/wasm/terminal.c)

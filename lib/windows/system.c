@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <io.h>
 #include <direct.h>
+#include <string.h>
+#include <time.h>
 #include <libplatform/filesystem.h>
 #include <libplatform/system.h>
 
@@ -26,6 +28,46 @@ int platform_access(const char *path, int mode) {
   if (mode & PLATFORM_ACCESS_READ) windows_mode |= 4;
   if (mode & PLATFORM_ACCESS_WRITE) windows_mode |= 2;
   return _access(path, windows_mode);
+}
+
+uint64_t platform_get_monotonic_time_us(void) {
+  static LARGE_INTEGER frequency;
+  static INIT_ONCE once = INIT_ONCE_STATIC_INIT;
+  BOOL pending = FALSE;
+  InitOnceBeginInitialize(&once, 0, &pending, NULL);
+  if (pending) {
+    QueryPerformanceFrequency(&frequency);
+    InitOnceComplete(&once, 0, NULL);
+  }
+  LARGE_INTEGER counter;
+  QueryPerformanceCounter(&counter);
+  return (uint64_t)((counter.QuadPart * 1000000ULL) / frequency.QuadPart);
+}
+
+int platform_localtime(const time_t *timer, struct tm *result) {
+  return localtime_s(result, timer) == 0 ? 0 : -1;
+}
+
+int platform_setenv(const char *name, const char *value) {
+  return _putenv_s(name, value ? value : "");
+}
+
+int platform_unsetenv(const char *name) { return _putenv_s(name, ""); }
+
+int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
+  if (!dest || !src || count > dest_size) return -1;
+  return memcpy_s(dest, dest_size, src, count) == 0 ? 0 : -1;
+}
+
+int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
+  if (!dest || count > dest_size) return -1;
+  return memset_s(dest, dest_size, ch, count) == 0 ? 0 : -1;
+}
+
+FILE *platform_fopen(const char *name, const char *filename, const char *mode) {
+  (void)name;
+  FILE *file = NULL;
+  return fopen_s(&file, filename, mode) == 0 ? file : NULL;
 }
 
 void platform_sleep_us(unsigned int us) {
