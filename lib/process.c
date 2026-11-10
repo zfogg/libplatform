@@ -12,8 +12,28 @@
 #include <stdlib.h>
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
-#include "process_title_internal.h"
 #include <stdint.h>
+#if defined(__linux__)
+#include <sys/prctl.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#elif defined(__APPLE__)
+#include <pthread.h>
+#endif
+
+int platform_process_title_native_set(const char *title, const char *short_name) {
+  (void)title;
+#if defined(__linux__)
+  if (syscall(SYS_gettid) != getpid()) return -1;
+  return prctl(PR_SET_NAME, short_name, 0UL, 0UL, 0UL) == 0 ? 0 : -1;
+#elif defined(__APPLE__)
+  if (pthread_main_np() == 0) return -1;
+  return pthread_setname_np(short_name) == 0 ? 0 : -1;
+#else
+  (void)short_name;
+  return 0;
+#endif
+}
 #ifdef __APPLE__
 #include <crt_externs.h>
 #define TITLE_ENVIRON (*_NSGetEnviron())
