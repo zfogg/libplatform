@@ -6,6 +6,7 @@
 #define KEYBOARD_DEFERRED_KEY_CAPACITY 1024
 
 #include <libplatform/keyboard.h>
+#include <libplatform/time.h>
 #include <libplatform/system.h>
 #include <libplatform/time.h>
 #include <utf8proc.h>
