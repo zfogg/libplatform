@@ -15,10 +15,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <ascii-chat/common.h>
 #include <libplatform/socket.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/debug/named.h>
+#include <libplatform/named.h>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -28,30 +26,30 @@ static volatile LONG winsock_initialized = 0;
 static WSADATA wsaData;
 
 // Socket implementation
-asciichat_error_t socket_init(void) {
+int socket_init(void) {
   // Use InterlockedCompareExchange for thread-safe initialization
   LONG prev = InterlockedCompareExchange(&winsock_initialized, 1, 0);
   if (prev == 2) {
     // Already initialized
-    return ASCIICHAT_OK;
+    return 0;
   }
   if (prev == 1) {
     // Another thread is initializing, spin-wait for completion
     while (InterlockedCompareExchange(&winsock_initialized, 1, 1) == 1) {
       Sleep(1); // Yield to other threads
     }
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // We won the race, initialize Winsock
   int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
   if (result != 0) {
     InterlockedExchange(&winsock_initialized, 0); // Reset on failure
-    return SET_ERRNO(ERROR_NETWORK, "WSAStartup failed with error %d", result);
+    return -1;
   }
   InterlockedExchange(&winsock_initialized, 2); // Mark as initialized
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 void socket_cleanup(void) {
@@ -62,18 +60,16 @@ void socket_cleanup(void) {
 
 socket_t socket_create(const char *name, int domain, int type, int protocol) {
   if (!name) {
-    SET_ERRNO(ERROR_INVALID_STATE, "Socket name is required");
     return INVALID_SOCKET;
   }
 
   // Ensure Winsock is initialized
-  if (socket_init() != ASCIICHAT_OK) {
+  if (socket_init() != 0) {
     return INVALID_SOCKET;
   }
 
   // AF_UNIX is not supported on Windows - return error instead of silently converting
   if (domain == AF_UNIX) {
-    SET_ERRNO(ERROR_NETWORK, "AF_UNIX sockets are not supported on Windows");
     return INVALID_SOCKET;
   }
 
@@ -87,7 +83,6 @@ socket_t socket_create(const char *name, int domain, int type, int protocol) {
 
 int socket_close(socket_t sock) {
   if (sock == INVALID_SOCKET) {
-    SET_ERRNO(ERROR_NETWORK, "Invalid socket handle");
     return -1;
   }
   NAMED_UNREGISTER_SOCKET(sock);
@@ -104,7 +99,6 @@ int socket_listen(socket_t sock, int backlog) {
 
 socket_t socket_accept(socket_t sock, struct sockaddr *addr, socklen_t *addrlen, const char *name) {
   if (!name) {
-    SET_ERRNO(ERROR_INVALID_STATE, "Socket name is required for accepted connections");
     return INVALID_SOCKET;
   }
 
@@ -223,7 +217,7 @@ int socket_poll(struct pollfd *fds, nfds_t nfds, int64_t timeout_ns) {
   if (timeout_ns < 0) {
     timeout_ms = -1; // Infinite timeout
   } else {
-    timeout_ms = (int)time_ns_to_ms((uint64_t)timeout_ns);
+    timeout_ms = (int)((uint64_t)timeout_ns / 1000000ULL);
   }
 
   // WSAPoll takes ULONG for nfds parameter, cast our nfds_t
@@ -449,8 +443,7 @@ ssize_t socket_send(socket_t sock, const void *buf, size_t len, int flags) {
     sent = (ssize_t)raw_sent;
     /* CORRUPTION DETECTION: Check Windows send() return value */
     if (raw_sent > (int)len) {
-      SET_ERRNO(ERROR_INVALID_STATE, "CRITICAL: Windows send() returned more than requested: raw_sent=%d > len=%zu",
-                raw_sent, len);
+      return -1;
     }
   }
   return sent;

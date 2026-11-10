@@ -70,7 +70,8 @@ static inline int safe_backtrace(void **buffer, int size) {
 #endif
 }
 
-int libplatform_backtrace_capture(void **buffer, int size) {
+#ifndef _WIN32
+int platform_backtrace_capture(void **buffer, int size) {
   int depth = safe_backtrace(buffer, size);
 
   if (depth == 0) {
@@ -80,21 +81,22 @@ int libplatform_backtrace_capture(void **buffer, int size) {
   return depth;
 }
 
-char **libplatform_backtrace_symbolize(void *const *buffer, int size) {
+char **platform_backtrace_symbols(void *const *buffer, int size) {
   return symbol_cache_resolve_batch(buffer, size);
 }
 
-void libplatform_backtrace_symbols_free(char **strings) {
+void platform_backtrace_symbols_destroy(char **strings) {
   if (!strings) return;
   symbol_cache_free_symbols(strings);
 }
+#endif
 
-void libplatform_backtrace_print(int skip_frames, libplatform_backtrace_write_fn write, void *context) {
+void platform_backtrace_print(int skip_frames, platform_backtrace_write_fn write, void *context) {
   void *buffer[LIBPLATFORM_BACKTRACE_MAX_FRAMES];
-  int depth = libplatform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
+  int depth = platform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
 
   if (depth > 0) {
-    char **symbols = libplatform_backtrace_symbolize((void *const *)buffer, depth);
+    char **symbols = platform_backtrace_symbols((void *const *)buffer, depth);
     if (symbols) {
       for (int i = skip_frames; i < depth && symbols[i]; i++) {
         if (write) {
@@ -103,7 +105,7 @@ void libplatform_backtrace_print(int skip_frames, libplatform_backtrace_write_fn
           write(line, context);
         }
       }
-      libplatform_backtrace_symbols_free(symbols);
+      platform_backtrace_symbols_destroy(symbols);
     }
   }
 }

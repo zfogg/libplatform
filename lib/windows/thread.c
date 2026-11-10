@@ -399,7 +399,7 @@ static DWORD WINAPI windows_thread_wrapper(LPVOID param) {
     return 1;
   }
 
-  NAMED_REGISTER_THREAD(GetCurrentThread(), wrapper->name, NULL);
+  NAMED_REGISTER_THREAD((uintptr_t)GetCurrentThread(), wrapper->name, NULL);
 
   // Validate wrapper structure before accessing its fields.
   // If the wrapper was freed or corrupted, accessing its fields will crash.
@@ -673,7 +673,7 @@ int thread_join(platform_thread_t *thread, void **retval) {
       *retval = (void *)(uintptr_t)exit_code;
     }
     // Unregister thread from debug naming registry before closing handle
-    NAMED_UNREGISTER_THREAD(*thread);
+    NAMED_UNREGISTER_THREAD((uintptr_t)*thread);
 
     CloseHandle((*thread));
     *thread = NULL; // Clear the handle to prevent reuse
@@ -684,7 +684,7 @@ int thread_join(platform_thread_t *thread, void **retval) {
   // WaitForSingleObject failed (not WAIT_OBJECT_0), so thread is in unknown state
   // We must still close the handle to prevent resource exhaustion
   // Unregister thread from debug naming registry before closing handle
-  NAMED_UNREGISTER_THREAD(*thread);
+  NAMED_UNREGISTER_THREAD((uintptr_t)*thread);
 
   CloseHandle((*thread));
   *thread = NULL;
@@ -714,7 +714,7 @@ int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeo
       *retval = (void *)(uintptr_t)exit_code;
     }
     // Unregister thread from debug naming registry before closing handle
-    NAMED_UNREGISTER_THREAD(*thread);
+    NAMED_UNREGISTER_THREAD((uintptr_t)*thread);
 
     CloseHandle((*thread));
     *thread = NULL; // Clear the handle to prevent reuse
@@ -731,7 +731,7 @@ int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeo
   // For WAIT_FAILED or other unexpected errors, close the handle to prevent leak
   // The thread is in an unknown state, but we must release the OS handle resource
   // Unregister thread from debug naming registry before closing handle
-  NAMED_UNREGISTER_THREAD(*thread);
+  NAMED_UNREGISTER_THREAD((uintptr_t)*thread);
   CloseHandle((*thread));
   *thread = NULL;
 

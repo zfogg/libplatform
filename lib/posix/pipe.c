@@ -14,8 +14,11 @@
 #include <errno.h>
 #include <stdbool.h>
 
-#include <ascii-chat/common.h>
 #include <libplatform/pipe.h>
+#include <libplatform/system.h>
+
+#define SAFE_STRNCPY(dst, src, size) do { strncpy((dst), (src), (size)); (dst)[(size) - 1] = '\0'; } while (0)
+#define log_debug(...) ((void)0)
 
 pipe_t platform_pipe_connect(const char *path) {
   if (!path) {

@@ -82,10 +82,10 @@
 #include <stdbool.h>
 
 /**
- * @brief Check whether a module belongs to ascii-chat
+ * @brief Check whether a module belongs to the supplied module set
  * @param module_name Module basename or path
  */
-bool symbol_module_is_project(const char *module_name);
+bool symbol_module_matches(const char *module_name, const char *const *module_names, size_t module_count);
 
 /**
  * @brief Format a source path for a symbolized frame

@@ -4,7 +4,7 @@
  */
 
 #include <malloc.h>
-#include <ascii-chat/common.h>
+#include <stddef.h>
 
 size_t platform_malloc_size(void *ptr) {
   if (!ptr) {

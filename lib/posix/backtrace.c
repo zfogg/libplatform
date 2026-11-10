@@ -5,6 +5,7 @@
  */
 
 #include <libplatform/backtrace.h>
+#include "backtrace_internal.h"
 #include <libplatform/symbols.h>
 #include <libplatform/util/string.h>
 #include <libplatform/util/path.h>
@@ -65,7 +66,7 @@ static inline int safe_backtrace(void **buffer, int size) {
 #endif
 }
 
-int platform_backtrace(void **buffer, int size) {
+int platform_backtrace_capture(void **buffer, int size) {
   int depth = safe_backtrace(buffer, size);
 
   if (depth == 0) {
@@ -81,21 +82,25 @@ char **platform_backtrace_symbols(void *const *buffer, int size) {
 
 void platform_backtrace_symbols_destroy(char **strings) {
   if (!strings) {
-    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: strings=%p", (void *)strings);
     return;
   }
   symbol_cache_free_symbols(strings);
 }
 
-void backtrace_print_simple(int skip_frames) {
-  void *buffer[PLATFORM_BACKTRACE_FRAME_CAPACITY];
-  int depth = platform_backtrace(buffer, PLATFORM_BACKTRACE_FRAME_CAPACITY);
+void platform_backtrace_print_simple(int skip_frames, platform_backtrace_write_fn write,
+                                     void *context) {
+  void *buffer[LIBPLATFORM_BACKTRACE_MAX_FRAMES];
+  int depth = platform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
 
   if (depth > 0) {
     char **symbols = platform_backtrace_symbols((void *const *)buffer, depth);
     if (symbols) {
       for (int i = skip_frames; i < depth && symbols[i]; i++) {
-        fprintf(stderr, "  [%d] %s\n", i - skip_frames, symbols[i]);
+        if (write) {
+          char line[1024];
+          (void)snprintf(line, sizeof(line), "  [%d] %s", i - skip_frames, symbols[i]);
+          write(line, context);
+        }
       }
       platform_backtrace_symbols_destroy(symbols);
     }

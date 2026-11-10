@@ -16,7 +16,7 @@
  */
 
 #include <stddef.h>
-#include "system.h"
+#include <libplatform/system.h>
 
 /**
  * @brief Get home directory or special Windows path

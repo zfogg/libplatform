@@ -2,6 +2,14 @@
 
 #include <libplatform/system.h>
 #include <stdio.h>
+#include <sys/stat.h>
+
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+#endif
 
 /**
  * @file platform/filesystem.h
@@ -46,6 +54,17 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+
+typedef struct {
+  const char *name;
+  const char *config_directory;
+  const char *data_directory;
+} platform_application_config_t;
+
+/** Configure the application identity used by per-user platform directories. */
+int platform_set_application_config(const platform_application_config_t *config);
+/** Return the currently configured application identity. */
+const platform_application_config_t *platform_application_config(void);
 #include <sys/types.h>
 #include <stdint.h>
 
@@ -201,7 +220,7 @@ extern "C" {
  * @brief Directory permission: Private (owner read/write/execute only)
  *
  * Octal mode 0700: rwx------
- * Used for private directories like ~/.ascii-chat
+ * Used for private directories like ~/.application
  *
  * @note On Windows, this is a no-op (Windows uses ACLs instead of POSIX permissions)
  *
@@ -352,7 +371,7 @@ int platform_is_directory(const char *path);
  *
  * @par Example:
  * @code{.c}
- * if (platform_mkdir("~/.ascii-chat", 0700) == ASCIICHAT_OK) {
+ * if (platform_mkdir("~/.application", 0700) == ASCIICHAT_OK) {
  *   // Directory created or already exists
  * }
  * @endcode
@@ -380,8 +399,8 @@ int platform_mkdir(const char *path, int mode);
  *
  * @par Example:
  * @code{.c}
- * // Create ~/.ascii-chat/config/ and all parent directories
- * if (platform_mkdir_recursive("~/.ascii-chat/config", 0700) == ASCIICHAT_OK) {
+ * // Create ~/.application/config/ and all parent directories
+ * if (platform_mkdir_recursive("~/.application/config", 0700) == ASCIICHAT_OK) {
  *   // Directory and parents created or already exist
  * }
  * @endcode
@@ -400,7 +419,7 @@ int platform_mkdir_recursive(const char *path, int mode);
  *
  * @param path_out Buffer to store the created temp directory path (must be at least 256 bytes)
  * @param path_size Size of path_out buffer
- * @param prefix Prefix for the temp directory name (e.g., "ascii-chat-gpg")
+ * @param prefix Prefix for the temp directory name (e.g., "application-gpg")
  * @return ASCIICHAT_OK on success, error code on failure
  *
  * @note Caller must delete the directory when done using platform_rmdir_recursive()
@@ -637,14 +656,14 @@ typedef struct {
  * - Append: search all for matching entries (known_hosts)
  *
  * **Search Order (Unix/macOS):**
- * 1. ~/.config/ascii-chat/filename (XDG user config)
- * 2. /opt/homebrew/etc/ascii-chat/filename (macOS Homebrew)
- * 3. /usr/local/etc/ascii-chat/filename (Unix local)
- * 4. /etc/ascii-chat/filename (system-wide)
+ * 1. ~/.config/application/filename (XDG user config)
+ * 2. /opt/homebrew/etc/application/filename (macOS Homebrew)
+ * 3. /usr/local/etc/application/filename (Unix local)
+ * 4. /etc/application/filename (system-wide)
  *
  * **Search Order (Windows):**
- * 1. %APPDATA%\ascii-chat\filename (user config)
- * 2. %PROGRAMDATA%\ascii-chat\filename (system-wide)
+ * 1. %APPDATA%\application\filename (user config)
+ * 2. %PROGRAMDATA%\application\filename (system-wide)
  *
  * @param filename Config filename (e.g., "config.toml", "colors.toml", "known_hosts")
  * @param list_out Pointer to config_file_list_t to populate
@@ -723,8 +742,8 @@ const char *platform_get_home_dir(void);
  * @brief Get the application configuration directory
  *
  * Platform-specific implementation:
- *   - POSIX: Returns $XDG_CONFIG_HOME/ascii-chat/ (default: ~/.config/ascii-chat/)
- *   - Windows: Returns %APPDATA%\ascii-chat\
+ *   - POSIX: Returns $XDG_CONFIG_HOME/application/ (default: ~/.config/application/)
+ *   - Windows: Returns %APPDATA%\application\
  *
  * @return Allocated string with config directory path (including trailing separator),
  *         or NULL on error. Caller must free with SAFE_FREE()
@@ -737,8 +756,8 @@ const char *platform_get_home_dir(void);
  * @code{.c}
  * char *config_dir = platform_get_config_dir();
  * if (config_dir) {
- *   // config_dir = "/home/user/.config/ascii-chat/" on Linux
- *   // config_dir = "C:\\Users\\user\\AppData\\Roaming\\ascii-chat\\" on Windows
+ *   // config_dir = "/home/user/.config/application/" on Linux
+ *   // config_dir = "C:\\Users\\user\\AppData\\Roaming\\application\\" on Windows
  *   SAFE_FREE(config_dir);
  * }
  * @endcode
@@ -751,8 +770,8 @@ char *platform_get_config_dir(void);
  * @brief Get the application data directory
  *
  * Platform-specific implementation:
- *   - POSIX: Returns $XDG_DATA_HOME/ascii-chat/ (default: ~/.local/share/ascii-chat/)
- *   - Windows: Returns %APPDATA%\ascii-chat\
+ *   - POSIX: Returns $XDG_DATA_HOME/application/ (default: ~/.local/share/application/)
+ *   - Windows: Returns %APPDATA%\application\
  *
  * @return Allocated string with data directory path (including trailing separator),
  *         or NULL on error. Caller must free() the returned string.
@@ -764,8 +783,8 @@ char *platform_get_config_dir(void);
  * @code{.c}
  * char *data_dir = platform_get_data_dir();
  * if (data_dir) {
- *   // data_dir = "/home/user/.local/share/ascii-chat/" on Linux
- *   // data_dir = "C:\\Users\\user\\AppData\\Roaming\\ascii-chat\\" on Windows
+ *   // data_dir = "/home/user/.local/share/application/" on Linux
+ *   // data_dir = "C:\\Users\\user\\AppData\\Roaming\\application\\" on Windows
  *   SAFE_FREE(data_dir);
  * }
  * @endcode
@@ -778,11 +797,11 @@ char *platform_get_data_dir(void);
  * @brief Get application data directory candidates
  *
  * Platform-specific implementations return conventional application data
- * locations for ascii-chat, ordered from most to least preferred:
- *   - Linux: ${ASCIICHAT_INSTALL_PREFIX}/var/ascii-chat/
+ * locations for application, ordered from most to least preferred:
+ *   - Linux: ${ASCIICHAT_INSTALL_PREFIX}/var/application/
  *   - macOS: user and local-domain Application Support directories, followed
- *     by ${ASCIICHAT_INSTALL_PREFIX}/var/ascii-chat/ and /usr/local/var/ascii-chat/
- *   - Windows: %PROGRAMDATA%\ascii-chat\
+ *     by ${ASCIICHAT_INSTALL_PREFIX}/var/application/ and /usr/local/var/application/
+ *   - Windows: %PROGRAMDATA%\application\
  *
  * Each candidate includes the permissions to use when creating it. This
  * function only resolves paths; callers create directories and check access.
@@ -794,7 +813,7 @@ char *platform_get_data_dir(void);
  * @note An unavailable platform directory is represented by an empty list.
  * @note Caller must release the list with platform_directory_list_destroy().
  */
-int platform_get_data_dir_candidates(platform_directory_list_t *list_out);
+int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out);
 
 /**
  * @brief Release paths returned by platform_get_data_dir_candidates()

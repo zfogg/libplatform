@@ -6,9 +6,8 @@
 
 #ifdef _WIN32
 
-#include <ascii-chat/signal.h>
-#include <ascii-chat/log/log.h>
-#include <ascii-chat/common.h>
+#include <libplatform/signal.h>
+#include <signal.h>
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -61,7 +60,7 @@ static LONG WINAPI exception_handler_wrapper(PEXCEPTION_POINTERS exc_info) {
 /**
  * Install Windows crash exception handler
  */
-asciichat_error_t platform_install_crash_handler(platform_crash_handler_t handler) {
+int platform_install_crash_handler(platform_crash_handler_t handler) {
   if (!handler) {
     /* Uninstalling - restore previous filter */
     return platform_uninstall_crash_handler();
@@ -74,17 +73,15 @@ asciichat_error_t platform_install_crash_handler(platform_crash_handler_t handle
   g_prev_exception_filter = SetUnhandledExceptionFilter(exception_handler_wrapper);
 
   if (!g_prev_exception_filter) {
-    log_warn("SetUnhandledExceptionFilter returned NULL");
   }
 
-  log_debug("Installed Windows crash exception handler");
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * Uninstall Windows crash exception handler
  */
-asciichat_error_t platform_uninstall_crash_handler(void) {
+int platform_uninstall_crash_handler(void) {
   /* Restore the previous exception filter */
   if (g_prev_exception_filter) {
     SetUnhandledExceptionFilter(g_prev_exception_filter);
@@ -95,8 +92,7 @@ asciichat_error_t platform_uninstall_crash_handler(void) {
   }
 
   g_crash_handler = NULL;
-  log_debug("Uninstalled Windows crash exception handler");
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**

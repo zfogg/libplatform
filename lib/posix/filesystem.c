@@ -434,14 +434,14 @@ static int get_xdg_config_dirs(char ***dirs_out, size_t *count_out) {
  * @brief Find config file across multiple standard locations (POSIX implementation)
  *
  * Search priority (highest to lowest):
- * 1. XDG_CONFIG_HOME/ascii-chat (default: ~/.config/ascii-chat)
- * 2. Each directory in XDG_CONFIG_DIRS/ascii-chat (default: /etc/xdg/ascii-chat)
+ * 1. XDG_CONFIG_HOME/application (default: ~/.config/application)
+ * 2. Each directory in XDG_CONFIG_DIRS/application (default: /etc/xdg/application)
  * 3. Backward compatibility paths:
- *    - /opt/homebrew/etc/ascii-chat (macOS Homebrew ARM)
- *    - /home/linuxbrew/.linuxbrew/etc/ascii-chat (Linux Homebrew system-wide)
- *    - ~/.linuxbrew/etc/ascii-chat (Linux Homebrew user)
- *    - /usr/local/etc/ascii-chat (Unix/Linux local)
- *    - /etc/ascii-chat (system-wide)
+ *    - /opt/homebrew/etc/application (macOS Homebrew ARM)
+ *    - /home/linuxbrew/.linuxbrew/etc/application (Linux Homebrew system-wide)
+ *    - ~/.linuxbrew/etc/application (Linux Homebrew user)
+ *    - /usr/local/etc/application (Unix/Linux local)
+ *    - /etc/application (system-wide)
  */
 int platform_find_config_file(const char *filename, config_file_list_t *list_out) {
   if (!filename || !list_out) {
@@ -486,8 +486,8 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
   uint8_t priority = 0;
   char full_path[PLATFORM_MAX_PATH_LENGTH];
 
-  // Priority 0: XDG_CONFIG_HOME/ascii-chat (highest priority, user config)
-  int ret = snprintf(full_path, sizeof(full_path), "%s/ascii-chat/%s", xdg_config_home, filename);
+  // Priority 0: XDG_CONFIG_HOME/application (highest priority, user config)
+  int ret = snprintf(full_path, sizeof(full_path), "%s/application/%s", xdg_config_home, filename);
   if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
     if (platform_is_regular_file(full_path)) {
       config_file_result_t *result = &list_out->files[list_out->count];
@@ -501,9 +501,9 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
     }
   }
 
-  // Priorities 1+: XDG_CONFIG_DIRS/ascii-chat
+  // Priorities 1+: XDG_CONFIG_DIRS/application
   for (size_t i = 0; i < xdg_config_dirs_count; i++) {
-    ret = snprintf(full_path, sizeof(full_path), "%s/ascii-chat/%s", xdg_config_dirs[i], filename);
+    ret = snprintf(full_path, sizeof(full_path), "%s/application/%s", xdg_config_dirs[i], filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -521,12 +521,12 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
   // Backward compatibility: Legacy paths
   const char *legacy_dirs[] = {
 #ifdef __APPLE__
-      "/opt/homebrew/etc/ascii-chat", // macOS Homebrew ARM
+      "/opt/homebrew/etc/application", // macOS Homebrew ARM
 #else
-      "/home/linuxbrew/.linuxbrew/etc/ascii-chat", // Linux Homebrew (system-wide)
+      "/home/linuxbrew/.linuxbrew/etc/application", // Linux Homebrew (system-wide)
 #endif
-      "/usr/local/etc/ascii-chat", // Unix/macOS local
-      "/etc/ascii-chat",           // System-wide
+      "/usr/local/etc/application", // Unix/macOS local
+      "/etc/application",           // System-wide
   };
   const size_t num_legacy = sizeof(legacy_dirs) / sizeof(legacy_dirs[0]);
 
@@ -547,10 +547,10 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
   }
 
 #ifndef __APPLE__
-  // Linux: Check user Linuxbrew path (~/.linuxbrew/etc/ascii-chat)
+  // Linux: Check user Linuxbrew path (~/.linuxbrew/etc/application)
   const char *home = getenv("HOME");
   if (home && home[0] != '\0') {
-    ret = snprintf(full_path, sizeof(full_path), "%s/.linuxbrew/etc/ascii-chat/%s", home, filename);
+    ret = snprintf(full_path, sizeof(full_path), "%s/.linuxbrew/etc/application/%s", home, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -606,27 +606,27 @@ const char *platform_get_home_dir(void) {
 }
 
 char *platform_get_config_dir(void) {
-  /* Unix: Use $XDG_CONFIG_HOME/ascii-chat/ if set */
+  /* Unix: Use $XDG_CONFIG_HOME/application/ if set */
   const char *xdg_config_home = platform_getenv("XDG_CONFIG_HOME");
   if (xdg_config_home && xdg_config_home[0] != '\0') {
-    size_t len = strlen(xdg_config_home) + strlen("/ascii-chat/") + 1;
+    size_t len = strlen(xdg_config_home) + strlen("/application/") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s/ascii-chat/", xdg_config_home);
+    snprintf(dir, len, "%s/application/", xdg_config_home);
     return dir;
   }
 
-  /* Fallback: ~/.config/ascii-chat/ (XDG Base Directory standard) */
+  /* Fallback: ~/.config/application/ (XDG Base Directory standard) */
   const char *home = platform_getenv("HOME");
   if (home && home[0] != '\0') {
-    size_t len = strlen(home) + strlen("/.config/ascii-chat/") + 1;
+    size_t len = strlen(home) + strlen("/.config/application/") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s/.config/ascii-chat/", home);
+    snprintf(dir, len, "%s/.config/application/", home);
     return dir;
   }
 
@@ -634,27 +634,27 @@ char *platform_get_config_dir(void) {
 }
 
 char *platform_get_data_dir(void) {
-  /* Unix: Use $XDG_DATA_HOME/ascii-chat/ if set */
+  /* Unix: Use $XDG_DATA_HOME/application/ if set */
   const char *xdg_data_home = platform_getenv("XDG_DATA_HOME");
   if (xdg_data_home && xdg_data_home[0] != '\0') {
-    size_t len = strlen(xdg_data_home) + strlen("/ascii-chat/") + 1;
+    size_t len = strlen(xdg_data_home) + strlen("/application/") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s/ascii-chat/", xdg_data_home);
+    snprintf(dir, len, "%s/application/", xdg_data_home);
     return dir;
   }
 
-  /* Fallback: ~/.local/share/ascii-chat/ (XDG Base Directory standard) */
+  /* Fallback: ~/.local/share/application/ (XDG Base Directory standard) */
   const char *home = platform_getenv("HOME");
   if (home && home[0] != '\0') {
-    size_t len = strlen(home) + strlen("/.local/share/ascii-chat/") + 1;
+    size_t len = strlen(home) + strlen("/.local/share/application/") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s/.local/share/ascii-chat/", home);
+    snprintf(dir, len, "%s/.local/share/application/", home);
     return dir;
   }
 

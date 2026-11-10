@@ -26,14 +26,6 @@
 #include <errno.h>
 #include <stdlib.h>
 
-void platform_directory_list_destroy(platform_directory_list_t *list) {
-  if (!list) return;
-  for (size_t i = 0; i < list->count; i++) free(list->candidates[i].path);
-  free(list->candidates);
-  list->candidates = NULL;
-  list->count = 0;
-}
-
 // ============================================================================
 // Basic File Checks
 // ============================================================================
@@ -437,7 +429,7 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
   uint8_t priority = 0;
   char full_path[MAX_PATH];
 
-  // Priority 0: %APPDATA%\ascii-chat (user config)
+  // Priority 0: %APPDATA%\application (user config)
   char *config_dir = platform_get_config_dir();
   if (config_dir) {
     int ret = snprintf(full_path, sizeof(full_path), "%s%s", config_dir, filename);
@@ -457,10 +449,10 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
 
   free(config_dir);
 
-  // Priority 1: %LOCALAPPDATA%\ascii-chat
+  // Priority 1: %LOCALAPPDATA%\application
   char localappdata[MAX_PATH];
   if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localappdata))) {
-    int ret = snprintf(full_path, sizeof(full_path), "%s\\ascii-chat\\%s", localappdata, filename);
+    int ret = snprintf(full_path, sizeof(full_path), "%s\\application\\%s", localappdata, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -475,10 +467,10 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
     }
   }
 
-  // Priority 2: %PROGRAMDATA%\ascii-chat (system config)
+  // Priority 2: %PROGRAMDATA%\application (system config)
   char programdata[MAX_PATH];
   if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_COMMON_APPDATA, NULL, 0, programdata))) {
-    int ret = snprintf(full_path, sizeof(full_path), "%s\\ascii-chat\\%s", programdata, filename);
+    int ret = snprintf(full_path, sizeof(full_path), "%s\\application\\%s", programdata, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -540,21 +532,21 @@ char *platform_get_config_dir(void) {
   char appdata[MAX_PATH];
   const char *config_home = getenv("APPDATA");
   if (config_home && config_home[0] != '\0') {
-    size_t len = strlen(config_home) + strlen("\\ascii-chat\\") + 1;
+    size_t len = strlen(config_home) + strlen("\\application\\") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s\\ascii-chat\\", config_home);
+    snprintf(dir, len, "%s\\application\\", config_home);
     return dir;
   }
   if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appdata))) {
-    size_t len = strlen(appdata) + strlen("\\ascii-chat\\") + 1;
+    size_t len = strlen(appdata) + strlen("\\application\\") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s\\ascii-chat\\", appdata);
+    snprintf(dir, len, "%s\\application\\", appdata);
     return dir;
   }
 
@@ -564,19 +556,20 @@ char *platform_get_config_dir(void) {
 char *platform_get_data_dir(void) {
   char localappdata[MAX_PATH];
   if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localappdata))) {
-    size_t len = strlen(localappdata) + strlen("\\ascii-chat\\") + 1;
+    size_t len = strlen(localappdata) + strlen("\\application\\") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s\\ascii-chat\\", localappdata);
+    snprintf(dir, len, "%s\\application\\", localappdata);
     return dir;
   }
 
   return NULL;
 }
 
-int platform_get_data_dir_candidates(platform_directory_list_t *list_out) {
+int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
+  (void)install_prefix;
   if (!list_out) {
     return -1;
   }
@@ -594,14 +587,14 @@ int platform_get_data_dir_candidates(platform_directory_list_t *list_out) {
     return -1;
   }
 
-  size_t len = strlen(program_data) + strlen("\\ascii-chat\\") + 1;
+  size_t len = strlen(program_data) + strlen("\\application\\") + 1;
   list_out->candidates[0].path = malloc(len);
   if (!list_out->candidates[0].path) {
     platform_directory_list_destroy(list_out);
     return -1;
   }
 
-  snprintf(list_out->candidates[0].path, len, "%s\\ascii-chat\\", program_data);
+  snprintf(list_out->candidates[0].path, len, "%s\\application\\", program_data);
   list_out->candidates[0].mode = 0755;
   list_out->count = 1;
   return 0;
@@ -886,10 +879,6 @@ bool check_binary_in_path_uncached(const char *bin_name) {
 
   free(path_copy);
   return found;
-}
-
-bool platform_is_binary_in_path(const char *bin_name) {
-  return bin_name && bin_name[0] != '\0' && check_binary_in_path_uncached(bin_name);
 }
 
 /**

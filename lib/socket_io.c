@@ -4,8 +4,8 @@
 #define PLATFORM_SOCKET_IO_BYTES_BUFFER_SIZE 512
 
 #include <libplatform/socket.h>
-#include <ascii-chat/buffer.h>
-#include <ascii-chat/util/time.h>
+#include <stdlib.h>
+#include <libplatform/time.h>
 #include <limits.h>
 #include <string.h>
 #ifndef _WIN32
@@ -27,25 +27,25 @@ void socket_io_stats_reset(void) {
   io_stats = (socket_io_stats_t){0};
 }
 
-static asciichat_error_t validate_vectors(const socket_buffer_t *buffers, size_t count, size_t *total) {
+static int validate_vectors(const socket_buffer_t *buffers, size_t count, size_t *total) {
   if (!buffers || !count || count > SOCKET_IOV_MAX)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid send vectors");
+    return -1;
   *total = 0;
   for (size_t i = 0; i < count; ++i) {
     if ((buffers[i].len && !buffers[i].data) || buffers[i].len > (size_t)INT_MAX - *total)
-      return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid send vector size");
+      return -1;
     *total += buffers[i].len;
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t socket_sendv(socket_t sock, const socket_buffer_t *buffers, size_t count, size_t *sent) {
+int socket_sendv(socket_t sock, const socket_buffer_t *buffers, size_t count, size_t *sent) {
   size_t total;
   if (!sent)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Missing byte count");
+    return -1;
   *sent = 0;
-  asciichat_error_t err = validate_vectors(buffers, count, &total);
-  if (err != ASCIICHAT_OK || !total)
+  int err = validate_vectors(buffers, count, &total);
+  if (err != 0 || !total)
     return err;
   ++io_stats.send_calls;
 #ifdef _WIN32
@@ -58,8 +58,8 @@ asciichat_error_t socket_sendv(socket_t sock, const socket_buffer_t *buffers, si
   if (WSASend(sock, vectors, (DWORD)count, &bytes, 0, NULL, NULL) == SOCKET_ERROR) {
     int error = WSAGetLastError();
     if (error == WSAEWOULDBLOCK || error == WSAEINTR)
-      return ASCIICHAT_OK;
-    return SET_ERRNO(ERROR_NETWORK, "WSASend failed: %d", error);
+      return 0;
+    return -1;
   }
   *sent = bytes;
 #else
@@ -77,29 +77,29 @@ asciichat_error_t socket_sendv(socket_t sock, const socket_buffer_t *buffers, si
 #elif defined(SO_NOSIGPIPE)
   int one = 1;
   if (setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one)) != 0)
-    return SET_ERRNO_SYS(ERROR_NETWORK, "Cannot suppress SIGPIPE");
+    return -1;
 #endif
   ssize_t bytes = sendmsg(sock, &msg, flags);
   if (bytes < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
-      return ASCIICHAT_OK;
-    return SET_ERRNO_SYS(ERROR_NETWORK, "sendmsg failed");
+      return 0;
+    return -1;
   }
   *sent = (size_t)bytes;
 #endif
   io_stats.sent_bytes += *sent;
   if (!*sent)
-    return SET_ERRNO(ERROR_NETWORK, "Socket closed during vectored send");
-  return ASCIICHAT_OK;
+    return -1;
+  return 0;
 }
 
-asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers, size_t count, uint64_t timeout_ns) {
+int socket_sendv_all(socket_t sock, const socket_buffer_t *buffers, size_t count, uint64_t timeout_ns) {
   size_t total;
-  asciichat_error_t result = validate_vectors(buffers, count, &total);
-  if (result != ASCIICHAT_OK || !total)
+  int result = validate_vectors(buffers, count, &total);
+  if (result != 0 || !total)
     return result;
   if (!timeout_ns || timeout_ns > INT64_MAX)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid send deadline");
+    return -1;
   socket_buffer_t pending[SOCKET_IOV_MAX];
   memcpy(pending, buffers, count * sizeof(*buffers));
   size_t index = 0, sent_total = 0;
@@ -112,12 +112,12 @@ asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers
 #endif
   socklen_t option_len = sizeof(original_timeout);
   if (socket_getsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &original_timeout, &option_len) != 0)
-    return SET_ERRNO(ERROR_NETWORK, "Cannot read send timeout");
+    return -1;
 #endif
   while (sent_total < total) {
     uint64_t elapsed = time_get_ns() - start;
     if (elapsed >= timeout_ns) {
-      result = SET_ERRNO(ERROR_NETWORK_TIMEOUT, "Vectored send exceeded its deadline");
+      result = -1;
       break;
     }
     struct pollfd ready = {.fd = sock, .events = POLLOUT};
@@ -131,7 +131,7 @@ asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers
         continue;
     }
     if (polled <= 0 || !(ready.revents & POLLOUT)) {
-      result = SET_ERRNO(ERROR_NETWORK, "Socket unavailable during vectored send");
+      result = -1;
       break;
     }
 #if defined(_WIN32) || defined(__APPLE__)
@@ -140,7 +140,7 @@ asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers
     // wait, preserving the caller's blocking mode and configured timeout.
     elapsed = time_get_ns() - start;
     if (elapsed >= timeout_ns) {
-      result = SET_ERRNO(ERROR_NETWORK_TIMEOUT, "Vectored send exceeded its deadline");
+      result = -1;
       break;
     }
     uint64_t remaining_ms = (timeout_ns - elapsed + 999999) / 1000000;
@@ -151,7 +151,7 @@ asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers
                               .tv_usec = (suseconds_t)((remaining_ms % 1000) * 1000)};
 #endif
     if (socket_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) != 0) {
-      result = SET_ERRNO(ERROR_NETWORK, "Cannot set send deadline");
+      result = -1;
       break;
     }
 #endif
@@ -159,7 +159,7 @@ asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers
       ++index;
     size_t sent = 0;
     result = socket_sendv(sock, pending + index, count - index, &sent);
-    if (result != ASCIICHAT_OK) {
+    if (result != 0) {
       // A failing blocking WSASend may have consumed bytes without reporting a
       // count. Conservatively terminate the stream rather than retry a packet.
       socket_shutdown(sock, SHUT_RDWR);
@@ -181,44 +181,39 @@ asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers
   }
 #if defined(_WIN32) || defined(__APPLE__)
   if (socket_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &original_timeout, sizeof(original_timeout)) != 0)
-    result = SET_ERRNO(ERROR_NETWORK, "Cannot restore send timeout");
+    result = -1;
 #endif
-  if (result != ASCIICHAT_OK && sent_total) {
+  if (result != 0 && sent_total) {
     socket_shutdown(sock, SHUT_RDWR);
-    return SET_ERRNO(ERROR_NETWORK, "Incomplete packet: sent %zu/%zu bytes", sent_total, total);
+    return -1;
   }
   return result;
 }
 
-asciichat_error_t socket_send_buffer_alloc(size_t capacity, socket_send_buffer_t *buffer) {
+int socket_send_buffer_alloc(size_t capacity, socket_send_buffer_t *buffer) {
   if (!buffer || !capacity || capacity > SOCKET_SEND_BUFFER_MAX)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid send buffer capacity");
+    return -1;
   *buffer = (socket_send_buffer_t){0};
 #ifdef __linux__
   if (capacity >= SOCKET_ZEROCOPY_THRESHOLD) {
-    // Charge page rounding as well as the requested mapping length.
     long page = sysconf(_SC_PAGESIZE);
     if (page <= 0 || capacity > SIZE_MAX - (size_t)page + 1)
-      return SET_ERRNO(ERROR_MEMORY, "Cannot size send mapping");
-    size_t charge = ((capacity + (size_t)page - 1) / (size_t)page) * (size_t)page;
-    asciichat_error_t reserved = buffer_budget_reserve(&buffer->budget, charge);
-    if (reserved != ASCIICHAT_OK)
-      return reserved;
+      return -1;
     void *data = mmap(NULL, capacity, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (data != MAP_FAILED) {
       buffer->data = data;
       buffer->capacity = capacity;
       buffer->mapped = true;
-      return ASCIICHAT_OK;
+      return 0;
     }
-    buffer_budget_release(&buffer->budget);
+    
   }
 #endif
-  buffer->data = buffer_alloc(NULL, capacity);
+  buffer->data = malloc(capacity);
   if (!buffer->data)
-    return SET_ERRNO(ERROR_MEMORY, "Cannot allocate send buffer");
+    return -1;
   buffer->capacity = capacity;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 void socket_send_buffer_free(socket_send_buffer_t *buffer) {
@@ -229,50 +224,50 @@ void socket_send_buffer_free(socket_send_buffer_t *buffer) {
     munmap(buffer->data, buffer->capacity);
   else
 #endif
-    buffer_release(buffer->data);
-  buffer_budget_release(&buffer->budget);
+    free(buffer->data);
+  
   *buffer = (socket_send_buffer_t){0};
 }
 
-asciichat_error_t socket_zerocopy_try(socket_t sock, const socket_send_buffer_t *buffer, size_t offset, size_t length,
+int socket_zerocopy_try(socket_t sock, const socket_send_buffer_t *buffer, size_t offset, size_t length,
                                       size_t *sent, bool *supported) {
   if (!buffer || !buffer->data || !sent || !supported || offset > buffer->capacity ||
       length > buffer->capacity - offset)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid async zerocopy submission");
+    return -1;
   *sent = 0;
   *supported = false;
 #if defined(__linux__) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
   if (!buffer->mapped || length < SOCKET_ZEROCOPY_THRESHOLD)
-    return ASCIICHAT_OK;
+    return 0;
   int one = 1;
   if (setsockopt(sock, SOL_SOCKET, SO_ZEROCOPY, &one, sizeof(one)) != 0)
-    return ASCIICHAT_OK;
+    return 0;
   *supported = true;
   ++io_stats.send_calls;
   ssize_t count = send(sock, (const char *)buffer->data + offset, length, MSG_ZEROCOPY | MSG_DONTWAIT | MSG_NOSIGNAL);
   if (count < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
-      return ASCIICHAT_OK;
+      return 0;
     if (errno == ENOBUFS || errno == EOPNOTSUPP || errno == EINVAL) {
       *supported = false;
-      return ASCIICHAT_OK;
+      return 0;
     }
-    return SET_ERRNO_SYS(ERROR_NETWORK, "Async zerocopy submission failed");
+    return -1;
   }
   if (!count)
-    return SET_ERRNO(ERROR_NETWORK, "Async zerocopy made no progress");
+    return -1;
   *sent = (size_t)count;
   io_stats.sent_bytes += *sent;
   ++io_stats.zerocopy_calls;
 #else
   (void)sock;
 #endif
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t socket_zerocopy_poll(socket_t sock, bool *completed, bool *copied) {
+int socket_zerocopy_poll(socket_t sock, bool *completed, bool *copied) {
   if (!completed || !copied)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Missing async zerocopy completion outputs");
+    return -1;
   *completed = *copied = false;
 #if defined(__linux__) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
   union {
@@ -284,11 +279,11 @@ asciichat_error_t socket_zerocopy_poll(socket_t sock, bool *completed, bool *cop
   message.msg_controllen = sizeof(control.bytes);
   if (recvmsg(sock, &message, MSG_ERRQUEUE | MSG_DONTWAIT) < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
-      return ASCIICHAT_OK;
-    return SET_ERRNO_SYS(ERROR_NETWORK, "Async zerocopy completion failed");
+      return 0;
+    return -1;
   }
   if (message.msg_flags & MSG_CTRUNC)
-    return SET_ERRNO(ERROR_NETWORK, "Truncated async zerocopy completion");
+    return -1;
   for (struct cmsghdr *c = CMSG_FIRSTHDR(&message); c; c = CMSG_NXTHDR(&message, c)) {
     if (!((c->cmsg_level == SOL_IP && c->cmsg_type == IP_RECVERR) ||
           (c->cmsg_level == SOL_IPV6 && c->cmsg_type == IPV6_RECVERR)) ||
@@ -297,7 +292,7 @@ asciichat_error_t socket_zerocopy_poll(socket_t sock, bool *completed, bool *cop
     struct sock_extended_err error;
     memcpy(&error, CMSG_DATA(c), sizeof(error));
     if (error.ee_errno || error.ee_origin != SO_EE_ORIGIN_ZEROCOPY || error.ee_info != error.ee_data)
-      return SET_ERRNO(ERROR_NETWORK, "Unexpected async zerocopy completion");
+      return -1;
     *completed = true;
     *copied = (error.ee_code & SO_EE_CODE_ZEROCOPY_COPIED) != 0;
     ++io_stats.zerocopy_completions;
@@ -307,22 +302,22 @@ asciichat_error_t socket_zerocopy_poll(socket_t sock, bool *completed, bool *cop
 #else
   (void)sock;
 #endif
-  return ASCIICHAT_OK;
+  return 0;
 }
 
-asciichat_error_t socket_send_zerocopy(socket_t sock, const socket_send_buffer_t *buffer, size_t len,
+int socket_send_zerocopy(socket_t sock, const socket_send_buffer_t *buffer, size_t len,
                                        uint64_t timeout_ns, bool *supported, bool *copied) {
   if (!supported || !copied || !buffer || !buffer->data || len > buffer->capacity || !timeout_ns ||
       timeout_ns > INT64_MAX)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid zerocopy buffer or deadline");
+    return -1;
   *supported = false;
   *copied = false;
 #if defined(__linux__) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
   if (!buffer->mapped || len < SOCKET_ZEROCOPY_THRESHOLD)
-    return ASCIICHAT_OK;
+    return 0;
   int one = 1;
   if (setsockopt(sock, SOL_SOCKET, SO_ZEROCOPY, &one, sizeof(one)) != 0)
-    return ASCIICHAT_OK;
+    return 0;
   uint64_t start = time_get_ns();
   size_t offset = 0;
   while (offset < len) {
@@ -343,7 +338,7 @@ asciichat_error_t socket_send_zerocopy(socket_t sock, const socket_send_buffer_t
         continue;
       if (errno == ENOBUFS || errno == EOPNOTSUPP || errno == EINVAL) {
         if (!offset)
-          return ASCIICHAT_OK;
+          return 0;
         // Earlier submissions are completed. Fall back only for unsent bytes.
         *copied = true;
         goto remaining_copy;
@@ -409,20 +404,20 @@ asciichat_error_t socket_send_zerocopy(socket_t sock, const socket_send_buffer_t
       if (elapsed >= timeout_ns)
         goto failed;
       socket_buffer_t remaining = {(const char *)buffer->data + offset, len - offset};
-      if (socket_sendv_all(sock, &remaining, 1, timeout_ns - elapsed) != ASCIICHAT_OK)
+      if (socket_sendv_all(sock, &remaining, 1, timeout_ns - elapsed) != 0)
         goto failed;
-      return ASCIICHAT_OK;
+      return 0;
     }
   }
-  return ASCIICHAT_OK;
+  return 0;
 failed:
   // Unmapping does not recycle physical pages pinned by the kernel. The caller
   // must discard this mapping, never write into it after an unsuccessful send.
   *supported = true;
   socket_shutdown(sock, SHUT_RDWR);
-  return SET_ERRNO(ERROR_NETWORK, "Zerocopy send failed or exceeded its deadline");
+  return -1;
 #else
   (void)sock;
-  return ASCIICHAT_OK;
+  return 0;
 #endif
 }

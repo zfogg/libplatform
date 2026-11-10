@@ -20,14 +20,6 @@
 #include <libplatform/cond.h>
 #include <libplatform/thread.h>
 #include <libplatform/time.h>
-#ifdef LIBPLATFORM_STANDALONE
-#define log_msg(...) ((void)0)
-#define LOG_DEBUG 0
-#else
-#include <ascii-chat/platform/thread.h>
-#include <libplatform/time.h>
-#include <ascii-chat/log/log.h>
-#endif
 #include <stdint.h>
 #include <time.h>
 #include <stdatomic.h>
@@ -157,19 +149,19 @@ int cond_format_state(const cond_t *cond, char *buffer, size_t size) {
 
   if (cond->last_wait_time_ns > 0 && cond->last_wait_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_COND_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - cond->last_wait_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - cond->last_wait_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(wait_str, sizeof(wait_str), "wait=%s", elapsed_str);
   }
 
   if (cond->last_signal_time_ns > 0 && cond->last_signal_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_COND_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - cond->last_signal_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - cond->last_signal_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(signal_str, sizeof(signal_str), "signal=%s", elapsed_str);
   }
 
   if (cond->last_broadcast_time_ns > 0 && cond->last_broadcast_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_COND_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - cond->last_broadcast_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - cond->last_broadcast_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(broadcast_str, sizeof(broadcast_str), "broadcast=%s", elapsed_str);
   }
 
@@ -205,7 +197,7 @@ void cond_log_state(const cond_t *cond, const char *file, int line, const char *
     return;
   char buf[PLATFORM_COND_BUF_BUFFER_SIZE];
   cond_format_state(cond, buf, sizeof(buf));
-  log_msg(LOG_DEBUG, file, line, func, "cond/state %p: %s", (const void *)cond, buf);
+
 }
 
 #endif // !NDEBUG

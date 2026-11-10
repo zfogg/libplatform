@@ -5,25 +5,24 @@
 /* Existing buffer budgets in bytes, including NUL for text storage. */
 #define KEYBOARD_DEFERRED_KEY_CAPACITY 1024
 
-#include <ascii-chat/common/buffer_sizes.h>
 #include <libplatform/keyboard.h>
-#include <ascii-chat/ui/input.h>
+#include <libplatform/time.h>
 #include <libplatform/system.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat-deps/utf8proc/utf8proc.h>
+#include <libplatform/time.h>
+#include <utf8proc.h>
 #include <string.h>
 #include <stdlib.h>
-#include <ascii-chat/atomic.h>
-#include <ascii-chat/log/log.h>
+#include <stdatomic.h>
+#define NS_PER_MS_INT 1000000ULL
 
 keyboard_key_t keyboard_read_with_timeout(uint32_t timeout_ms) {
-  uint64_t deadline = time_get_ns() + (uint64_t)timeout_ms * NS_PER_MS_INT;
+  uint64_t deadline = (platform_get_monotonic_time_us() * 1000ULL) + (uint64_t)timeout_ms * NS_PER_MS_INT;
   do {
     keyboard_key_t key = keyboard_read_nonblocking();
     if (key != KEY_NONE || timeout_ms == 0)
       return key;
     platform_sleep_ns(NS_PER_MS_INT);
-  } while (time_get_ns() < deadline);
+  } while ((platform_get_monotonic_time_us() * 1000ULL) < deadline);
   return KEY_NONE;
 }
 
@@ -79,20 +78,20 @@ keyboard_key_t keyboard_text_utf16(uint16_t *pending_high, uint16_t unit) {
   return (keyboard_key_t)unit;
 }
 
-static atomic_t parser_guard = {0};
-static atomic_t background_rgb = {0};
-static atomic_t background_ns = {0};
+static atomic_int parser_guard = 0;
+static atomic_uint_least64_t background_rgb = 0;
+static atomic_uint_least64_t background_ns = 0;
 static keyboard_key_t deferred[KEYBOARD_DEFERRED_KEY_CAPACITY];
 static unsigned deferred_head, deferred_count;
 static bool querying_background;
 
 static bool parser_try_lock(void) {
   int expected = 0;
-  return atomic_cas_int_impl(&parser_guard, &expected, 1);
+  return atomic_compare_exchange_strong(&parser_guard, &expected, 1);
 }
 
 static void parser_unlock(void) {
-  atomic_store_int_impl(&parser_guard, 0);
+  atomic_store(&parser_guard, 0);
 }
 
 static bool parse_background(const char *text, uint32_t *rgb) {
@@ -132,10 +131,10 @@ static bool parse_background(const char *text, uint32_t *rgb) {
 }
 
 static char sequence[PLATFORM_KEYBOARD_SEQUENCE_BUFFER_SIZE];
-static atomic_t terminal_reply_ns = {0};
+static atomic_uint_least64_t terminal_reply_ns = 0;
 
 uint64_t keyboard_stream_terminal_reply_ns(void) {
-  return atomic_load_u64(&terminal_reply_ns);
+  return atomic_load(&terminal_reply_ns);
 }
 static size_t length;
 static uint64_t started;
@@ -167,7 +166,7 @@ static keyboard_key_t keyboard_stream_read_unlocked(int (*read_byte)(void)) {
   for (unsigned i = 0; i < 64; ++i) {
     int byte = read_byte();
     if (!byte) {
-      if (length == 1 && !pasting && time_get_ns() - started >= 50 * NS_PER_MS_INT) {
+      if (length == 1 && !pasting && (platform_get_monotonic_time_us() * 1000ULL) - started >= 50 * NS_PER_MS_INT) {
         length = 0;
         pending_escape = false;
         return KEY_ESCAPE;
@@ -207,7 +206,7 @@ static keyboard_key_t keyboard_stream_read_unlocked(int (*read_byte)(void)) {
     }
     text_decoder.length = 0;
     if (!length)
-      started = time_get_ns();
+      started = (platform_get_monotonic_time_us() * 1000ULL);
     if (byte > 255 || length == sizeof(sequence) - 1) {
       if (!pasting && length > 1 && sequence[1] == ']') {
         bool complete = byte == 7 || (sequence[length - 1] == 27 && byte == '\\');
@@ -233,17 +232,14 @@ static keyboard_key_t keyboard_stream_read_unlocked(int (*read_byte)(void)) {
       if (!complete)
         continue;
       if (!strncmp(sequence, "\033]11;rgb:", 9)) {
-        uint64_t completed_ns = time_get_ns();
-        atomic_store_u64(&terminal_reply_ns, completed_ns);
+        uint64_t completed_ns = platform_get_monotonic_time_us() * 1000ULL;
+        atomic_store(&terminal_reply_ns, completed_ns);
         uint32_t rgb;
         if (parse_background(sequence + 9, &rgb)) {
-          atomic_store_u64(&background_rgb, rgb);
-          atomic_store_u64(&background_ns, completed_ns);
+          atomic_store(&background_rgb, rgb);
+          atomic_store(&background_ns, completed_ns);
         }
-        if (!querying_background)
-          log_debug("TERMINAL_REPLY: parse_ms=%.3f bytes=%zu", (double)(completed_ns - started) / NS_PER_MS_INT,
-                    length);
-      }
+}
       length = 0;
       bool escape = pending_escape;
       pending_escape = false;
@@ -351,13 +347,13 @@ bool keyboard_stream_query_background(int (*read_byte)(void), bool (*send_query)
                                       uint8_t *b) {
   if (!r || !g || !b || !read_byte || !send_query)
     return false;
-  uint64_t deadline = time_get_ns() + 100 * NS_PER_MS_INT;
+  uint64_t deadline = (platform_get_monotonic_time_us() * 1000ULL) + 100 * NS_PER_MS_INT;
   while (!parser_try_lock()) {
-    if (time_get_ns() >= deadline)
+    if ((platform_get_monotonic_time_us() * 1000ULL) >= deadline)
       return false;
     platform_sleep_ms(1);
   }
-  uint64_t before = atomic_load_u64(&background_ns);
+  uint64_t before = atomic_load(&background_ns);
   querying_background = true;
   bool received = false;
   if (deferred_count < 1024 && send_query()) {
@@ -365,8 +361,8 @@ bool keyboard_stream_query_background(int (*read_byte)(void), bool (*send_query)
       keyboard_key_t key = keyboard_stream_read_unlocked(read_byte);
       if (key != KEY_NONE)
         deferred[(deferred_head + deferred_count++) % 1024] = key;
-      if (atomic_load_u64(&background_ns) > before) {
-        uint64_t rgb = atomic_load_u64(&background_rgb);
+      if (atomic_load(&background_ns) > before) {
+        uint64_t rgb = atomic_load(&background_rgb);
         *r = (uint8_t)(rgb >> 16);
         *g = (uint8_t)(rgb >> 8);
         *b = (uint8_t)rgb;
@@ -375,7 +371,7 @@ bool keyboard_stream_query_background(int (*read_byte)(void), bool (*send_query)
       }
       if (key == KEY_NONE)
         platform_sleep_ms(1);
-    } while (deferred_count < 1024 && time_get_ns() < deadline);
+    } while (deferred_count < 1024 && (platform_get_monotonic_time_us() * 1000ULL) < deadline);
   }
   querying_background = false;
   parser_unlock();
@@ -383,9 +379,9 @@ bool keyboard_stream_query_background(int (*read_byte)(void), bool (*send_query)
 }
 
 bool keyboard_stream_background(uint8_t *r, uint8_t *g, uint8_t *b) {
-  if (!atomic_load_u64(&background_ns))
+  if (!atomic_load(&background_ns))
     return false;
-  uint64_t rgb = atomic_load_u64(&background_rgb);
+  uint64_t rgb = atomic_load(&background_rgb);
   *r = (uint8_t)(rgb >> 16);
   *g = (uint8_t)(rgb >> 8);
   *b = (uint8_t)rgb;
@@ -401,6 +397,16 @@ keyboard_line_edit_result_t keyboard_apply_key(keyboard_line_edit_opts_t *opts) 
     return LINE_EDIT_ACCEPTED;
   if (key == KEY_ESCAPE || key == 3 || ((key == 8 || key == 127 || key == 23) && !*opts->len))
     return LINE_EDIT_CANCELLED;
-  ui_input_edit_key(opts->buffer, opts->max_len, opts->len, opts->cursor, key);
+  if (key == 8 || key == 127 || key == KEY_DELETE) {
+    if (*opts->cursor) {
+      memmove(opts->buffer + *opts->cursor - 1, opts->buffer + *opts->cursor, *opts->len - *opts->cursor + 1);
+      --*opts->cursor;
+      --*opts->len;
+    }
+  } else if (key >= 32 && key < 0x110000) {
+    memmove(opts->buffer + *opts->cursor + 1, opts->buffer + *opts->cursor, *opts->len - *opts->cursor + 1);
+    opts->buffer[(*opts->cursor)++] = (char)key;
+    ++*opts->len;
+  }
   return LINE_EDIT_CONTINUE;
 }

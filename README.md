@@ -1,8 +1,8 @@
 # libplatform
 
-Small, dependency-free cross-platform primitives extracted from ascii-chat.
+Small, dependency-free cross-platform primitives extracted from application.
 
-The backtrace and symbolization implementation is extracted from ascii-chat, including its address cache, batch `llvm-symbolizer`/`addr2line` resolution, source-path formatting, and WebAssembly-safe behavior. The library owns its fallback allocator, lifecycle, locking, and diagnostics seams; applications provide presentation through the output callback.
+The backtrace and symbolization implementation is extracted from application, including its address cache, batch `llvm-symbolizer`/`addr2line` resolution, source-path formatting, and WebAssembly-safe behavior. The library owns its fallback allocator, lifecycle, locking, and diagnostics seams; applications provide presentation through the output callback.
 
 Build and test:
 

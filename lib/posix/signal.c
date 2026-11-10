@@ -6,12 +6,15 @@
 
 #ifndef _WIN32
 
-#include <ascii-chat/signal.h>
-#include <ascii-chat/log/log.h>
-#include <ascii-chat/common.h>
+#include <libplatform/signal.h>
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
+
+#define log_error(...) ((void)0)
+#define log_debug(...) ((void)0)
+#define SET_ERRNO_SYS(...) (-1)
+#define ERROR_SYSTEM 1
 
 /**
  * Global crash handler callback
@@ -31,7 +34,7 @@ static void signal_handler_wrapper(int sig) {
 /**
  * Install POSIX crash signal handler
  */
-asciichat_error_t platform_install_crash_handler(platform_crash_handler_t handler) {
+int platform_install_crash_handler(platform_crash_handler_t handler) {
   struct sigaction sa, old_sa;
 
   /* Store the handler callback */
@@ -60,13 +63,13 @@ asciichat_error_t platform_install_crash_handler(platform_crash_handler_t handle
   }
 
   log_debug("Installed POSIX crash signal handler");
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
  * Uninstall POSIX crash signal handler
  */
-asciichat_error_t platform_uninstall_crash_handler(void) {
+int platform_uninstall_crash_handler(void) {
   struct sigaction sa;
 
   /* Reset to default signal handlers */
@@ -84,7 +87,7 @@ asciichat_error_t platform_uninstall_crash_handler(void) {
 
   g_crash_handler = NULL;
   log_debug("Uninstalled POSIX crash signal handler");
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**

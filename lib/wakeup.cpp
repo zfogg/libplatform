@@ -2,7 +2,6 @@
 #include <chrono>
 #include <new>
 #include <semaphore>
-#include <ascii-chat/common.h>
 #include <libplatform/wakeup.h>
 
 /**
@@ -13,12 +12,14 @@ struct platform_wakeup {
   std::atomic<bool> pending{false};
 };
 
-asciichat_error_t platform_wakeup_create(platform_wakeup_t **out) {
+int platform_wakeup_create(platform_wakeup_t **out) {
   if (!out)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "NULL wakeup output");
-  auto *storage = SAFE_MALLOC(sizeof(platform_wakeup_t), platform_wakeup_t *);
+    return -1;
+  auto *storage = static_cast<platform_wakeup_t *>(::operator new(sizeof(platform_wakeup_t), std::nothrow));
+  if (!storage)
+    return -1;
   *out = new (storage) platform_wakeup_t;
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 void platform_wakeup_signal(platform_wakeup_t *wake) {
@@ -38,6 +39,6 @@ bool platform_wakeup_wait(platform_wakeup_t *wake, uint64_t timeout_ns) {
 void platform_wakeup_destroy(platform_wakeup_t *wake) {
   if (wake) {
     wake->~platform_wakeup();
-    SAFE_FREE(wake);
+    ::operator delete(wake);
   }
 }

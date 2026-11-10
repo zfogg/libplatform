@@ -2,7 +2,6 @@
 /* Storage capacities in elements; text buffers include the terminating NUL. */
 #define PLATFORM_POSIX_SYSTEM_CHUNK_BUFFER_SIZE 4096
 
-#include <ascii-chat/util/url.h>
 /**
  * @file platform/posix/system.c
  * @ingroup platform
@@ -11,24 +10,16 @@
 
 #ifndef _WIN32
 
-#include "terminal.h"
-#include <ascii-chat/otel.h>
-#include <libplatform/api.h>
+#include <libplatform/system.h>
 #include <libplatform/terminal.h>
-#include <libplatform/internal.h>
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/debug/backtrace.h>
-#include <ascii-chat/common.h> // For log_error()
-#include <ascii-chat/common/buffer_sizes.h>
-#include <ascii-chat/asciichat_errno.h>
-#include <ascii-chat/util/ip.h>
-#include <libplatform/util/string.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/util/utf8.h>
-#include <libplatform/util/path.h>
-#include <libplatform/symbols.h> // For symbol cache
+#include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
-#include <ascii-chat/options/options.h> // For options_get()
+#include <libplatform/util/string.h>
+#include <libplatform/time.h>
+#include <libplatform/util/path.h>
+#include <libplatform/util/ip.h>
+#include <libplatform/util/utf8.h>
+#include <libplatform/symbols.h>
 #include <unistd.h>
 #include <poll.h>
 #include <fcntl.h>
@@ -52,7 +43,7 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #endif
 #include <pthread.h>
 #include <stdarg.h>
-#include <ascii-chat/atomic.h>
+#include <libplatform/atomic.h>
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <netdb.h>

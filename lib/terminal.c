@@ -8,12 +8,15 @@
 #include <libplatform/system.h>
 #ifndef _WIN32
 #include <unistd.h>
+#include <pthread.h>
 #else
 #include <io.h>
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 #endif
+#include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 int terminal_format_hyperlink(char *buffer, size_t capacity, const char *url, const char *label, bool enabled) {
@@ -236,6 +239,13 @@ bool terminal_is_piped_output(void) {
   return !terminal_is_stdout_tty();
 }
 
+bool terminal_should_force_stderr(void) {
+  if (!terminal_is_piped_output())
+    return false;
+  const char *testing = platform_getenv("TESTING");
+  return !(testing && testing[0] == '1' && testing[1] == '\0');
+}
+
 bool terminal_can_prompt_user(bool user_setting) {
   // Must be fully interactive (stdin and stdout are TTYs)
   if (!terminal_is_interactive()) {
@@ -331,3 +341,27 @@ bool terminal_should_use_control_sequences(int fd, bool user_setting) {
   }
   return platform_isatty(fd) != 0;
 }
+
+#ifndef _WIN32
+static pthread_mutex_t g_terminal_input_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void terminal_input_lock(void) { (void)pthread_mutex_lock(&g_terminal_input_mutex); }
+
+bool terminal_input_trylock(void) { return pthread_mutex_trylock(&g_terminal_input_mutex) == 0; }
+
+void terminal_input_unlock(void) { (void)pthread_mutex_unlock(&g_terminal_input_mutex); }
+
+bool terminal_supports_utf8(void) {
+  const char *locale = getenv("LC_ALL");
+  if (!locale || !*locale) locale = getenv("LC_CTYPE");
+  if (!locale || !*locale) locale = getenv("LANG");
+  if (!locale || !*locale) return true;
+
+  char normalized[64];
+  size_t length = strlen(locale);
+  if (length >= sizeof(normalized)) length = sizeof(normalized) - 1;
+  for (size_t i = 0; i < length; ++i) normalized[i] = (char)tolower((unsigned char)locale[i]);
+  normalized[length] = '\0';
+  return strstr(normalized, "utf-8") || strstr(normalized, "utf8");
+}
+#endif

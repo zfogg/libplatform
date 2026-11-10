@@ -10,7 +10,8 @@ void platform_systemd_notify_status(const char *status);
 void platform_systemd_notify_reloading(void);
 void platform_systemd_notify_watchdog(void);
 bool platform_systemd_watchdog_enabled(unsigned long long *usec);
-void platform_systemd_journal_log(int level, const char *message, const char *file, int line, const char *function);
+void platform_systemd_journal_log(int level, const char *message, const char *identifier, const char *file, int line,
+                                  const char *function);
 #else
 static inline bool platform_systemd_is_managed(void) {
   return false;
@@ -25,10 +26,11 @@ static inline bool platform_systemd_watchdog_enabled(unsigned long long *usec) {
   (void)usec;
   return false;
 }
-static inline void platform_systemd_journal_log(int level, const char *message, const char *file, int line,
-                                                const char *function) {
+static inline void platform_systemd_journal_log(int level, const char *message, const char *identifier,
+                                                const char *file, int line, const char *function) {
   (void)level;
   (void)message;
+  (void)identifier;
   (void)file;
   (void)line;
   (void)function;

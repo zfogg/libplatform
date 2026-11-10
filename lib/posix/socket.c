@@ -19,15 +19,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <ascii-chat/common.h>
-#include <libplatform/abstraction.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/debug/named.h>
+#include <libplatform/socket.h>
+#include <libplatform/system.h>
+#include <libplatform/time.h>
+#include <libplatform/debug/named.h>
+
+#define SET_ERRNO(...) (-1)
+#define SAFE_STRERROR strerror
 
 // Socket implementation (mostly pass-through for POSIX)
-asciichat_error_t socket_init(void) {
+int socket_init(void) {
   // POSIX doesn't need socket initialization
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 void socket_cleanup(void) {
@@ -178,7 +181,7 @@ int socket_poll(struct pollfd *fds, nfds_t nfds, int64_t timeout_ns) {
   if (timeout_ns < 0) {
     timeout_ms = -1; // Infinite timeout
   } else {
-    timeout_ms = (int)time_ns_to_ms((uint64_t)timeout_ns);
+    timeout_ms = (int)((uint64_t)timeout_ns / 1000000ULL);
   }
   return poll(fds, nfds, timeout_ms);
 }

@@ -28,9 +28,9 @@
  *
  * ## Configuration Directories
  *
- * All ascii-chat data files (config, known_hosts, etc.) use a single directory:
- * - Unix: $XDG_CONFIG_HOME/ascii-chat/ if set, otherwise ~/.ascii-chat/
- * - Windows: %APPDATA%\ascii-chat\ if set, otherwise ~\.ascii-chat\
+ * All application data files (config, known_hosts, etc.) use a single directory:
+ * - Unix: $XDG_CONFIG_HOME/application/ if set, otherwise ~/.application/
+ * - Windows: %APPDATA%\application\ if set, otherwise ~\.application\
  *
  * @note All returned paths that require freeing are allocated with malloc()
  *       and must be freed by the caller using free().
@@ -132,8 +132,8 @@ const char *path_last_components(const char *path, size_t component_count);
  *
  * @par Example
  * @code
- * char *expanded = expand_path("~/.config/ascii-chat");
- * // Returns: "/home/user/.config/ascii-chat" (on Unix)
+ * char *expanded = expand_path("~/.config/application");
+ * // Returns: "/home/user/.config/application" (on Unix)
  * free(expanded);
  * @endcode
  */
@@ -147,24 +147,24 @@ char *expand_path(const char *path);
  * conventions and environment variables. The path includes the directory
  * separator at the end for convenience.
  *
- * All ascii-chat data files use this single directory:
+ * All application data files use this single directory:
  * - config.toml (configuration)
  * - known_hosts (server key verification)
  *
  * Configuration path resolution:
- * - Unix: $XDG_CONFIG_HOME/ascii-chat/ if XDG_CONFIG_HOME is set, otherwise ~/.ascii-chat/
- * - Windows: %APPDATA%\ascii-chat\ if APPDATA is set, with fallback to %USERPROFILE%\AppData\Roaming\ascii-chat\,
- * %HOME%\.config\ascii-chat\, or C:\ProgramData\ascii-chat\
+ * - Unix: $XDG_CONFIG_HOME/application/ if XDG_CONFIG_HOME is set, otherwise ~/.application/
+ * - Windows: %APPDATA%\application\ if APPDATA is set, with fallback to %USERPROFILE%\AppData\Roaming\application\,
+ * %HOME%\.config\application\, or C:\ProgramData\application\
  *
  * @note Returned path is allocated with malloc() and must be freed by caller.
- * @note Path includes directory separator at the end (e.g., "/home/user/.config/ascii-chat/").
+ * @note Path includes directory separator at the end (e.g., "/home/user/.config/application/").
  * @note Returns NULL on failure (memory allocation error, etc.).
  *
  * @par Example
  * @code
  * char *config_dir = get_config_dir();
- * // Returns: "/home/user/.config/ascii-chat/" (on Unix with XDG_CONFIG_HOME unset)
- * // or: "C:\Users\user\AppData\Roaming\ascii-chat\" (on Windows)
+ * // Returns: "/home/user/.config/application/" (on Unix with XDG_CONFIG_HOME unset)
+ * // or: "C:\Users\user\AppData\Roaming\application\" (on Windows)
  * free(config_dir);
  * @endcode
  */
@@ -174,16 +174,16 @@ char *get_config_dir(void);
  * @brief Get application data directory path
  * @return Path to data directory (must be freed by caller), or NULL on failure
  *
- * Returns XDG_DATA_HOME/ascii-chat/ on Unix (~/.local/share/ascii-chat/ by default)
- * or AppData\ascii-chat\ on Windows.
+ * Returns XDG_DATA_HOME/application/ on Unix (~/.local/share/application/ by default)
+ * or AppData\application\ on Windows.
  *
  * Use this for application data files like databases, not configuration files.
  *
  * @par Example:
  * @code
  * char *data_dir = get_data_dir();
- * // Returns: "/home/user/.local/share/ascii-chat/" (on Unix)
- * // or: "C:\Users\user\AppData\Roaming\ascii-chat\" (on Windows)
+ * // Returns: "/home/user/.local/share/application/" (on Unix)
+ * // or: "C:\Users\user\AppData\Roaming\application\" (on Windows)
  * free(data_dir);
  * @endcode
  */
@@ -199,9 +199,9 @@ char *get_data_dir(void);
  *
  * Log directory resolution:
  * - Debug builds: Current working directory (for fast iteration)
- * - Release builds: $TMPDIR/ascii-chat/ (Unix: /tmp/ascii-chat/, Windows: %TEMP%\ascii-chat\)
+ * - Release builds: $TMPDIR/application/ (Unix: /tmp/application/, Windows: %TEMP%\application\)
  *
- * For release builds, this function automatically creates the ascii-chat subdirectory
+ * For release builds, this function automatically creates the application subdirectory
  * if it doesn't exist and verifies it's writable.
  *
  * @note Returned path is allocated with malloc() and must be freed by caller.
@@ -219,8 +219,8 @@ char *get_data_dir(void);
  * @par Example (Release Build)
  * @code
  * char *log_dir = get_log_dir();
- * // Returns: "/tmp/ascii-chat" (on Unix)
- * // or: "C:\Users\user\AppData\Local\Temp\ascii-chat" (on Windows)
+ * // Returns: "/tmp/application" (on Unix)
+ * // or: "C:\Users\user\AppData\Local\Temp\application" (on Windows)
  * free(log_dir);
  * @endcode
  */
@@ -236,11 +236,11 @@ char *get_log_dir(void);
  *
  * Directory resolution (in order of preference):
  * 1. System-wide location using baked-in install prefix:
- *    - Unix: ${ASCIICHAT_INSTALL_PREFIX}/var/ascii-chat/ (e.g., /opt/homebrew/var/ascii-chat/ or
- * /usr/local/var/ascii-chat/)
- *    - Windows: %PROGRAMDATA%\ascii-chat\
- * 2. macOS only: /usr/local/var/ascii-chat/ (if different from install prefix, typically user-writable)
- * 3. User data directory: $XDG_DATA_HOME/ascii-chat/ or ~/.local/share/ascii-chat/
+ *    - Unix: ${ASCIICHAT_INSTALL_PREFIX}/var/application/ (e.g., /opt/homebrew/var/application/ or
+ * /usr/local/var/application/)
+ *    - Windows: %PROGRAMDATA%\application\
+ * 2. macOS only: /usr/local/var/application/ (if different from install prefix, typically user-writable)
+ * 3. User data directory: $XDG_DATA_HOME/application/ or ~/.local/share/application/
  *
  * The install prefix is determined at compile time from CMake's CMAKE_INSTALL_PREFIX,
  * which Homebrew sets appropriately:
@@ -253,17 +253,17 @@ char *get_log_dir(void);
  * is not writable, it falls back to the next option.
  *
  * @note Returned path is allocated with malloc() and must be freed by caller.
- * @note Path includes directory separator at the end (e.g., "/opt/homebrew/var/ascii-chat/").
+ * @note Path includes directory separator at the end (e.g., "/opt/homebrew/var/application/").
  * @note Returns NULL if both system and user data directories are inaccessible.
  * @note Creates directories recursively if they don't exist and parent is writable.
  *
  * @par Example
  * @code
  * char *db_dir = get_discovery_database_dir();
- * // macOS (Apple Silicon): "/opt/homebrew/var/ascii-chat/", then "/usr/local/var/ascii-chat/"
- * // macOS (Intel): "/usr/local/var/ascii-chat/"
- * // Linux: "/usr/local/var/ascii-chat/"
- * // User fallback: "~/.local/share/ascii-chat/"
+ * // macOS (Apple Silicon): "/opt/homebrew/var/application/", then "/usr/local/var/application/"
+ * // macOS (Intel): "/usr/local/var/application/"
+ * // Linux: "/usr/local/var/application/"
+ * // User fallback: "~/.local/share/application/"
  * free(db_dir);
  * @endcode
  */
@@ -346,12 +346,12 @@ bool path_looks_like_path(const char *value);
  * Trusted base directories include:
  * - Current working directory
  * - System temp directory
- * - User config directory (~/.ascii-chat/ or %APPDATA%\ascii-chat\)
+ * - User config directory (~/.application/ or %APPDATA%\application\)
  * - User home directory
  * - User SSH directory (~/.ssh/)
- * - System config directories (Unix: /etc/ascii-chat/, /usr/local/etc/ascii-chat/)
+ * - System config directories (Unix: /etc/application/, /usr/local/etc/application/)
  * - System log directories (Unix: /var/log/, /var/tmp/)
- * - System-wide app data (Windows: %PROGRAMDATA%\ascii-chat\)
+ * - System-wide app data (Windows: %PROGRAMDATA%\application\)
  *
  * @note For PATH_ROLE_LOG_FILE, the base directory check is skipped to allow
  *       logging to any writable location.

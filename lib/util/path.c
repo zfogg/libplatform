@@ -11,6 +11,7 @@
 #define PATH_COMPONENT_BUFFER_SIZE 256
 
 #include <libplatform/util/path.h>
+#include <libplatform/filesystem.h>
 #include <libplatform/util/string.h>
 #include <string.h>
 #include <stdbool.h>
@@ -230,7 +231,7 @@ bool path_is_absolute(const char *path) {
 #endif
 }
 
-#if 0 /* ascii-chat-specific configuration and path policy remains in ascii-chat. */
+#if 0 /* application-specific configuration and path policy remains in application. */
 char *expand_path(const char *path) {
   if (path[0] == PATH_TILDE) {
     const char *home = platform_get_home_dir();
@@ -271,7 +272,7 @@ char *get_log_dir(void) {
 #endif
 
 #ifdef NDEBUG
-  // Release builds: Use $TMPDIR/ascii-chat/
+  // Release builds: Use $TMPDIR/application/
   // Get system temp directory
   char temp_dir[PLATFORM_MAX_PATH_LENGTH];
   if (!platform_get_temp_dir(temp_dir, sizeof(temp_dir))) {
@@ -288,13 +289,13 @@ char *get_log_dir(void) {
     return result;
   }
 
-  // Build path to ascii-chat subdirectory
-  size_t log_dir_len = strlen(temp_dir) + strlen(PATH_SEPARATOR_STR) + strlen("ascii-chat") + 1;
+  // Build path to application subdirectory
+  size_t log_dir_len = strlen(temp_dir) + strlen(PATH_SEPARATOR_STR) + strlen("application") + 1;
   char *log_dir = SAFE_MALLOC(log_dir_len, char *);
   if (!log_dir) {
     return NULL;
   }
-  safe_snprintf(log_dir, log_dir_len, "%s%sascii-chat", temp_dir, PATH_SEPARATOR_STR);
+  safe_snprintf(log_dir, log_dir_len, "%s%sapplication", temp_dir, PATH_SEPARATOR_STR);
 
   // Create the directory if it doesn't exist (with owner-only permissions)
   asciichat_error_t mkdir_result = platform_mkdir(log_dir, DIR_PERM_PRIVATE);
@@ -377,9 +378,10 @@ char *get_discovery_database_dir(void) {
   return NULL;
 }
 
+#endif /* application-specific configuration and path policy */
+
 bool path_normalize_copy(const char *path, char *out, size_t out_len) {
   if (!path || !out || out_len == 0) {
-    SET_ERRNO(ERROR_INVALID_PARAM, "null path or out or out_len is 0");
     return false;
   }
 
@@ -395,24 +397,6 @@ bool path_normalize_copy(const char *path, char *out, size_t out_len) {
 
   memcpy(out, normalized, len + 1);
   return true;
-}
-
-bool path_is_absolute(const char *path) {
-  if (!path || !*path) {
-    return false;
-  }
-
-#ifdef _WIN32
-  if ((path[0] == '\\' && path[1] == '\\')) {
-    return true; // UNC path
-  }
-  if (isalpha((unsigned char)path[0]) && path[1] == PATH_DRIVE_SEPARATOR && path[2] == PATH_DELIM) {
-    return true;
-  }
-  return false;
-#else
-  return path[0] == PATH_DELIM;
-#endif
 }
 
 bool path_is_within_base(const char *path, const char *base) {
@@ -491,6 +475,8 @@ bool path_looks_like_path(const char *value) {
 
   return false;
 }
+
+#if 0 /* application-specific path validation policy */
 
 static asciichat_error_t map_role_to_error(path_role_t role) {
   switch (role) {
@@ -619,11 +605,11 @@ static bool is_sensitive_system_path(const char *path) {
 }
 
 /**
- * Check if an existing file is an ascii-chat log file by reading its header.
- * ascii-chat logs have a distinctive format with timestamps and log levels.
+ * Check if an existing file is an application log file by reading its header.
+ * application logs have a distinctive format with timestamps and log levels.
  *
  * @param path The path to the file to check
- * @return true if the file appears to be an ascii-chat log file (false for directories or non-files)
+ * @return true if the file appears to be an application log file (false for directories or non-files)
  */
 static bool is_file_empty(const char *path) {
   if (!path) {
@@ -664,12 +650,12 @@ static bool is_existing_ascii_chat_log(const char *path) {
   char buffer[UTIL_PATH_BUFFER_BUFFER_SIZE];
   bool is_ascii_chat_log = false;
 
-  // Read first line and check for ascii-chat log signature
+  // Read first line and check for application log signature
   if (fgets(buffer, sizeof(buffer), f) != NULL) {
     char plain[sizeof(buffer)];
     strip_ansi_codes(buffer, plain, sizeof(plain));
 
-    // ascii-chat logs start with timestamps like: [HH:MM:SS.microseconds] [LEVEL]
+    // application logs start with timestamps like: [HH:MM:SS.microseconds] [LEVEL]
     // Pattern: [digit][digit]:[digit][digit]:[digit][digit].[digits]
     if (plain[0] == '[' && isdigit((unsigned char)plain[1]) && isdigit((unsigned char)plain[2]) && plain[3] == ':') {
       is_ascii_chat_log = true;
@@ -836,13 +822,13 @@ asciichat_error_t path_validate_user_path(const char *input, path_role_t role, c
 
   char ascii_chat_home[PLATFORM_MAX_PATH_LENGTH];
   if (home_env) {
-    build_ascii_chat_path(home_env, ".ascii-chat", ascii_chat_home, sizeof(ascii_chat_home));
+    build_ascii_chat_path(home_env, ".application", ascii_chat_home, sizeof(ascii_chat_home));
     append_base_if_valid(ascii_chat_home, bases, &base_count);
   }
 
 #ifndef _WIN32
   char ascii_chat_home_tmp[PLATFORM_MAX_PATH_LENGTH];
-  build_ascii_chat_path("/tmp", ".ascii-chat", ascii_chat_home_tmp, sizeof(ascii_chat_home_tmp));
+  build_ascii_chat_path("/tmp", ".application", ascii_chat_home_tmp, sizeof(ascii_chat_home_tmp));
   append_base_if_valid(ascii_chat_home_tmp, bases, &base_count);
 #endif
 
@@ -856,13 +842,13 @@ asciichat_error_t path_validate_user_path(const char *input, path_role_t role, c
   char program_data_logs[PLATFORM_MAX_PATH_LENGTH];
   const char *program_data = platform_getenv("PROGRAMDATA");
   if (program_data) {
-    build_ascii_chat_path(program_data, "ascii-chat", program_data_logs, sizeof(program_data_logs));
+    build_ascii_chat_path(program_data, "application", program_data_logs, sizeof(program_data_logs));
     append_base_if_valid(program_data_logs, bases, &base_count);
   }
 #else
   // System-wide config directories (for server deployments)
-  append_base_if_valid("/etc/ascii-chat", bases, &base_count);
-  append_base_if_valid("/usr/local/etc/ascii-chat", bases, &base_count);
+  append_base_if_valid("/etc/application", bases, &base_count);
+  append_base_if_valid("/usr/local/etc/application", bases, &base_count);
   append_base_if_valid("/var/log", bases, &base_count);
   append_base_if_valid("/var/tmp", bases, &base_count);
   append_base_if_valid("/tmp", bases, &base_count);
@@ -886,11 +872,11 @@ asciichat_error_t path_validate_user_path(const char *input, path_role_t role, c
     // On macOS, fopen() can succeed on directories, so we must use platform_is_regular_file()
     bool is_regular_file = platform_is_regular_file(normalized_buf);
 
-    // If a regular file exists, it MUST be an ascii-chat log or empty file to be overwritten
+    // If a regular file exists, it MUST be an application log or empty file to be overwritten
     if (is_regular_file && !is_existing_ascii_chat_log(normalized_buf) && !is_file_empty(normalized_buf)) {
       return SET_ERRNO(ERROR_LOGGING_INIT,
-                       "Cannot overwrite existing non-ascii-chat file: %s\n"
-                       "For safety, ascii-chat will only overwrite its own log files or empty files",
+                       "Cannot overwrite existing non-application file: %s\n"
+                       "For safety, application will only overwrite its own log files or empty files",
                        normalized_buf);
     }
 

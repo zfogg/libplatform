@@ -79,8 +79,8 @@ static bool ascii_case_equal(const char *left, const char *right) {
   return *left == '\0' && *right == '\0';
 }
 
-bool symbol_module_is_project(const char *module_name) {
-  if (!module_name || !*module_name) {
+bool symbol_module_matches(const char *module_name, const char *const *module_names, size_t module_count) {
+  if (!module_name || !*module_name || !module_names) {
     return false;
   }
 
@@ -91,17 +91,13 @@ bool symbol_module_is_project(const char *module_name) {
     }
   }
 
-  static const char *project_modules[] = {"ascii-chat",      "ascii-chat.exe",   "asciichat.dll",     "libasciichat.a",
-                                          "libasciichat.so", "libasciichat.dll", "libasciichat.dylib"};
-  for (size_t i = 0; i < sizeof(project_modules) / sizeof(project_modules[0]); i++) {
-    if (ascii_case_equal(basename, project_modules[i])) {
+  for (size_t i = 0; i < module_count; i++) {
+    if (module_names[i] && ascii_case_equal(basename, module_names[i])) {
       return true;
     }
   }
 
-  // Installed Unix libraries may carry an ABI or full version in the name.
-  return strncmp(basename, "libasciichat.", strlen("libasciichat.")) == 0 &&
-         (strstr(basename, ".so") != NULL || strstr(basename, ".dylib") != NULL);
+  return false;
 }
 
 static bool source_path_is_absolute(const char *path) {
@@ -118,7 +114,7 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
   const char *path = source_path ? source_path : "unknown";
   const char *project_relative = extract_project_relative_path(path);
   // Source files in this checkout also belong to test and tooling executables.
-  *external = project_relative == path && (!symbol_module_is_project(module_name) || source_path_is_absolute(path));
+  *external = project_relative == path || source_path_is_absolute(path);
   const char *display_path = *external ? path_last_components(path, 5) : project_relative;
   bool truncated = *external && display_path != path;
   size_t prefix_size = truncated ? 4 : 0; // Ellipsis plus the omitted path separator.

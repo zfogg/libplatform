@@ -19,14 +19,6 @@
 #include <libplatform/mutex.h>
 #include <libplatform/thread.h>
 #include <libplatform/time.h>
-#ifdef LIBPLATFORM_STANDALONE
-#define log_msg(...) ((void)0)
-#define LOG_DEBUG 0
-#else
-#include <ascii-chat/platform/thread.h>
-#include <libplatform/time.h>
-#include <ascii-chat/log/log.h>
-#endif
 #include <stdint.h>
 #include <stdio.h>
 
@@ -114,13 +106,13 @@ int mutex_format_state(const mutex_t *mutex, char *buffer, size_t size) {
 
   if (mutex->last_lock_time_ns > 0 && mutex->last_lock_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_MUTEX_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - mutex->last_lock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - mutex->last_lock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(lock_str, sizeof(lock_str), "lock=%s", elapsed_str);
   }
 
   if (mutex->last_unlock_time_ns > 0 && mutex->last_unlock_time_ns <= now_ns) {
     char elapsed_str[PLATFORM_MUTEX_ELAPSED_BUFFER_SIZE];
-    time_pretty(now_ns - mutex->last_unlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
+    platform_time_pretty(now_ns - mutex->last_unlock_time_ns, -1, elapsed_str, sizeof(elapsed_str));
     snprintf(unlock_str, sizeof(unlock_str), "unlock=%s", elapsed_str);
   }
 
@@ -154,7 +146,7 @@ void mutex_log_state(const mutex_t *mutex, const char *file, int line, const cha
     return;
   char buf[PLATFORM_MUTEX_BUF_BUFFER_SIZE];
   mutex_format_state(mutex, buf, sizeof(buf));
-  log_msg(LOG_DEBUG, file, line, func, "mutex/state %p: %s", (const void *)mutex, buf);
+
 }
 
 #endif // !NDEBUG

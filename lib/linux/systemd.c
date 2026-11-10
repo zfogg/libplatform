@@ -71,7 +71,8 @@ bool platform_systemd_watchdog_enabled(unsigned long long *usec) {
 #endif
 }
 /** @brief Send a structured log record to journald when systemd manages us. */
-void platform_systemd_journal_log(int level, const char *message, const char *file, int line, const char *function) {
+void platform_systemd_journal_log(int level, const char *message, const char *identifier, const char *file, int line,
+                                  const char *function) {
 #ifdef HAVE_LIBSYSTEMD
   if (!platform_systemd_is_managed() || !sd_journal_send || !message)
     return;
@@ -79,16 +80,18 @@ void platform_systemd_journal_log(int level, const char *message, const char *fi
 #ifndef NDEBUG
   (void)sd_journal_send("MESSAGE=%s", message, "PRIORITY=%d", priority, "CODE_FILE=%s", file ? file : "",
                         "CODE_LINE=%d", line, "CODE_FUNC=%s", function ? function : "", "SYSLOG_IDENTIFIER=%s",
-                        "ascii-chat", NULL);
+                        identifier ? identifier : "application", NULL);
 #else
   (void)file;
   (void)line;
   (void)function;
-  (void)sd_journal_send("MESSAGE=%s", message, "PRIORITY=%d", priority, "SYSLOG_IDENTIFIER=%s", "ascii-chat", NULL);
+  (void)sd_journal_send("MESSAGE=%s", message, "PRIORITY=%d", priority, "SYSLOG_IDENTIFIER=%s",
+                        identifier ? identifier : "application", NULL);
 #endif
 #else
   (void)level;
   (void)message;
+  (void)identifier;
   (void)file;
   (void)line;
   (void)function;

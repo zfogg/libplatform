@@ -2,7 +2,7 @@
 
 /**
  * @file platform/cond.h
- * @brief Cross-platform condition variable interface for ascii-chat
+ * @brief Cross-platform condition variable interface for application
  * @ingroup platform
  * @addtogroup platform
  * @{

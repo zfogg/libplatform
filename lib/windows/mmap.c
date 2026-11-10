@@ -7,8 +7,7 @@
 #ifdef _WIN32
 
 #include <libplatform/mmap.h>
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/log/log.h>
+#include <libplatform/debug/named.h>
 
 #include <windows.h>
 
@@ -22,13 +21,13 @@ void platform_mmap_init(platform_mmap_t *mapping) {
   mapping->mapping_handle = NULL;
 }
 
-asciichat_error_t platform_mmap_open(const char *name, const char *path, size_t size, platform_mmap_t *out) {
+int platform_mmap_open(const char *name, const char *path, size_t size, platform_mmap_t *out) {
   if (!name || !path || !out) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "mmap: NULL name, path or output pointer");
+    return -1;
   }
 
   if (size == 0) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "mmap: size cannot be zero");
+    return -1;
   }
 
   // Open or create the file
@@ -37,7 +36,7 @@ asciichat_error_t platform_mmap_open(const char *name, const char *path, size_t 
 
   if (file == INVALID_HANDLE_VALUE) {
     DWORD error = GetLastError();
-    return SET_ERRNO(ERROR_CONFIG, "mmap: failed to open file: %s (error %lu)", path, error);
+    return -1;
   }
 
   // Get current file size
@@ -45,7 +44,7 @@ asciichat_error_t platform_mmap_open(const char *name, const char *path, size_t 
   if (!GetFileSizeEx(file, &file_size)) {
     DWORD error = GetLastError();
     CloseHandle(file);
-    return SET_ERRNO(ERROR_CONFIG, "mmap: failed to get file size: %s (error %lu)", path, error);
+    return -1;
   }
 
   // Resize file if needed
@@ -55,14 +54,12 @@ asciichat_error_t platform_mmap_open(const char *name, const char *path, size_t 
     if (!SetFilePointerEx(file, new_size, NULL, FILE_BEGIN) || !SetEndOfFile(file)) {
       DWORD error = GetLastError();
       CloseHandle(file);
-      return SET_ERRNO(ERROR_CONFIG, "mmap: failed to resize file to %zu bytes: %s (error %lu)", size, path, error);
+      return -1;
     }
-    log_debug("mmap: created/resized file %s to %zu bytes (file descriptor: %s)", path, size, name);
-  } else if ((size_t)file_size.QuadPart > size) {
+} else if ((size_t)file_size.QuadPart > size) {
     // File is larger than requested - use existing size
     size = (size_t)file_size.QuadPart;
-    log_dev("mmap: using existing file size %zu bytes for %s (file descriptor: %s)", size, path, name);
-  }
+}
 
   // Create file mapping
   DWORD size_high = (DWORD)((size >> 32) & 0xFFFFFFFF);
@@ -73,7 +70,7 @@ asciichat_error_t platform_mmap_open(const char *name, const char *path, size_t 
   if (!mapping) {
     DWORD error = GetLastError();
     CloseHandle(file);
-    return SET_ERRNO(ERROR_MEMORY, "mmap: CreateFileMapping failed: %s (error %lu)", path, error);
+    return -1;
   }
 
   // Map view of file
@@ -83,16 +80,14 @@ asciichat_error_t platform_mmap_open(const char *name, const char *path, size_t 
     DWORD error = GetLastError();
     CloseHandle(mapping);
     CloseHandle(file);
-    return SET_ERRNO(ERROR_MEMORY, "mmap: MapViewOfFile failed: %s (error %lu)", path, error);
+    return -1;
   }
 
   out->addr = addr;
   out->size = size;
   out->file_handle = file;
   out->mapping_handle = mapping;
-
-  log_debug("mmap: mapped %s at %p (%zu bytes)", path, addr, size);
-  return ASCIICHAT_OK;
+return 0;
 }
 
 void platform_mmap_close(platform_mmap_t *mapping) {
@@ -102,8 +97,7 @@ void platform_mmap_close(platform_mmap_t *mapping) {
 
   if (mapping->addr) {
     if (!UnmapViewOfFile(mapping->addr)) {
-      log_warn("mmap: UnmapViewOfFile failed (error %lu)", GetLastError());
-    }
+}
     mapping->addr = NULL;
   }
 
@@ -128,14 +122,12 @@ void platform_mmap_sync(platform_mmap_t *mapping, bool async) {
   // Note: FlushViewOfFile is always async; it just initiates the flush.
   // To wait for completion, you'd need FlushFileBuffers on the file handle.
   if (!FlushViewOfFile(mapping->addr, mapping->size)) {
-    log_warn("mmap: FlushViewOfFile failed (error %lu)", GetLastError());
-  }
+}
 
   // If sync requested, also flush file buffers to ensure data hits disk
   if (!async && mapping->file_handle != INVALID_HANDLE_VALUE) {
     if (!FlushFileBuffers(mapping->file_handle)) {
-      log_warn("mmap: FlushFileBuffers failed (error %lu)", GetLastError());
-    }
+}
   }
 }
 

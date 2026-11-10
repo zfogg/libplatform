@@ -24,6 +24,10 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdatomic.h>
+
+bool terminal_supports_utf8(void) {
+  return GetConsoleOutputCP() == CP_UTF8 || GetConsoleCP() == CP_UTF8;
+}
 #ifndef STDOUT_FILENO
 #define STDOUT_FILENO 1
 #endif

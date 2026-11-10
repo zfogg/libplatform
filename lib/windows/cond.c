@@ -13,8 +13,8 @@
 #define mutex_stack_pop(...) ((void)0)
 #define mutex_stack_push_locked(...) ((void)0)
 #else
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/debug/mutex.h>
+#include <libplatform/debug/named.h>
+#include <libplatform/debug/mutex.h>
 #endif
 #include <windows.h>
 #include <time.h>

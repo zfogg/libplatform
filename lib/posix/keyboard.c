@@ -5,13 +5,12 @@
  */
 
 #include <libplatform/keyboard.h>
-#include "terminal.h"
-#include <libplatform/system.h>
-#include <ascii-chat/util/time.h>
 #include <libplatform/terminal.h>
-#include <ascii-chat/common.h>
+#include <libplatform/system.h>
+#include <libplatform/time.h>
+#include <libplatform/terminal.h>
 #include <libplatform/lifecycle.h>
-#include <ascii-chat/util/lifecycle.h>
+#include <libplatform/lifecycle.h>
 // utf8.h no longer needed - keyboard thread handles raw bytes
 
 #include <termios.h>
@@ -23,9 +22,15 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+
+#define log_debug(...) ((void)0)
+#define log_error(...) ((void)0)
+#define log_warn(...) ((void)0)
+#define SET_ERRNO_SYS(...) (-1)
+#define ERROR_PLATFORM_INIT 1
 #include <pthread.h>
 #include <signal.h>
-#include <ascii-chat/util/time.h>
+#include <libplatform/time.h>
 
 /* ============================================================================
  * Constants
@@ -50,11 +55,11 @@ static bool g_tty_fd_owned = false;
  * Keyboard Functions
  * ============================================================================ */
 
-asciichat_error_t keyboard_init(void) {
+int keyboard_init(void) {
   // If already initialized, return success
   if (lifecycle_is_initialized(&g_keyboard_lc)) {
     log_debug("Already initialized");
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // Stderr can host interactive overlays while stdout carries redirected output.
@@ -63,13 +68,13 @@ asciichat_error_t keyboard_init(void) {
     log_debug("Skipping (output is piped, non-interactive mode)");
     // LOG_IO may redirect stdout temporarily. Retry initialization on the
     // next poll instead of permanently committing an unconfigured keyboard.
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // CAS to claim initialization
   if (!lifecycle_init(&g_keyboard_lc, "keyboard")) {
     log_debug("Lost init race, another thread initialized");
-    return ASCIICHAT_OK; // Already initialized
+    return 0; // Already initialized
   }
 
   // We won the init race - do the actual work
@@ -157,7 +162,7 @@ asciichat_error_t keyboard_init(void) {
 
   // Mark as initialized (still under lock-free CAS)
   log_debug("SUCCESS - using %s for keyboard input", use_stdin ? "stdin" : "/dev/tty");
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 void keyboard_destroy(void) {

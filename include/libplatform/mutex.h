@@ -2,7 +2,7 @@
 
 /**
  * @file platform/mutex.h
- * @brief Cross-platform mutex interface for ascii-chat
+ * @brief Cross-platform mutex interface for application
  * @ingroup platform
  * @addtogroup platform
  * @{

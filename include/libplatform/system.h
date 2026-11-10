@@ -2,7 +2,7 @@
 
 /**
  * @file platform/system.h
- * @brief Cross-platform system functions interface for ascii-chat
+ * @brief Cross-platform system functions interface for application
  * @ingroup platform_system
  * @addtogroup platform
  * @{
@@ -43,7 +43,7 @@ typedef SSIZE_T ssize_t;
 #endif
 #endif
 #include <stdint.h>
-#include "process.h"
+#include <libplatform/process.h>
 
 #ifndef PLATFORM_MAX_PATH_LENGTH
 #define PLATFORM_MAX_PATH_LENGTH 32767
@@ -130,6 +130,13 @@ void platform_force_exit(int exit_code);
  * @ingroup platform_system
  */
 void platform_sleep_ms(unsigned int ms);
+void platform_sleep_ns(uint64_t ns);
+
+/** Sleep for a specified number of microseconds. */
+void platform_sleep_us(unsigned int us);
+
+/** Sleep for a specified number of nanoseconds. */
+void platform_sleep_ns(uint64_t ns);
 
 /**
  * @brief Get monotonic time in microseconds

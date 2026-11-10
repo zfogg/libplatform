@@ -234,8 +234,8 @@ static size_t title_secret_option_length(const char *argument) {
   return 0;
 }
 
-int platform_process_title_set_args(const char *mode, int argc, char **argv, int mode_arg_index) {
-  if (!mode || argc < 1 || !argv || !argv[0] || mode_arg_index < -1 || mode_arg_index >= argc) {
+int platform_process_title_set_args(const char *prefix, const char *mode, int argc, char **argv, int mode_arg_index) {
+  if (!prefix || !mode || argc < 1 || !argv || !argv[0] || mode_arg_index < -1 || mode_arg_index >= argc) {
     return -1;
   }
   for (int i = 1; i < argc; ++i) {
@@ -255,7 +255,7 @@ int platform_process_title_set_args(const char *mode, int argc, char **argv, int
   char *title = malloc(capacity);
   title_writer_t writer = {.data = title, .length = 0, .capacity = capacity};
   title[0] = '\0';
-  title_append(&writer, "ascii-chat: ");
+  title_append(&writer, prefix);
   title_append(&writer, mode);
   title_append(&writer, " mode");
   bool first = true;

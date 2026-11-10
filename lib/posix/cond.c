@@ -5,8 +5,8 @@
 #define mutex_stack_pop(...) ((void)0)
 #define mutex_stack_push_locked(...) ((void)0)
 #else
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/debug/mutex.h>
+#include <libplatform/debug/named.h>
+#include <libplatform/debug/mutex.h>
 #endif
 /**
  * @file platform/posix/cond.c
@@ -21,7 +21,7 @@
 #include <stddef.h>
 #include <pthread.h>
 #include <time.h>
-#include <ascii-chat/atomic.h> // For atomic_fetch_sub
+#include <libplatform/atomic.h> // For atomic_fetch_sub
 #include <errno.h>             // For ETIMEDOUT
 
 /**
@@ -37,14 +37,7 @@ int cond_init(cond_t *cond, const char *name) {
     cond->last_signal_time_ns = 0;
     cond->last_broadcast_time_ns = 0;
     cond->last_wait_time_ns = 0;
-    cond->waiting_count = (atomic_t){.impl = 0,
-                                     .last_store_time_ns = 0,
-                                     .last_load_time_ns = 0,
-                                     .store_count = 0,
-                                     .load_count = 0,
-                                     .cas_count = 0,
-                                     .cas_success_count = 0,
-                                     .fetch_count = 0};
+    atomic_store(&cond->waiting_count, 0);
     cond->last_waiting_key = 0;
     cond->last_wait_mutex = NULL;
     cond->last_wait_file = NULL;

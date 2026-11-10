@@ -2,7 +2,7 @@
 
 /**
  * @file platform/terminal.h
- * @brief 🖥️ Cross-platform terminal interface for ascii-chat
+ * @brief 🖥️ Cross-platform terminal interface for application
  * @ingroup platform_terminal
  * @addtogroup platform
  * @{
@@ -1110,7 +1110,7 @@ bool terminal_is_stdin_tty(void);
  * - Progress bars or animations should be shown
  *
  * @note Wrapper around platform_isatty(STDOUT_FILENO) for clarity
- * @note Returns false in piped contexts (e.g., ascii-chat client | less)
+ * @note Returns false in piped contexts (e.g., application client | less)
  *
  * @ingroup platform_terminal
  */
@@ -1146,10 +1146,10 @@ bool terminal_is_stderr_tty(void);
  * - Password prompts are appropriate
  *
  * Examples:
- * - `ascii-chat mirror` in terminal → true (interactive)
- * - `ascii-chat mirror | less` → false (stdout piped)
- * - `cat file | ascii-chat client` → false (stdin piped)
- * - `ascii-chat client < input.txt > output.txt` → false (both piped)
+ * - `application mirror` in terminal → true (interactive)
+ * - `application mirror | less` → false (stdout piped)
+ * - `cat file | application client` → false (stdin piped)
+ * - `application client < input.txt > output.txt` → false (both piped)
  *
  * @note Equivalent to: terminal_is_stdin_tty() && terminal_is_stdout_tty()
  * @note Used for enabling interactive features (prompts, padding, splash)
@@ -1172,9 +1172,9 @@ bool terminal_is_interactive(void);
  * - Clean, parseable output should be preferred
  *
  * Examples:
- * - `ascii-chat mirror > output.txt` → true (redirected)
- * - `ascii-chat client | grep pattern` → true (piped)
- * - `ascii-chat mirror` in terminal → false (TTY)
+ * - `application mirror > output.txt` → true (redirected)
+ * - `application client | grep pattern` → true (piped)
+ * - `application mirror` in terminal → false (TTY)
  *
  * @note Equivalent to: !terminal_is_stdout_tty()
  * @note Common pattern: force stderr when piped to prevent data corruption
@@ -1182,6 +1182,9 @@ bool terminal_is_interactive(void);
  * @ingroup platform_terminal
  */
 bool terminal_is_piped_output(void);
+
+/** Return true when stdout is redirected and logs must not use it. */
+bool terminal_should_force_stderr(void);
 
 /**
  * @brief Determine if logs should be forced to stderr
@@ -1198,9 +1201,9 @@ bool terminal_is_piped_output(void);
  * 3. Otherwise → allow stdout (false)
  *
  * Examples:
- * - `ascii-chat mirror > frames.txt` → true (don't corrupt frame data)
- * - `ascii-chat mirror` in terminal → false (stdout is fine)
- * - `TESTING=1 ascii-chat mirror` → false (tests may capture stdout)
+ * - `application mirror > frames.txt` → true (don't corrupt frame data)
+ * - `application mirror` in terminal → false (stdout is fine)
+ * - `TESTING=1 application mirror` → false (tests may capture stdout)
  *
  * @note This prevents logs from corrupting piped ASCII frame data
  * @note TESTING environment variable bypasses this for test environments
@@ -1246,11 +1249,11 @@ bool terminal_is_piped_output(void);
  * 4. Otherwise → true (interactive prompts OK)
  *
  * Examples:
- * - `ascii-chat client` in terminal → true (can prompt)
- * - `ascii-chat client --snapshot` → false (non-interactive mode)
- * - `echo data | ascii-chat client` → false (stdin piped)
- * - `ASCII_CHAT_QUESTION_PROMPT_RESPONSE='y' ascii-chat client` → false (automated)
- * - `ascii-chat client > output.txt` → false (stdout redirected)
+ * - `application client` in terminal → true (can prompt)
+ * - `application client --snapshot` → false (non-interactive mode)
+ * - `echo data | application client` → false (stdin piped)
+ * - `ASCII_CHAT_QUESTION_PROMPT_RESPONSE='y' application client` → false (automated)
+ * - `application client > output.txt` → false (stdout redirected)
  *
  * @note Combines checks for: TTY status, snapshot mode, automation env vars
  * @note Used by password prompts, known_hosts verification, user confirmations

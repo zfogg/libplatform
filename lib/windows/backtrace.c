@@ -9,6 +9,7 @@
 #define PLATFORM_WINDOWS_BACKTRACE_SOURCE_PATH_BUFFER_SIZE 512
 
 #include <libplatform/backtrace.h>
+#include "backtrace_internal.h"
 #include <libplatform/symbols.h>
 #include <libplatform/util/path.h>
 #include <stdio.h>
@@ -47,7 +48,7 @@ static const char *module_name_for_address(HANDLE process, DWORD64 address, char
   return module_name;
 }
 
-int libplatform_backtrace_capture(void **buffer, int size) {
+int platform_backtrace_capture(void **buffer, int size) {
   if (!buffer || size <= 0) {
     return 0;
   }
@@ -118,7 +119,7 @@ int libplatform_backtrace_capture(void **buffer, int size) {
   return count;
 }
 
-char **libplatform_backtrace_symbolize(void *const *buffer, int size) {
+char **platform_backtrace_symbols(void *const *buffer, int size) {
   if (!buffer || size <= 0) {
     return NULL;
   }
@@ -224,7 +225,7 @@ char **libplatform_backtrace_symbolize(void *const *buffer, int size) {
   return symbols;
 }
 
-void libplatform_backtrace_symbols_free(char **strings) {
+void platform_backtrace_symbols_destroy(char **strings) {
   if (!strings) {
     return;
   }
@@ -238,12 +239,12 @@ void libplatform_backtrace_symbols_free(char **strings) {
   free(strings);
 }
 
-void libplatform_backtrace_print(int skip_frames, libplatform_backtrace_write_fn write, void *context) {
+void platform_backtrace_print_simple(int skip_frames, platform_backtrace_write_fn write, void *context) {
   void *buffer[LIBPLATFORM_BACKTRACE_MAX_FRAMES];
-  int depth = libplatform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
+  int depth = platform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
 
   if (depth > 0) {
-    char **symbols = libplatform_backtrace_symbolize((void *const *)buffer, depth);
+    char **symbols = platform_backtrace_symbols((void *const *)buffer, depth);
     if (symbols) {
       int start = 1 + skip_frames;
       for (int i = start; i < depth; i++) {
@@ -253,7 +254,7 @@ void libplatform_backtrace_print(int skip_frames, libplatform_backtrace_write_fn
           write(line, context);
         }
       }
-      libplatform_backtrace_symbols_free(symbols);
+      platform_backtrace_symbols_destroy(symbols);
     }
   }
 }

@@ -1,6 +1,19 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdarg.h>
+#include <stdio.h>
+#ifdef _WIN32
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#else
+#include <sys/types.h>
+#endif
+
+int platform_vsnprintf(char *str, size_t size, const char *format, va_list ap);
+int platform_vasprintf(char **strp, const char *format, va_list ap);
+int platform_asprintf(char **strp, const char *format, ...);
+ssize_t platform_getline(char **lineptr, size_t *n, FILE *stream);
 char *platform_strdup(const char *s);
 int platform_strcasecmp(const char *s1, const char *s2);
 int platform_strncasecmp(const char *s1, const char *s2, size_t n);

@@ -6,21 +6,27 @@
 
 #ifndef _WIN32
 
-#include <ascii-chat/platform/api.h>
-#include <ascii-chat/asciichat_errno.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/util/path.h>
-#include <ascii-chat/util/string.h>
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/debug/mutex.h>
+#include <libplatform/thread.h>
+#include <libplatform/time.h>
+#include <libplatform/util/path.h>
+#include <libplatform/util/string.h>
+#include <libplatform/debug/named.h>
+#include <libplatform/debug/mutex.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <time.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 #include <sched.h>
 #include <unistd.h>
+
+#define SAFE_MALLOC(size, type) ((type)malloc(size))
+#define SAFE_FREE(ptr) free(ptr)
+#define SAFE_STRNCPY(dst, src, size) do { strncpy((dst), (src), (size)); (dst)[(size) - 1] = '\0'; } while (0)
+#define log_debug(...) ((void)0)
+#define US_PER_MS_INT 1000ULL
 
 #ifdef __APPLE__
 #include <mach/mach.h>
@@ -42,13 +48,13 @@
  * This function wraps user thread functions to ensure proper cleanup
  * (like mutex stack cleanup) happens before the thread terminates.
  *
- * @param arg Pointer to asciichat_thread_wrapper_t allocated by platform_thread_create
+ * @param arg Pointer to platform_thread_wrapper_t allocated by platform_thread_create
  * @return Return value from user thread function
  *
  * @internal
  */
 void *thread_wrapper_impl(void *arg) {
-  asciichat_thread_wrapper_t *wrapper = (asciichat_thread_wrapper_t *)arg;
+  platform_thread_wrapper_t *wrapper = (platform_thread_wrapper_t *)arg;
   if (!wrapper) {
     log_debug("[THREAD] Wrapper is NULL, exiting immediately");
     return NULL;
@@ -76,7 +82,6 @@ void *thread_wrapper_impl(void *arg) {
 
   log_debug("[THREAD] Wrapper freed, thread exiting");
   // Logging and tracked frees take mutexes; release their TLS stack last.
-  errno_destroy();
   mutex_stack_cleanup_current_thread();
   return result;
 }
@@ -91,7 +96,7 @@ void *thread_wrapper_impl(void *arg) {
  */
 int platform_thread_create(platform_thread_t *thread, const char *name, void *(*func)(void *), void *arg) {
   // Allocate wrapper structure to hold user's function and argument
-  asciichat_thread_wrapper_t *wrapper = SAFE_MALLOC(sizeof(asciichat_thread_wrapper_t), asciichat_thread_wrapper_t *);
+  platform_thread_wrapper_t *wrapper = SAFE_MALLOC(sizeof(platform_thread_wrapper_t), platform_thread_wrapper_t *);
   if (!wrapper) {
     return -1; // Memory allocation failure
   }
@@ -215,8 +220,6 @@ int thread_join_timeout(platform_thread_t *thread, void **retval, uint64_t timeo
  */
 void thread_exit(void *retval) {
   // Clean up thread-local error context to prevent leaks
-  errno_clear();
-
   pthread_exit(retval);
 }
 
@@ -227,7 +230,7 @@ void thread_exit(void *retval) {
  */
 int thread_detach(platform_thread_t *thread) {
   if (!thread || !thread_is_initialized(thread)) {
-    return SET_ERRNO(ERROR_THREAD, "Invalid thread handle for detach operation");
+    return -1;
   }
   int result = pthread_detach(*thread);
   if (result == 0) {
@@ -324,7 +327,7 @@ int ascii_tls_set(tls_key_t key, void *value) {
  * Uses SCHED_FIFO with priority 80 for Linux/POSIX systems.
  * Requires CAP_SYS_NICE capability or appropriate rtprio resource limit.
  */
-asciichat_error_t thread_set_realtime_priority(void) {
+int thread_set_realtime_priority(void) {
 #ifdef __APPLE__
   // macOS: Use thread_policy_set for real-time scheduling
   thread_time_constraint_policy_data_t policy;
@@ -336,9 +339,9 @@ asciichat_error_t thread_set_realtime_priority(void) {
   kern_return_t result = thread_policy_set(mach_thread_self(), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
                                            THREAD_TIME_CONSTRAINT_POLICY_COUNT);
   if (result != KERN_SUCCESS) {
-    return SET_ERRNO(ERROR_THREAD, "Failed to set real-time thread priority on macOS");
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 
 #else
   // Linux: Use SCHED_FIFO with high priority
@@ -347,11 +350,9 @@ asciichat_error_t thread_set_realtime_priority(void) {
   param.sched_priority = 80; // High priority (1-99 range for SCHED_FIFO)
 
   if (pthread_setschedparam(pthread_self(), policy, &param) != 0) {
-    return SET_ERRNO_SYS(
-        ERROR_THREAD,
-        "Failed to set real-time thread priority (try running with elevated privileges or configuring rtprio limits)");
+    return -1;
   }
-  return ASCIICHAT_OK;
+  return 0;
 #endif
 }
 

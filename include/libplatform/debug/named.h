@@ -1,0 +1,1185 @@
+#pragma once
+
+/**
+ * @file debug/named.h
+ * @brief Named object registry for debugging — log identifiable resource names
+ * @ingroup debug_util
+ * @addtogroup debug_util
+ * @{
+ *
+ * This module provides a centralized registry for naming any addressable resource:
+ * mutexes, threads, sockets, ring buffers, network connections, etc.
+ *
+ * Any value that fits in a uintptr_t can be registered with a human-readable name.
+ * Names are auto-suffixed with a unique ID (e.g., "recv_mutex.7") to distinguish
+ * multiple instances of the same conceptual resource.
+ *
+ * The registry is thread-safe and zero-overhead in release builds (NDEBUG).
+ *
+ * @note Registry is not thread-safe for unregistration during unwind. Always
+ *       unregister resources before they become invalid (e.g., in destroy/cleanup).
+ *
+ * USAGE EXAMPLES:
+ * ===============
+ * // Pointer-based (for heap objects, structs)
+ * ringbuffer_t *rb = ringbuffer_create(...);
+ * NAMED_REGISTER(rb, "recv_audio");       // auto name: "recv_audio.3"
+ * // ... use rb ...
+ * NAMED_UNREGISTER(rb);
+ * ringbuffer_destroy(rb);
+ *
+ * // Integer handle-based (for fd, socket, etc.)
+ * int client_fd = accept(server_fd, ...);
+ * NAMED_REGISTER_ID(client_fd, "client_socket");
+ * // ... use client_fd ...
+ * NAMED_UNREGISTER_ID(client_fd);
+ * close(client_fd);
+ *
+ * // Describing in logs
+ * log_info("Data received on %s", NAME_DESCRIBE_SOCKET(fd));
+ * // Output: "socket: client_socket.2 (0x8)"
+ *
+ * @author Zachary Fogg <me@zfo.gg>
+ * @date February 2026
+ */
+
+/* Storage capacities in elements; text buffers include the terminating NUL. */
+#define DEBUG_NAMED_NAME_BUFFER_SIZE 256
+#define DEBUG_NAMED_TYPE_BUFFER_SIZE 64
+#define DEBUG_NAMED_FORMAT_BUFFER_SIZE 64
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <libplatform/thread.h>
+
+// ============================================================================
+// Core Registry API
+// ============================================================================
+
+/**
+ * @brief Initialize the named object registry
+ * @return 0 on success, non-zero on error
+ * @ingroup debug_util
+ *
+ * Must be called once at startup before any named_register() calls.
+ * Typically called from lock_debug_init().
+ */
+int named_init(void);
+
+/**
+ * @brief Destroy the named object registry
+ * @ingroup debug_util
+ *
+ * Cleans up all registered names and internal structures.
+ * Typically called from lock_debug_destroy().
+ */
+void named_destroy(void);
+
+/**
+ * @brief Register a resource with an auto-suffixed name, type, and location info
+ * @param key A uintptr_t representing the resource (pointer or integer handle)
+ * @param base_name The base name (e.g., "recv"); suffix auto-generated
+ * @param type Data type label (e.g., "mutex", "rwlock", "socket"); stored and printed
+ * @param file Source file where registration occurred (typically __FILE__)
+ * @param line Source line where registration occurred (typically __LINE__)
+ * @param func Function where registration occurred (typically __func__)
+ * @return Pointer to the full registered name (e.g., "recv.7"), valid until unregister
+ * @ingroup debug_util
+ *
+ * The returned name string is stored in the registry and remains valid until
+ * named_unregister(key) is called. Do not modify or free the returned pointer.
+ *
+ * The type parameter is stored in the registry and used by named_describe() to format
+ * output as "type: name (0xKEY) @ file:line:func()" automatically, without needing
+ * a type_hint parameter.
+ *
+ * Multiple registrations of the same key will overwrite the previous entry.
+ * In release builds (NDEBUG), this is a no-op and returns base_name.
+ */
+const char *named_register(uintptr_t key, const char *base_name, const char *type, const char *format_spec,
+                           const char *file, int line, const char *func, uintptr_t parent_key);
+
+/**
+ * @brief Register a resource with a formatted name, type, and location info (no auto-suffix)
+ * @param key A uintptr_t representing the resource
+ * @param type Data type label (e.g., "mutex", "socket"); stored and printed
+ * @param file Source file where registration occurred
+ * @param line Source line where registration occurred
+ * @param func Function where registration occurred
+ * @param fmt Printf-style format string
+ * @param ... Format arguments
+ * @return Pointer to the full registered name
+ * @ingroup debug_util
+ *
+ * Allows full control over the registered name. The format string and arguments
+ * are printed to create the name (e.g., "client.%u" with args "17" → "client.17").
+ * No auto-suffix counter is applied.
+ *
+ * The type parameter is stored in the registry and used by named_describe() for
+ * automatic formatting without needing type_hint.
+ *
+ * In release builds (NDEBUG), this is a no-op and returns "?".
+ */
+const char *named_register_fmt(uintptr_t key, const char *type, const char *format_spec, const char *file, int line,
+                               const char *func, const char *fmt, ...);
+
+/**
+ * @brief Unregister a resource by key
+ * @param key The same uintptr_t passed to named_register
+ * @ingroup debug_util
+ *
+ * Removes the resource from the registry. Safe to call multiple times for the
+ * same key (idempotent).
+ */
+void named_unregister(uintptr_t key);
+
+/**
+ * @brief Update the registered name for a resource with a new base name
+ * @param key The resource key
+ * @param new_base_name New base name (will be auto-suffixed with counter)
+ * @return Updated name string, or NULL if key not found
+ * @ingroup debug_util
+ *
+ * Updates an existing registration with a new base name. The new name will be
+ * auto-suffixed with a counter to make it unique (e.g., "client_123.0").
+ * Useful when a resource gets an ID assigned after creation (e.g., client_id).
+ *
+ * In release builds (NDEBUG), this is a no-op and returns NULL.
+ */
+const char *named_update_name(uintptr_t key, const char *new_base_name);
+
+/**
+ * @brief Look up the registered name for a resource
+ * @param key The resource key
+ * @return Registered name string, or NULL if not registered
+ * @ingroup debug_util
+ *
+ * Returns the name string registered with named_register() or named_register_fmt(),
+ * or NULL if the key is not in the registry.
+ *
+ * In release builds (NDEBUG), this always returns NULL.
+ */
+const char *named_get(uintptr_t key);
+
+/** Copied display metadata; never contains pointers into a live registry entry. */
+/**
+ * @brief The useful part of named metadata is in its fields: together they describe what is pending, who owns it, and how much data is valid. Keep the object with its parent operation and use the parent cleanup path.
+ */
+typedef struct {
+  char name[DEBUG_NAMED_NAME_BUFFER_SIZE];
+  char type[DEBUG_NAMED_TYPE_BUFFER_SIZE];
+  char format[DEBUG_NAMED_FORMAT_BUFFER_SIZE];
+} named_metadata_t;
+
+/**
+ * Copy display metadata from a per-thread snapshot. Stable registrations need
+ * no registry lock, including misses. Registration/removal invalidates snapshots.
+ * Returns false if absent, busy, or the metadata exceeds the output buffers.
+ * These copies identify objects; they do not pin objects for dereferencing.
+ */
+bool named_metadata_copy(uintptr_t key, named_metadata_t *output);
+bool named_fd_metadata_copy(int fd, named_metadata_t *output);
+bool named_packet_metadata_copy(int packet_type, named_metadata_t *output);
+
+/**
+ * @brief Look up the registered type for a resource
+ * @param key The resource key
+ * @return Registered type string, or NULL if not registered
+ * @ingroup debug_util
+ *
+ * Returns the type string registered with named_register() or named_register_fmt(),
+ * or NULL if the key is not in the registry.
+ *
+ * In release builds (NDEBUG), this always returns NULL.
+ */
+const char *named_get_type(uintptr_t key);
+
+/** Check a type prefix in copied metadata; false if absent, uninitialized or busy. */
+bool named_registry_has_type(const char *type, size_t length);
+
+/**
+ * @brief Get the format specifier for a registered named object
+ * @param key The resource key
+ * @return Format specifier string (e.g., "0x%tx"), or NULL if not registered
+ * @ingroup debug_util
+ *
+ * Returns the format specifier registered with named_register(), or NULL if
+ * the key is not in the registry.
+ *
+ * In release builds (NDEBUG), this always returns NULL.
+ */
+const char *named_get_format_spec(uintptr_t key);
+
+/**
+ * @brief Register a file descriptor with namespace encoding
+ * @param fd File descriptor value
+ * @param file Source file where registration occurred
+ * @param line Source line where registration occurred
+ * @param func Function where registration occurred
+ * @return Registered name string
+ * @ingroup debug_util
+ *
+ * Registers an FD with a key that includes type namespace to avoid collisions
+ * with packet types or other numeric values. If name is non-NULL, uses "name (fd=N)"
+ * format; otherwise auto-generates as "fd=N".
+ * In release builds (NDEBUG), this is a no-op and returns "fd=%d" string.
+ */
+const char *named_register_fd(int fd, const char *name, const char *file, int line, const char *func);
+
+/**
+ * @brief Look up a registered file descriptor
+ * @param fd File descriptor value
+ * @return Registered name string, or NULL if not registered
+ * @ingroup debug_util
+ *
+ * Looks up an FD using the same namespace encoding as named_register_fd().
+ * In release builds (NDEBUG), this always returns NULL.
+ */
+const char *named_get_fd(int fd);
+
+/**
+ * @brief Get the format specifier for a registered file descriptor
+ * @param fd File descriptor value
+ * @return Format specifier string (e.g., "%d"), or NULL if not registered
+ * @ingroup debug_util
+ */
+const char *named_get_fd_format_spec(int fd);
+
+/**
+ * @brief Register a packet type with namespace encoding
+ * @param pkt_type Packet type value
+ * @param file Source file where registration occurred
+ * @param line Source line where registration occurred
+ * @param func Function where registration occurred
+ * @return Registered name string
+ * @ingroup debug_util
+ *
+ * Registers a packet type with a key that includes type namespace to avoid collisions
+ * with FDs or other numeric values. Name is auto-generated as "PACKET_TYPE=%d".
+ * In release builds (NDEBUG), this is a no-op and returns "PACKET_TYPE=%d" string.
+ */
+const char *named_register_packet_type(int pkt_type, const char *file, int line, const char *func);
+
+/**
+ * @brief Look up a registered packet type
+ * @param pkt_type Packet type value
+ * @return Registered name string, or NULL if not registered
+ * @ingroup debug_util
+ *
+ * Looks up a packet type using the same namespace encoding as named_register_packet_type().
+ * In release builds (NDEBUG), this always returns NULL.
+ */
+const char *named_get_packet_type(int pkt_type);
+
+/**
+ * @brief Get the format specifier for a registered packet type
+ * @param pkt_type Packet type value
+ * @return Format specifier string (e.g., "%d"), or NULL if not registered
+ * @ingroup debug_util
+ */
+const char *named_get_packet_type_format_spec(int pkt_type);
+
+/**
+ * @brief Look up an integer ID by type name and value
+ * @param type_name Type string (e.g., "socket", "client", "connection")
+ * @param type_len Length of type name
+ * @param id Integer ID value to look up
+ * @return Registered name string, or NULL if not found
+ * @ingroup debug_util
+ *
+ * Searches the registry for entries matching the given type and integer ID.
+ * Enables formatting of patterns like "socket 12" → "socket/server_listener (socket=12)".
+ * In release builds (NDEBUG), this always returns NULL.
+ */
+const char *named_get_by_type_and_id(const char *type_name, size_t type_len, int id);
+
+/**
+ * @brief Format a description string for logging
+ * @param key The resource key
+ * @param type_hint A type label (e.g., "mutex", "socket", "thread")
+ * @return Description string in format "type_hint: name (0xKEY)" or type_hint if not registered
+ * @ingroup debug_util
+ *
+ * Returns a per-thread static buffer suitable for a single log call. The buffer
+ * is overwritten on the next call to this function within the same thread.
+ * Do not store or free the returned pointer.
+ *
+ * If the key is not registered, returns just the type_hint.
+ * In release builds (NDEBUG), this always returns "?".
+ */
+const char *named_describe(uintptr_t key, const char *type_hint);
+
+/**
+ * @brief Convert a thread handle to a registry key
+ * @param thread Thread handle (platform_thread_t)
+ * @return uintptr_t suitable for registry lookups
+ * @ingroup debug_util
+ *
+ * Platform-specific conversion. On POSIX, pthread_t is cast directly.
+ * On Windows, HANDLE is cast directly.
+ *
+ * This function is defined in lib/platform/posix/thread.c or lib/platform/windows/thread.c
+ */
+uintptr_t thread_to_key(platform_thread_t thread);
+
+// ============================================================================
+// Convenience Macros — Pointer-based Registration
+// ============================================================================
+
+/**
+ * @brief Register any pointer with base name, type, format spec, and location (auto-suffix)
+ * @param ptr Object pointer (void* or typed pointer)
+ * @param name Base name string
+ * @param type Data type label (e.g., "mutex", "socket")
+ * @param fmt Format specifier for printing (e.g., "0x%tx")
+ * @ingroup debug_util
+ *
+ * In debug builds, automatically captures __FILE__, __LINE__, and __func__ for location info.
+ * In release builds (NDEBUG), this is a no-op.
+ */
+#define NAMED_REGISTER(ptr, name, type, fmt, parent_ptr)                                                               \
+  named_register((uintptr_t)(const void *)(ptr), (name), (type), (fmt), __FILE__, __LINE__, __func__,                  \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register with a formatted name, type, and format spec
+ * @param ptr Object pointer
+ * @param type Data type label
+ * @param fmt_spec Format specifier for printing (e.g., "0x%tx")
+ * @param fmt Printf-style format string for name
+ * @param ... Format arguments
+ * @ingroup debug_util
+ *
+ * In debug builds, automatically captures __FILE__, __LINE__, and __func__ for location info.
+ * In release builds (NDEBUG), this is a no-op.
+ */
+#define NAMED_REGISTER_FMT(ptr, type, fmt_spec, fmt, ...)                                                              \
+  named_register_fmt((uintptr_t)(const void *)(ptr), (type), (fmt_spec), __FILE__, __LINE__, __func__, (fmt),          \
+                     __VA_ARGS__)
+
+/**
+ * @brief Unregister a pointer
+ * @param ptr Object pointer
+ * @ingroup debug_util
+ */
+#define NAMED_UNREGISTER(ptr) named_unregister((uintptr_t)(const void *)(ptr))
+
+/**
+ * @brief Look up registered name for a pointer
+ * @param ptr Object pointer
+ * @ingroup debug_util
+ */
+#define NAMED_GET(ptr) named_get((uintptr_t)(const void *)(ptr))
+
+/**
+ * @brief Describe a pointer in log format
+ * @param ptr Object pointer
+ * @param hint Type hint string (e.g., "mutex")
+ * @ingroup debug_util
+ */
+#define NAMED_DESCRIBE(ptr, hint) named_describe((uintptr_t)(const void *)(ptr), (hint))
+
+// ============================================================================
+// Convenience Macros — Integer Handle Registration
+// ============================================================================
+
+/**
+ * @brief Register an integer handle (fd, socket, etc.) with type
+ * @param id Integer handle (socket_t, int, etc.)
+ * @param name Base name string
+ * @param type Data type label (e.g., "socket", "fd")
+ * @ingroup debug_util
+ *
+ * In debug builds, automatically captures __FILE__, __LINE__, and __func__ for location info.
+ * In release builds (NDEBUG), this is a no-op.
+ */
+#define NAMED_REGISTER_ID(id, name, type, fmt, parent_ptr)                                                             \
+  named_register((uintptr_t)(intptr_t)(id), (name), (type), (fmt), __FILE__, __LINE__, __func__,                       \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Unregister an integer handle
+ * @param id Integer handle
+ * @ingroup debug_util
+ */
+#define NAMED_UNREGISTER_ID(id) named_unregister((uintptr_t)(intptr_t)(id))
+
+/**
+ * @brief Describe an integer handle in log format
+ * @param id Integer handle
+ * @param hint Type hint string (e.g., "socket")
+ * @ingroup debug_util
+ */
+#define NAMED_DESCRIBE_ID(id, hint) named_describe((uintptr_t)(intptr_t)(id), (hint))
+
+// ============================================================================
+// Type-Specific Convenience Macros (Mutex, RWLock, Cond, Thread)
+// ============================================================================
+
+/**
+ * @brief Register a mutex with automatic format specifier
+ * @param mutex Mutex pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for mutex addresses.
+ */
+#define NAMED_REGISTER_MUTEX(mutex, name, parent_ptr)                                                                  \
+  named_register((uintptr_t)(const void *)(mutex), (name), "mutex", "0x%tx", __FILE__, __LINE__, __func__,             \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an rwlock with automatic format specifier
+ * @param lock RWLock pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for rwlock addresses.
+ */
+#ifndef NDEBUG
+#define NAMED_REGISTER_RWLOCK(lock, name, parent_ptr)                                                                  \
+  named_register((uintptr_t)(const void *)(lock), (name), "rwlock", "0x%tx", __FILE__, __LINE__, __func__,             \
+                 (uintptr_t)(const void *)(parent_ptr))
+#else
+#define NAMED_REGISTER_RWLOCK(lock, name, parent_ptr) ((void)(lock), (void)(parent_ptr), (name))
+#endif
+
+/**
+ * @brief Register a condition variable with automatic format specifier
+ * @param cond Condition variable pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for cond addresses.
+ */
+#define NAMED_REGISTER_COND(cond, name, parent_ptr)                                                                    \
+  named_register((uintptr_t)(const void *)(cond), (name), "cond", "0x%tx", __FILE__, __LINE__, __func__,               \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a socket with automatic format specifier
+ * @param socket Socket pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for socket addresses.
+ */
+#define NAMED_REGISTER_SOCKET(socket, name, parent_ptr)                                                                \
+  named_register((uintptr_t)(intptr_t)(socket), (name), "socket", "0x%tx", __FILE__, __LINE__, __func__,               \
+                 (uintptr_t)(const void *)(parent_ptr))
+#define NAMED_UNREGISTER_SOCKET(socket) NAMED_UNREGISTER_ID((socket))
+
+/**
+ * @brief Register a WebSocket connection with automatic format specifier
+ * @param websocket WebSocket pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for websocket addresses.
+ */
+#define NAMED_REGISTER_WEBSOCKET(websocket, name, parent_ptr)                                                          \
+  named_register((uintptr_t)(const void *)(websocket), (name), "websocket", "0x%tx", __FILE__, __LINE__, __func__,     \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a data channel with automatic format specifier
+ * @param datachannel Data channel pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for datachannel addresses.
+ */
+#define NAMED_REGISTER_DATACHANNEL(datachannel, name, parent_ptr)                                                      \
+  named_register((uintptr_t)(const void *)(datachannel), (name), "datachannel", "0x%tx", __FILE__, __LINE__, __func__, \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a thread pool work item with automatic format specifier
+ * @param work Work item pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for work item addresses.
+ */
+#define NAMED_REGISTER_THREADPOOL_WORK(work, name, parent_ptr)                                                         \
+  named_register((uintptr_t)(const void *)(work), (name), "work", "0x%tx", __FILE__, __LINE__, __func__,               \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a client connection with automatic format specifier
+ * @param client Client pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for client addresses.
+ */
+#define NAMED_REGISTER_CLIENT(client, name, parent_ptr)                                                                \
+  named_register((uintptr_t)(const void *)(client), (name), "client", "0x%tx", __FILE__, __LINE__, __func__,           \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a crypto context with automatic format specifier
+ * @param ctx Crypto context pointer
+ * @param name Base name string (typically "crypto_client_<id>")
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for crypto context addresses.
+ */
+#define NAMED_REGISTER_CRYPTO_CONTEXT(ctx, name, parent_ptr)                                                           \
+  named_register((uintptr_t)(const void *)(ctx), (name), "crypto", "0x%tx", __FILE__, __LINE__, __func__,              \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a transport with automatic format specifier
+ * @param transport Transport pointer
+ * @param name Base name string (typically "transport_client_<id>" or "transport_tcp_<id>")
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for transport addresses.
+ */
+#define NAMED_REGISTER_TRANSPORT(transport, name, parent_ptr)                                                          \
+  named_register((uintptr_t)(const void *)(transport), (name), "transport", "0x%tx", __FILE__, __LINE__, __func__,     \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a frame buffer with automatic format specifier
+ * @param buf Frame buffer pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for frame buffer addresses.
+ */
+#define NAMED_REGISTER_FRAME_BUFFER(buf, name, parent_ptr)                                                             \
+  named_register((uintptr_t)(const void *)(buf), (name), "frame_buffer", "0x%tx", __FILE__, __LINE__, __func__,        \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a packet queue with automatic format specifier
+ * @param queue Packet queue pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for packet queue addresses.
+ */
+#define NAMED_REGISTER_PACKET_QUEUE(queue, name, parent_ptr)                                                           \
+  named_register((uintptr_t)(const void *)(queue), (name), "packet_queue", "0x%tx", __FILE__, __LINE__, __func__,      \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an audio ring buffer with automatic format specifier
+ * @param buf Audio ring buffer pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for ring buffer addresses.
+ */
+#define NAMED_REGISTER_AUDIO_RINGBUF(buf, name, parent_ptr)                                                            \
+  named_register((uintptr_t)(const void *)(buf), (name), "audio_ringbuf", "0x%tx", __FILE__, __LINE__, __func__,       \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an audio mixer with automatic format specifier
+ * @param mixer Mixer pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for mixer addresses.
+ */
+#define NAMED_REGISTER_MIXER(mixer, name, parent_ptr)                                                                  \
+  named_register((uintptr_t)(const void *)(mixer), (name), "mixer", "0x%tx", __FILE__, __LINE__, __func__,             \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an audio codec with automatic format specifier
+ * @param codec Audio codec pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for audio codec addresses.
+ */
+#define NAMED_REGISTER_AUDIO_CODEC(codec, name, parent_ptr)                                                            \
+  named_register((uintptr_t)(const void *)(codec), (name), "audio_codec", "0x%tx", __FILE__, __LINE__, __func__,       \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a video encoder with automatic format specifier
+ * @param encoder Video encoder pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for video encoder addresses.
+ */
+#define NAMED_REGISTER_VIDEO_ENCODER(encoder, name, parent_ptr)                                                        \
+  named_register((uintptr_t)(const void *)(encoder), (name), "video_encoder", "0x%tx", __FILE__, __LINE__, __func__,   \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a buffer domain with automatic format specifier
+ * @param pool buffer domain pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for buffer domain addresses.
+ */
+#define NAMED_REGISTER_BUFFER_DOMAIN(pool, name, parent_ptr)                                                           \
+  named_register((uintptr_t)(const void *)(pool), (name), "buffer_domain", "0x%tx", __FILE__, __LINE__, __func__,      \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an FFmpeg decoder with automatic format specifier
+ * @param decoder FFmpeg decoder pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for decoder addresses.
+ */
+#define NAMED_REGISTER_FFMPEG_DECODER(decoder, name, parent_ptr)                                                       \
+  named_register((uintptr_t)(const void *)(decoder), (name), "ffmpeg_decoder", "0x%tx", __FILE__, __LINE__, __func__,  \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an FFmpeg encoder with automatic format specifier
+ * @param encoder FFmpeg encoder pointer
+ * @param name Base name string
+ * @param parent_ptr Parent context pointer (uintptr_t cast)
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for encoder addresses.
+ */
+#define NAMED_REGISTER_FFMPEG_ENCODER(encoder, name, parent_ptr)                                                       \
+  named_register((uintptr_t)(const void *)(encoder), (name), "ffmpeg_encoder", "0x%tx", __FILE__, __LINE__, __func__,  \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an H.265 encoder with automatic format specifier
+ * @param encoder H.265 encoder pointer
+ * @param name Base name string
+ * @param parent_ptr Parent context pointer (uintptr_t cast)
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for H.265 encoder addresses.
+ */
+#define NAMED_REGISTER_H265_ENCODER(encoder, name, parent_ptr)                                                         \
+  named_register((uintptr_t)(const void *)(encoder), (name), "h265_encoder", "0x%tx", __FILE__, __LINE__, __func__,    \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an H.265 decoder with automatic format specifier
+ * @param decoder H.265 decoder pointer
+ * @param name Base name string
+ * @param parent_ptr Parent context pointer (uintptr_t cast)
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for H.265 decoder addresses.
+ */
+#define NAMED_REGISTER_H265_DECODER(decoder, name, parent_ptr)                                                         \
+  named_register((uintptr_t)(const void *)(decoder), (name), "h265_decoder", "0x%tx", __FILE__, __LINE__, __func__,    \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an audio context with automatic format specifier
+ * @param ctx Audio context pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for audio context addresses.
+ */
+#define NAMED_REGISTER_AUDIO_CONTEXT(ctx, name, parent_ptr)                                                            \
+  named_register((uintptr_t)(const void *)(ctx), (name), "audio_context", "0x%tx", __FILE__, __LINE__, __func__,       \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a rate limiter with automatic format specifier
+ * @param limiter Rate limiter pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for rate limiter addresses.
+ */
+#define NAMED_REGISTER_RATE_LIMITER(limiter, name, parent_ptr)                                                         \
+  named_register((uintptr_t)(const void *)(limiter), (name), "rate_limiter", "0x%tx", __FILE__, __LINE__, __func__,    \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a WAV writer with automatic format specifier
+ * @param writer WAV writer pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for WAV writer addresses.
+ */
+#define NAMED_REGISTER_WAV_WRITER(writer, name, parent_ptr)                                                            \
+  named_register((uintptr_t)(const void *)(writer), (name), "wav_writer", "0x%tx", __FILE__, __LINE__, __func__,       \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a media source with automatic format specifier
+ * @param source Media source pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for media source addresses.
+ */
+#define NAMED_REGISTER_MEDIA_SOURCE(source, name, parent_ptr)                                                          \
+  named_register((uintptr_t)(const void *)(source), (name), "media_source", "0x%tx", __FILE__, __LINE__, __func__,     \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Open a file and register the file descriptor
+ * @param pathname File path to open
+ * @param name Debug name for the file descriptor
+ * @param flags Open flags (O_RDONLY, O_WRONLY, etc.)
+ * @param ... Optional mode argument for O_CREAT
+ * @ingroup debug_util
+ *
+ * Convenience macro that opens a file and registers the returned FD.
+ * Automatically uses "%d" format specifier for file descriptor integers.
+ *
+ * Usage:
+ *   int fd = NAMED_OPEN("/path/to/file", "myfile", O_RDONLY);
+ *   int fd = NAMED_OPEN("/path/to/file", "myfile", O_CREAT | O_WRONLY, 0644);
+ */
+#define NAMED_OPEN(pathname, name, flags, ...)                                                                         \
+  ({                                                                                                                   \
+    int _fd;                                                                                                           \
+    if ((flags) & O_CREAT) {                                                                                           \
+      _fd = platform_open((pathname), (flags), __VA_ARGS__);                                                           \
+    } else {                                                                                                           \
+      _fd = platform_open((pathname), (flags));                                                                        \
+    }                                                                                                                  \
+    if (_fd >= 0) {                                                                                                    \
+      named_register_fd(_fd, NULL, __FILE__, __LINE__, __func__);                                                      \
+    }                                                                                                                  \
+    _fd;                                                                                                               \
+  })
+
+/**
+ * @brief Unregister a file descriptor
+ * @param fd File descriptor to unregister
+ * @ingroup debug_util
+ *
+ * Call this before closing a named file descriptor.
+ */
+#define NAMED_UNREGISTER_FD(fd) NAMED_UNREGISTER_ID((fd))
+
+/**
+ * @brief Register an existing file descriptor
+ * @param fd File descriptor (must be >= 0)
+ * @param name Human-readable name for the fd (e.g., "inhibit"), or NULL for auto-generated
+ * @ingroup debug_util
+ *
+ * Convenience macro for registering file descriptors that are already open.
+ * If name is non-NULL, registers as "name (fd=N)"; otherwise uses "fd=N".
+ * In release builds (NDEBUG), this is a no-op.
+ */
+#define NAMED_REGISTER_FD(fd, name) named_register_fd((fd), (name), __FILE__, __LINE__, __func__)
+
+/**
+ * @brief Register an atomic_t with automatic format specifier
+ * @param a Pointer to atomic_t
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for atomic addresses.
+ */
+#define NAMED_REGISTER_ATOMIC(a, name, parent_ptr)                                                                     \
+  named_register((uintptr_t)(const void *)(a), (name), "atomic", "0x%tx", __FILE__, __LINE__, __func__,                \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an _Atomic(void *) with automatic format specifier
+ * @param a Pointer to _Atomic(void *)
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for atomic_ptr addresses.
+ */
+#define NAMED_REGISTER_ATOMIC_PTR(a, name, parent_ptr)                                                                 \
+  named_register((uintptr_t)(const void *)(a), (name), "atomic_ptr", "0x%tx", __FILE__, __LINE__, __func__,            \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+// ============================================================================
+// Thread-Specific Registration Macros
+// ============================================================================
+
+/**
+ * @brief Register a thread handle with name and automatic format specifier
+ * @param thread platform_thread_t handle (NOT a pointer)
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro that automatically uses "0x%tx" format specifier for thread addresses.
+ * In debug builds, automatically captures __FILE__, __LINE__, and __func__ for location info.
+ * The thread handle itself (not a pointer) is used as the registry key.
+ * In release builds (NDEBUG), this is a no-op.
+ */
+#define NAMED_REGISTER_THREAD(thread, name, parent_ptr)                                                                \
+  named_register(thread_to_key((thread)), (name), "thread", "0x%tx", __FILE__, __LINE__, __func__,                     \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Unregister a thread handle
+ * @param thread platform_thread_t handle (NOT a pointer)
+ * @ingroup debug_util
+ */
+#define NAMED_UNREGISTER_THREAD(thread) named_unregister(thread_to_key((thread)))
+
+// ============================================================================
+// Type-Specific Description Macros
+// ============================================================================
+
+/**
+ * @name Type-Specific Description Macros
+ * @{
+ *
+ * These macros encapsulate the proper casting and type hint for common types.
+ * Use these instead of NAMED_DESCRIBE for better readability and consistency.
+ */
+
+/**
+ * @brief Describe a mutex_t for logging
+ * @param m Pointer to mutex_t
+ * @ingroup debug_util
+ */
+#define NAME_DESCRIBE_MUTEX(m) named_describe((uintptr_t)(const void *)(m), "mutex")
+
+/**
+ * @brief Describe an rwlock_t for logging
+ * @param l Pointer to rwlock_t
+ * @ingroup debug_util
+ */
+#define NAME_DESCRIBE_RWLOCK(l) named_describe((uintptr_t)(const void *)(l), "rwlock")
+
+/**
+ * @brief Describe a cond_t for logging
+ * @param c Pointer to cond_t
+ * @ingroup debug_util
+ */
+#define NAME_DESCRIBE_COND(c) named_describe((uintptr_t)(const void *)(c), "cond")
+
+/**
+ * @brief Describe a thread for logging
+ * @param t platform_thread_t handle
+ * @ingroup debug_util
+ *
+ * Uses named_describe_thread() function to handle platform-specific conversion.
+ */
+#define NAME_DESCRIBE_THREAD(t) named_describe_thread(t)
+
+/**
+ * @brief Describe a transport for logging
+ * @param tr Pointer to acip_transport_t
+ * @ingroup debug_util
+ */
+#define NAME_DESCRIBE_TRANSPORT(tr) named_describe((uintptr_t)(const void *)(tr), "transport")
+
+/**
+ * @brief Describe a socket for logging
+ * @param fd socket_t file descriptor
+ * @ingroup debug_util
+ */
+#define NAME_DESCRIBE_SOCKET(fd) named_describe((uintptr_t)(intptr_t)(fd), "socket")
+
+/**
+ * @brief Describe a ring buffer for logging
+ * @param rb Pointer to ringbuffer_t
+ * @ingroup debug_util
+ */
+#define NAME_DESCRIBE_RINGBUF(rb) named_describe((uintptr_t)(const void *)(rb), "ringbuf")
+
+/** @} */ /* Type-Specific Description Macros */
+
+// ============================================================================
+// Thread-Specific Description Function
+// ============================================================================
+
+/**
+ * @brief Describe a thread for logging (function wrapper)
+ * @param thread platform_thread_t handle
+ * @return Description string "thread: name (0xID)"
+ * @ingroup debug_util
+ *
+ * This is a function (not a macro) to handle the opaque platform_thread_t type
+ * properly, converting it through thread_to_key().
+ */
+const char *named_describe_thread(void *thread);
+
+// ============================================================================
+// Registry Iteration
+// ============================================================================
+
+/**
+ * @brief Callback function for iterating registered entries
+ * @param key The registered key (uintptr_t)
+ * @param name The registered name string
+ * @param user_data User-provided context pointer
+ * @ingroup debug_util
+ *
+ * Called for each entry in the registry. The callback should not modify
+ * the registry during iteration.
+ */
+typedef void (*named_iter_callback_t)(uintptr_t key, const char *name, void *user_data);
+
+/**
+ * @brief Register a TCP client with automatic format specifier
+ * @param client TCP client pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_TCP_CLIENT(client, name, parent_ptr)                                                            \
+  named_register((uintptr_t)(const void *)(client), (name), "tcp_client", "0x%tx", __FILE__, __LINE__, __func__,       \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a WebSocket client with automatic format specifier
+ * @param client WebSocket client pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_WEBSOCKET_CLIENT(client, name, parent_ptr)                                                      \
+  named_register((uintptr_t)(const void *)(client), (name), "websocket_client", "0x%tx", __FILE__, __LINE__, __func__, \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an app client with automatic format specifier
+ * @param client App client pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_APP_CLIENT(client, name, parent_ptr)                                                            \
+  named_register((uintptr_t)(const void *)(client), (name), "app_client", "0x%tx", __FILE__, __LINE__, __func__,       \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a video frame buffer with automatic format specifier
+ * @param buf Video frame buffer pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_VIDEO_FRAME_BUFFER(buf, name, parent_ptr)                                                       \
+  named_register((uintptr_t)(const void *)(buf), (name), "video_frame_buffer", "0x%tx", __FILE__, __LINE__, __func__,  \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a thread pool with automatic format specifier
+ * @param pool Thread pool pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_THREAD_POOL(pool, name, parent_ptr)                                                             \
+  named_register((uintptr_t)(const void *)(pool), (name), "thread_pool", "0x%tx", __FILE__, __LINE__, __func__,        \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an options builder with automatic format specifier
+ * @param builder Options builder pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_OPTIONS_BUILDER(builder, name, parent_ptr)                                                      \
+  named_register((uintptr_t)(const void *)(builder), (name), "options_builder", "0x%tx", __FILE__, __LINE__, __func__, \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a simple frame swap with automatic format specifier
+ * @param swap Simple frame swap pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_SIMPLE_FRAME_SWAP(swap, name, parent_ptr)                                                       \
+  named_register((uintptr_t)(const void *)(swap), (name), "simple_frame_swap", "0x%tx", __FILE__, __LINE__, __func__,  \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a client audio pipeline with automatic format specifier
+ * @param pipeline Client audio pipeline pointer
+ * @param name Base name string
+ * @ingroup debug_util
+ */
+#define NAMED_REGISTER_CLIENT_AUDIO_PIPELINE(pipeline, name, parent_ptr)                                               \
+  named_register((uintptr_t)(const void *)(pipeline), (name), "client_audio_pipeline", "0x%tx", __FILE__, __LINE__,    \
+                 __func__, (uintptr_t)(const void *)(parent_ptr))
+
+#ifdef DEBUG_MEMORY
+#define NAMED_REGISTER_WEBSOCKET_IMPL(data, name, parent_ptr)                                                          \
+  named_register((uintptr_t)(const void *)(data), (name), "websocket_impl", "0x%tx", __FILE__, __LINE__, __func__,     \
+                 (uintptr_t)(const void *)(parent_ptr))
+#else
+#define NAMED_REGISTER_WEBSOCKET_IMPL(data, name, parent_ptr) ((void)(data), (void)(name), (void)(parent_ptr))
+#endif
+
+/**
+ * @brief Register all packet types from packet_type_t enum
+ * @ingroup debug_util
+ *
+ * Registers all packet type enum values in the named registry using keys
+ * in the format "PACKET_TYPE=%d" where %d is the enum value.
+ * This should be called once during initialization to enable packet type
+ * identification in log message formatting.
+ */
+void named_registry_register_packet_types(void);
+
+/**
+ * @brief Iterate through all registered entries
+ * @param callback Function to call for each entry
+ * @param user_data Opaque context passed to callback
+ * @ingroup debug_util
+ *
+ * Copies all names and keys, then invokes callbacks outside the registry lock.
+ * Tries the registry lock without waiting. Sets *completed to false on
+ * contention or growth during allocation, and true after visiting every entry.
+ * No callbacks run on an incomplete attempt; callers may keep their previous
+ * snapshot and retry later. Actual errors are returned with SET_ERRNO.
+ * Keys do not pin objects: use named_registry_read() before accessing an object
+ * that can be destroyed. Callbacks can block and are outside this guarantee.
+ */
+int named_registry_for_each(named_iter_callback_t callback, void *user_data, bool *completed);
+
+/**
+ * Read a registered object while preventing concurrent unregistration.
+ * The callback must only copy data: no logging, allocation, or registry calls.
+ * Owners must unregister before freeing the object. Returns false if absent,
+ * if the registered type does not match, or if the registry is busy.
+ */
+bool named_registry_read(uintptr_t key, const char *type, void (*read_object)(uintptr_t, void *), void *user_data);
+
+/** Nonblocking protected visit. Callbacks may only copy data (no logging,
+ * allocation, or registry calls). If capacity is insufficient, no callbacks
+ * run; required receives the current size. Objects must unregister before free.
+ */
+typedef void (*named_snapshot_fn)(uintptr_t key, uint64_t generation, const char *name, const char *type,
+                                  const char *file, int line, void *data);
+int named_registry_try_snapshot(size_t capacity, size_t *required, bool *completed,
+                                              named_snapshot_fn copy, void *data);
+
+/**
+ * @brief Register a libwebsockets context with automatic format specifier
+ * @param context LWS context pointer (struct lws_context *)
+ * @param name Base name string (e.g., "ws_server" or "ws_client")
+ * @ingroup debug_util
+ *
+ * Convenience macro for naming libwebsockets contexts. Automatically uses "0x%tx" format.
+ * Usage: NAMED_REGISTER_LWS_CONTEXT(lws_ctx, "ws_server");
+ */
+#define NAMED_REGISTER_LWS_CONTEXT(context, name, parent_ptr)                                                          \
+  named_register((uintptr_t)(const void *)(context), (name), "lws_context", "0x%tx", __FILE__, __LINE__, __func__,     \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register an FFmpeg decoder context with automatic format specifier
+ * @param context FFmpeg context pointer (AVFormatContext * or similar)
+ * @param name Base name string (e.g., "ffmpeg_decoder")
+ * @ingroup debug_util
+ *
+ * Convenience macro for naming FFmpeg contexts. Automatically uses "0x%tx" format.
+ * Usage: NAMED_REGISTER_FFMPEG_CONTEXT(avctx, "ffmpeg_input");
+ */
+#define NAMED_REGISTER_FFMPEG_CONTEXT(context, name, parent_ptr)                                                       \
+  named_register((uintptr_t)(const void *)(context), (name), "ffmpeg_context", "0x%tx", __FILE__, __LINE__, __func__,  \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Register a generic context with automatic format specifier
+ * @param context Any context pointer
+ * @param context_type Type string (e.g., "ssl_context", "decoder_context")
+ * @param name Base name string
+ * @ingroup debug_util
+ *
+ * Convenience macro for naming any opaque context. Automatically uses "0x%tx" format.
+ * Usage: NAMED_REGISTER_CONTEXT(ctx, "ssl_context", "tls_server");
+ */
+#define NAMED_REGISTER_CONTEXT(context, context_type, name, parent_ptr)                                                \
+  named_register((uintptr_t)(const void *)(context), (name), (context_type), "0x%tx", __FILE__, __LINE__, __func__,    \
+                 (uintptr_t)(const void *)(parent_ptr))
+
+/**
+ * @brief Get name of a pointer/key or format as address fallback
+ * @param key The uintptr_t key to look up
+ * @param buffer Output buffer for the result
+ * @param size Size of the output buffer
+ * @ingroup debug_util
+ *
+ * Tries to look up the registered name for the key. If found, copies it to buffer.
+ * If not found, formats the key as "0x%tx" (hexadecimal address).
+ *
+ * Useful in hot paths like logging where you want the name if available, but need
+ * a reasonable fallback for unregistered keys.
+ *
+ * In release builds (NDEBUG), always formats as address.
+ */
+#define NAMED_GET_BY_PTR(key, buffer, size)                                                                            \
+  do {                                                                                                                 \
+    const char *_name = named_get(key);                                                                                \
+    if (_name) {                                                                                                       \
+      size_t _len = strlen(_name);                                                                                     \
+      if (_len >= (size))                                                                                              \
+        _len = (size) - 1;                                                                                             \
+      memcpy((buffer), (_name), _len);                                                                                 \
+      (buffer)[_len] = '\0';                                                                                           \
+    } else {                                                                                                           \
+      snprintf((buffer), (size), "0x%tx", (ptrdiff_t)(key));                                                           \
+    }                                                                                                                  \
+  } while (0)
+
+/**
+ * @brief Get name of an integer ID or format as hex fallback
+ * @param id The integer ID to look up (e.g., thread ID, FD, packet type)
+ * @param buffer Output buffer for the result
+ * @param size Size of the output buffer
+ * @ingroup debug_util
+ *
+ * Tries to look up the registered name for an integer ID. If found, copies it to buffer.
+ * If not found, formats the ID as "0x%lx" (hexadecimal).
+ *
+ * Use this for thread IDs and other small integer identifiers.
+ * In release builds (NDEBUG), always formats as hex.
+ */
+#define NAMED_GET_BY_INT(id, buffer, size)                                                                             \
+  do {                                                                                                                 \
+    const char *_name = named_get((uintptr_t)(id));                                                                    \
+    if (_name) {                                                                                                       \
+      size_t _len = strlen(_name);                                                                                     \
+      if (_len >= (size))                                                                                              \
+        _len = (size) - 1;                                                                                             \
+      memcpy((buffer), (_name), _len);                                                                                 \
+      (buffer)[_len] = '\0';                                                                                           \
+    } else {                                                                                                           \
+      snprintf((buffer), (size), "0x%lx", (unsigned long)(id));                                                        \
+    }                                                                                                                  \
+  } while (0)
+
+/**
+ * @brief Copy a string to buffer, with bounds checking
+ * @param str The string to copy (may be NULL)
+ * @param buffer Output buffer
+ * @param size Size of the output buffer
+ * @ingroup debug_util
+ *
+ * Safe string copy that handles NULL inputs and ensures null termination.
+ * Useful for formatting optional or variable string fields.
+ *
+ * In release builds (NDEBUG), copies the string as-is.
+ */
+#define NAMED_GET_BY_STR(str, buffer, size)                                                                            \
+  do {                                                                                                                 \
+    if ((str)) {                                                                                                       \
+      strncpy((buffer), (str), (size) - 1);                                                                            \
+      (buffer)[(size) - 1] = '\0';                                                                                     \
+    } else {                                                                                                           \
+      (buffer)[0] = '\0';                                                                                              \
+    }                                                                                                                  \
+  } while (0)
+
+/** Print a synchronized hash-table summary without logging under its lock. */
+void named_print_hash_stats(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+/** @} */ /* debug_named */

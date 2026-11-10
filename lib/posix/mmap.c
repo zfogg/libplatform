@@ -5,8 +5,7 @@
  */
 
 #include <libplatform/mmap.h>
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/log/log.h>
+#include <libplatform/debug/named.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -14,6 +13,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+
+#define SET_ERRNO(...) (-1)
+#define SET_ERRNO_SYS(...) (-1)
+#define ERROR_INVALID_PARAM 1
+#define ERROR_CONFIG 2
+#define ERROR_MEMORY 3
+#define ASCIICHAT_OK 0
 
 void platform_mmap_init(platform_mmap_t *mapping) {
   if (!mapping) {
@@ -24,7 +30,7 @@ void platform_mmap_init(platform_mmap_t *mapping) {
   mapping->fd = -1;
 }
 
-asciichat_error_t platform_mmap_open(const char *name, const char *path, size_t size, platform_mmap_t *out) {
+int platform_mmap_open(const char *name, const char *path, size_t size, platform_mmap_t *out) {
   if (!name || !path || !out) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "mmap: NULL name, path or output pointer");
   }

@@ -2,7 +2,7 @@
 
 /**
  * @file platform/rwlock.h
- * @brief Cross-platform read-write lock interface for ascii-chat
+ * @brief Cross-platform read-write lock interface for application
  * @ingroup platform
  * @addtogroup platform
  * @{
