@@ -4,7 +4,7 @@ project(libplatform VERSION 0.1.0 LANGUAGES C)
 option(LIBPLATFORM_BUILD_TESTS "Build libplatform tests" ON)
 include(GNUInstallDirs)
 
-add_library(libplatform backtrace)
+add_library(libplatform)
 add_library(libplatform::libplatform ALIAS libplatform)
 target_sources(libplatform PRIVATE src/backtrace.c)
 target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
