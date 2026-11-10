@@ -17,21 +17,27 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux static toolchain
+        if: matrix.os == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: Build static and shared packages
         shell: bash
         run: |
           set -euxo pipefail
           for linkage in static shared; do
             shared=OFF; [ "$linkage" = shared ] && shared=ON
-            cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON
+            compiler=""
+            if [ '${{ matrix.os }}' = linux ] && [ "$linkage" = static ] && [ '${{ matrix.arch }}' = x86_64 ]; then compiler='-DCMAKE_C_COMPILER=musl-gcc'; fi
+            cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON $compiler
             cmake --build "build-$linkage"
             ctest --test-dir "build-$linkage" --output-on-failure
             cmake --install "build-$linkage" --prefix "stage-$linkage"
           done
-          mkdir -p package/include package/lib
+          mkdir -p package/include package/lib package/bin
           cp -R stage-static/include/* package/include/
-          cp stage-static/lib/* package/lib/ || true
-          cp stage-shared/lib/* package/lib/ || true
+          cp -R stage-static/lib/* package/lib/ || true
+          cp -R stage-shared/lib/* package/lib/ || true
+          cp -R stage-shared/bin/* package/bin/ 2>/dev/null || true
           7z a "libplatform-${{ matrix.os }}-${{ matrix.arch }}.zip" package
       - uses: actions/upload-artifact@v4
         with:
