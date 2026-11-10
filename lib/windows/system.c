@@ -61,7 +61,8 @@ int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count)
 
 int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
   if (!dest || count > dest_size) return -1;
-  return memset_s(dest, dest_size, ch, count) == 0 ? 0 : -1;
+  memset(dest, ch, count);
+  return 0;
 }
 
 FILE *platform_fopen(const char *name, const char *filename, const char *mode) {
