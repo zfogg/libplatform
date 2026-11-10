@@ -26,17 +26,21 @@
 #define SAFE_GETENV getenv
 #define platform_strdup strdup
 #define safe_snprintf snprintf
+#if defined(_WIN32)
+#define popen _popen
+#define pclose _pclose
+#endif
 #define ERROR_INVALID_PARAM 1
 #define ERROR_THREAD 2
 #define SET_ERRNO(code, ...) (code)
 
-typedef atomic_uint_fast64_t atomic_t;
-static inline bool atomic_load_bool(const atomic_t *v) { return atomic_load(v) != 0; }
-static inline void atomic_store_bool(atomic_t *v, bool x) { atomic_store(v, x ? 1 : 0); }
-static inline bool atomic_cas_bool(atomic_t *v, bool *expected, bool desired) { uint64_t e = *expected ? 1 : 0; bool ok = atomic_compare_exchange_strong(v, &e, desired ? 1 : 0); if (!ok) *expected = e != 0; return ok; }
-static inline void atomic_fetch_add_u64(atomic_t *v, uint64_t x) { (void)atomic_fetch_add(v, x); }
-static inline void atomic_store_u64(atomic_t *v, uint64_t x) { atomic_store(v, x); }
-static inline uint64_t atomic_load_u64(const atomic_t *v) { return atomic_load(v); }
+typedef struct { atomic_uint_fast64_t value; } atomic_t;
+static inline bool atomic_load_bool(const atomic_t *v) { return atomic_load(&v->value) != 0; }
+static inline void atomic_store_bool(atomic_t *v, bool x) { atomic_store(&v->value, x ? 1 : 0); }
+static inline bool atomic_cas_bool(atomic_t *v, bool *expected, bool desired) { uint64_t e = *expected ? 1 : 0; bool ok = atomic_compare_exchange_strong(&v->value, &e, desired ? 1 : 0); if (!ok) *expected = e != 0; return ok; }
+static inline void atomic_fetch_add_u64(atomic_t *v, uint64_t x) { (void)atomic_fetch_add(&v->value, x); }
+static inline void atomic_store_u64(atomic_t *v, uint64_t x) { atomic_store(&v->value, x); }
+static inline uint64_t atomic_load_u64(const atomic_t *v) { return atomic_load(&v->value); }
 
 typedef struct { atomic_bool initialized; } lifecycle_t;
 #define LIFECYCLE_INIT { 0 }
