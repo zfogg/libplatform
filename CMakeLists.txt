@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.20)
+project(libplatform VERSION 0.1.0 LANGUAGES C)
+
+option(LIBPLATFORM_BUILD_TESTS "Build libplatform tests" ON)
+include(GNUInstallDirs)
+
+add_library(libplatform backtrace)
+add_library(libplatform::libplatform ALIAS libplatform)
+target_sources(libplatform PRIVATE src/backtrace.c)
+target_include_directories(libplatform PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_compile_features(libplatform PUBLIC c_std_11)
+set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform)
+if(NOT WIN32 AND NOT EMSCRIPTEN)
+  target_link_libraries(libplatform PRIVATE ${CMAKE_DL_LIBS})
+endif()
+
+install(TARGETS libplatform EXPORT libplatformTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT libplatformTargets NAMESPACE libplatform:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libplatform)
+
+if(LIBPLATFORM_BUILD_TESTS)
+  enable_testing()
+  add_executable(libplatform-test tests/test_backtrace.c)
+  target_link_libraries(libplatform-test PRIVATE libplatform)
+  add_test(NAME libplatform-test COMMAND libplatform-test)
+endif()

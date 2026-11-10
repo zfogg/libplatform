@@ -1,0 +1,48 @@
+name: release
+on:
+  push:
+    tags: ['v*.*.*']
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, arch: x86_64, runner: ubuntu-24.04 }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04 }
+          - { os: macos, arch: x86_64, runner: macos-13 }
+          - { os: macos, arch: arm64, runner: macos-14 }
+          - { os: windows, arch: x86_64, runner: windows-2022 }
+          - { os: windows, arch: arm64, runner: windows-11-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build static and shared packages
+        shell: bash
+        run: |
+          set -euxo pipefail
+          for linkage in static shared; do
+            shared=OFF; [ "$linkage" = shared ] && shared=ON
+            cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON
+            cmake --build "build-$linkage"
+            ctest --test-dir "build-$linkage" --output-on-failure
+            cmake --install "build-$linkage" --prefix "stage-$linkage"
+          done
+          mkdir -p package/include package/lib
+          cp -R stage-static/include/* package/include/
+          cp stage-static/lib/* package/lib/ || true
+          cp stage-shared/lib/* package/lib/ || true
+          7z a "libplatform-${{ matrix.os }}-${{ matrix.arch }}.zip" package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libplatform-${{ matrix.os }}-${{ matrix.arch }}
+          path: '*.zip'
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: assets, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with: { files: 'assets/*.zip', generate_release_notes: true }
