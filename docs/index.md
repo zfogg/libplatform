@@ -90,3 +90,41 @@ something like this, each application grows its own collection of subtly
 different portability wrappers and spends years maintaining them.
 
 libplatform is meant to be the place you start instead.
+
+## Header map
+
+The installed headers are grouped by responsibility rather than by operating
+system, so application code can use one stable API:
+
+- `agent.h` finds SSH/GPG agents; `app_callbacks.h` defines callbacks for
+  library-owned diagnostics; `compiler.h` handles compiler compatibility; and
+  `cpu.h` reports CPU features.
+- `atomic.h` provides atomic values and operations; `mutex.h`, `rwlock.h`,
+  `cond.h`, and `thread.h` provide synchronization and threads; `named.h`
+  names long-lived objects; and `lifecycle.h` controls initialization and
+  shutdown.
+- `backtrace.h` captures and prints platform backtraces; `symbols.h` resolves
+  addresses; `memory.h` provides the allocation seam; and `errno.h` defines
+  the platform error boundary.
+- `debug/atomic.h` tracks atomic operations; `debug/backtrace.h` provides the
+  diagnostic backtrace workflow; `debug/coverage.h` exposes coverage hooks;
+  `debug/debug_helpers.h`, `debug/helpers.h`, `debug/errno.h`, and
+  `debug/stats.h` provide diagnostic support; and `debug/memory.h`,
+  `debug/mutex.h`, `debug/named.h`, and `debug/sync.h` provide memory, lock,
+  registry, and synchronization reports.
+- `filesystem.h` handles files and directories; `mmap.h` handles mapped files;
+  `pipe.h` and `wakeup.h` handle worker communication; and `process.h` handles
+  process titles and subprocesses.
+- `socket.h` abstracts sockets; `signal.h` handles signals; `system.h` and
+  `systemd.h` cover system services; `time.h` covers clocks and deadlines; and
+  `windows_compat.h` contains Windows compatibility definitions.
+- `terminal.h` detects and controls terminals; `keyboard.h` handles keyboard
+  input and line editing; `question.h` handles prompts; `clipboard.h` reads
+  the clipboard; and `font.h` provides the embedded-font registry.
+- `windows/getopt.h` provides Windows getopt compatibility;
+  `windows/system.h` provides Windows system details; `posix/system.h` is the
+  POSIX system boundary; and `uthash.h` is the vendored hash dependency.
+
+The utility headers (`format.h`, `ip.h`, `path.h`, `string.h`, and `utf8.h`)
+are private implementation headers under `lib/util/`; they are not installed
+for consumers.
