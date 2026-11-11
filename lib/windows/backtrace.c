@@ -118,7 +118,7 @@ int platform_backtrace_capture(void **buffer, int size) {
   return count;
 }
 
-char **platform_backtrace_symbols(void *const *buffer, int size) {
+char **platform_backtrace_symbols(void *const *buffer, int size, const char *const *owned_dirs) {
   if (!buffer || size <= 0) {
     return NULL;
   }
@@ -131,7 +131,7 @@ char **platform_backtrace_symbols(void *const *buffer, int size) {
 
   // Resolve the complete trace in one symbolizer process. An unresolved lookup
   // is returned as a printable address, so it must not suppress the PDB fallback.
-  char **cache_results = symbol_cache_resolve_batch(buffer, size);
+  char **cache_results = symbol_cache_resolve_batch(buffer, size, owned_dirs);
   bool needs_dbghelp = false;
   for (int i = 0; i < size; i++) {
     symbols[i] = NULL;
@@ -194,7 +194,7 @@ char **platform_backtrace_symbols(void *const *buffer, int size) {
         char source_path[PLATFORM_WINDOWS_BACKTRACE_SOURCE_PATH_BUFFER_SIZE];
         bool external = false;
         if (symbol_format_source_path(resolved_module, line_info.FileName, source_path, sizeof(source_path),
-                                      &external) != 0) {
+                                      &external, owned_dirs) != 0) {
           strncpy(source_path, "unknown", sizeof(source_path));
         }
         snprintf(symbol_buffer, sizeof(symbol_buffer), "%s%s%s%s() (%s:%ld)%s", resolved_module ? "[" : "",

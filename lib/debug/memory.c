@@ -1308,7 +1308,7 @@ void debug_memory_report(bool colors) {
       APPEND_REPORT("\n  Allocation from %s:%d (%zu bytes):\n", trace->file, trace->line, trace->size);
       bool was_in_debug_memory = g_in_debug_memory;
       g_in_debug_memory = true;
-      backtrace_symbolize(&trace->backtrace);
+      backtrace_symbolize(&trace->backtrace, NULL);
       for (int i = 0; i < trace->backtrace.count; i++) {
         if (trace->backtrace.symbols && trace->backtrace.symbols[i]) {
           APPEND_REPORT("    [%d] %s\n", i, trace->backtrace.symbols[i]);

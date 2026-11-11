@@ -51,12 +51,12 @@ void backtrace_capture(backtrace_t *bt) {
 
 #if !defined(NDEBUG) || defined(ENABLE_ERRNO_BACKTRACES)
 
-void backtrace_symbolize(backtrace_t *bt) {
+void backtrace_symbolize(backtrace_t *bt, const char *const *owned_dirs) {
   if (!bt || bt->tried_symbolize) {
     return; // Already tried or invalid (don't try twice)
   }
   bt->tried_symbolize = true;
-  bt->symbols = platform_backtrace_symbols(bt->ptrs, bt->count);
+  bt->symbols = platform_backtrace_symbols(bt->ptrs, bt->count, owned_dirs);
 }
 
 void backtrace_capture_and_symbolize(backtrace_t *bt) {
@@ -64,7 +64,7 @@ void backtrace_capture_and_symbolize(backtrace_t *bt) {
     return;
   }
   backtrace_capture(bt);
-  backtrace_symbolize(bt);
+  backtrace_symbolize(bt, NULL);
 }
 
 void backtrace_t_free(backtrace_t *bt) {
@@ -398,7 +398,8 @@ void backtrace_print_symbols(int level, const char *label, char **symbols, int c
 
 #if defined(NDEBUG) && !defined(ENABLE_ERRNO_BACKTRACES)
 
-void backtrace_symbolize(backtrace_t *bt) {
+void backtrace_symbolize(backtrace_t *bt, const char *const *owned_dirs) {
+  (void)owned_dirs;
   (void)bt;
   // No-op in release builds
 }

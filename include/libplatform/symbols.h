@@ -100,7 +100,7 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
  * most four parent directories and the filename.
  */
 int symbol_format_source_path(const char *module_name, const char *source_path, char *output,
-                              size_t output_size, bool *external);
+                              size_t output_size, bool *external, const char *const *owned_dirs);
 
 /* ============================================================================
  * Symbol Cache Lifecycle
@@ -257,7 +257,7 @@ void symbol_cache_print_stats(void);
  *
  * @ingroup platform
  */
-char **symbol_cache_resolve_batch(void *const *buffer, int size);
+char **symbol_cache_resolve_batch(void *const *buffer, int size, const char *const *owned_dirs);
 
 /**
  * @brief Free symbol array returned by symbol_cache_resolve_batch

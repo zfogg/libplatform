@@ -712,7 +712,7 @@ void debug_sync_poll(void) {
   if (backtrace) {
     backtrace_t trace = {0};
     backtrace_capture(&trace);
-    backtrace_symbolize(&trace);
+    backtrace_symbolize(&trace, NULL);
     if (trace.symbols)
       backtrace_print(0, "Diagnostics worker backtrace", &trace, 0, 0, NULL);
     backtrace_t_free(&trace);

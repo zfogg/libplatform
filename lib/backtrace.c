@@ -81,8 +81,8 @@ int platform_backtrace_capture(void **buffer, int size) {
   return depth;
 }
 
-char **platform_backtrace_symbols(void *const *buffer, int size) {
-  return symbol_cache_resolve_batch(buffer, size);
+char **platform_backtrace_symbols(void *const *buffer, int size, const char *const *owned_dirs) {
+  return symbol_cache_resolve_batch(buffer, size, owned_dirs);
 }
 
 void platform_backtrace_symbols_destroy(char **strings) {
@@ -96,7 +96,7 @@ void platform_backtrace_print(int skip_frames, platform_backtrace_write_fn write
   int depth = platform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
 
   if (depth > 0) {
-    char **symbols = platform_backtrace_symbols((void *const *)buffer, depth);
+    char **symbols = platform_backtrace_symbols((void *const *)buffer, depth, NULL);
     if (symbols) {
       for (int i = skip_frames; i < depth && symbols[i]; i++) {
         if (write) {
