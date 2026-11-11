@@ -8,15 +8,7 @@
 #include <ascii-chat/asciichat_errno.h>
 #include <libplatform/socket.h>
 
-asciichat_error_t socket_sendv_all(socket_t sock, const socket_buffer_t *buffers, size_t count, uint64_t timeout_ns) {
-  (void)sock;
-  (void)buffers;
-  (void)count;
-  (void)timeout_ns;
-  return SET_ERRNO(ERROR_NOT_SUPPORTED, "WASM uses browser transports instead of native sockets");
-}
-
-asciichat_error_t platform_popen(const char *name, const char *command, const char *mode, FILE **out_stream) {
+int platform_popen(const char *name, const char *command, const char *mode, FILE **out_stream) {
   (void)name;
   (void)command;
   (void)mode;
@@ -24,7 +16,7 @@ asciichat_error_t platform_popen(const char *name, const char *command, const ch
   return SET_ERRNO(ERROR_NOT_SUPPORTED, "not supported in WASM");
 }
 
-asciichat_error_t platform_pclose(FILE **stream_ptr) {
+int platform_pclose(FILE **stream_ptr) {
   (void)stream_ptr;
   return SET_ERRNO(ERROR_NOT_SUPPORTED, "not supported in WASM");
 }

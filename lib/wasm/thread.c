@@ -4,8 +4,10 @@
  * @ingroup platform
  */
 
-#include <libplatform/abstraction.h>
 #include <libplatform/thread.h>
+#include <libplatform/mutex.h>
+#include <libplatform/rwlock.h>
+#include <ascii-chat/asciichat_errno.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <errno.h>
@@ -76,7 +78,7 @@ int rwlock_rdlock_impl(rwlock_t *rwlock) {
   return pthread_rwlock_rdlock((pthread_rwlock_t *)rwlock);
 }
 
-asciichat_error_t rwlock_tryrdlock(rwlock_t *rwlock, bool *acquired) {
+int rwlock_tryrdlock(rwlock_t *rwlock, bool *acquired) {
   if (!rwlock || !acquired)
     return SET_ERRNO(ERROR_INVALID_PARAM, "Cannot try a null rwlock");
   int err = pthread_rwlock_tryrdlock((pthread_rwlock_t *)rwlock);

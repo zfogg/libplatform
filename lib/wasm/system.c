@@ -12,8 +12,6 @@
 #error "This file is for WASM/Emscripten builds only"
 #endif
 
-#include <libplatform/api.h>
-#include <libplatform/internal.h>
 #include <ascii-chat/common.h>
 #include <ascii-chat/common/buffer_sizes.h>
 #include <ascii-chat/asciichat_errno.h>
@@ -27,7 +25,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <ascii-chat/atomic.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
