@@ -28,6 +28,98 @@ platform branches by hand. It is just a lot of chores, and the chores are easy
 to get subtly wrong. libplatform puts those chores in one place and gives the
 rest of the application a stable interface.
 
+## Why use it?
+
+Even a tiny client that owns one mutex and opens one TCP connection starts
+collecting operating-system code. Windows has `CRITICAL_SECTION`, Winsock,
+`SOCKET`, `closesocket()`, and `WSAStartup()`. macOS and Linux use pthreads,
+BSD sockets, integer file descriptors, `close()`, and different error paths.
+The application ends up maintaining something like this:
+
+```c
+#ifdef _WIN32
+CRITICAL_SECTION lock;
+SOCKET socket_fd;
+InitializeCriticalSection(&lock);
+EnterCriticalSection(&lock);
+WSAStartup(MAKEWORD(2, 2), &wsa_data);
+socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+connect(socket_fd, (const struct sockaddr *)&address, sizeof(address));
+closesocket(socket_fd);
+LeaveCriticalSection(&lock);
+DeleteCriticalSection(&lock);
+WSACleanup();
+#elif defined(__APPLE__)
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+pthread_mutex_lock(&lock);
+connect(socket_fd, (const struct sockaddr *)&address, sizeof(address));
+close(socket_fd);
+pthread_mutex_unlock(&lock);
+pthread_mutex_destroy(&lock);
+#else /* Linux and other POSIX targets */
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+pthread_mutex_lock(&lock);
+connect(socket_fd, (const struct sockaddr *)&address, sizeof(address));
+close(socket_fd);
+pthread_mutex_unlock(&lock);
+pthread_mutex_destroy(&lock);
+#endif
+```
+
+With libplatform, the application uses the same API on all of those targets.
+The platform-specific mutex object, socket handle, startup, cleanup, and debug
+instrumentation stay inside the library.
+
+```c
+#include <libplatform/mutex.h>
+
+static mutex_t send_lock;
+
+int network_init(void) {
+  return mutex_init(&send_lock, "network.send");
+}
+
+void send_one_message(void) {
+  mutex_lock(&send_lock);
+  /* Build and send one application message. */
+  mutex_unlock(&send_lock);
+}
+
+void network_shutdown(void) {
+  mutex_destroy(&send_lock);
+}
+```
+
+```c
+#include <libplatform/socket.h>
+
+socket_t connect_to_server(const struct sockaddr *address, socklen_t address_length) {
+  if (socket_init() != 0)
+    return INVALID_SOCKET_VALUE;
+
+  socket_t socket_fd = socket_create("server", AF_INET, SOCK_STREAM, 0);
+  if (!socket_is_valid(socket_fd)) {
+    socket_cleanup();
+    return INVALID_SOCKET_VALUE;
+  }
+
+  if (socket_connect(socket_fd, address, address_length) != 0) {
+    socket_close(socket_fd);
+    socket_cleanup();
+    return -1;
+  }
+
+  /* Use socket_send(), socket_recv(), and socket_set_timeout_ns() here. */
+  return socket_fd;
+}
+```
+
+The protocol, message format, and ownership policy still belong to the
+application. libplatform removes the operating-system maintenance from the
+parts that should not need to know which OS they are running on.
+
 ## Getting started
 
 libplatform uses CMake and is tested with Clang and Ninja. It needs utf8proc for
