@@ -12,11 +12,6 @@
 #include <string.h>
 #include <windows.h>
 
-extern const unsigned char g_font_matrix_resurrected[];
-extern const size_t g_font_matrix_resurrected_size;
-extern const unsigned char g_font_default[];
-extern const size_t g_font_default_size;
-
 // Default monospace fonts to try, in order of preference
 static const char *g_default_fonts[] = {"consola.ttf", // Consolas
                                         "cour.ttf",    // Courier New

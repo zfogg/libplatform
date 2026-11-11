@@ -211,7 +211,10 @@ target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
 endif()
-set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform)
+set_target_properties(libplatform PROPERTIES
+  OUTPUT_NAME platform
+  WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
 if(WIN32)
   target_link_libraries(libplatform PUBLIC dbghelp)
 elseif(NOT EMSCRIPTEN)
