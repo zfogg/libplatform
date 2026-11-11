@@ -545,5 +545,5 @@ of exceptions.
 
 ## License
 
-See the repository license for the terms covering libplatform and its bundled
-components.
+libplatform is released under the [MIT License](LICENSE). Bundled third-party
+components retain their own licenses where applicable.
