@@ -23,6 +23,7 @@ hawkmoth_root = str(Path(__file__).resolve().parents[1] / "include")
 hawkmoth_compiler = "clang"
 hawkmoth_autoconf = []
 hawkmoth_clang = ["-I", str(Path(__file__).resolve().parents[1] / "include")]
+hawkmoth_transform_default = "javadoc"
 
 html_theme = "alabaster"
 html_title = "libplatform"
@@ -39,3 +40,16 @@ html_theme_options = {
 }
 
 nitpicky = False
+
+
+def _mark_c_code_blocks(app, lines, transform, options):
+    """Give Hawkmoth's converted @code blocks C syntax highlighting."""
+    if transform != "javadoc":
+        return
+    for index, line in enumerate(lines):
+        if line == ".. code-block::":
+            lines[index] = ".. code-block:: c"
+
+
+def setup(app):
+    app.connect("hawkmoth-process-docstring", _mark_c_code_blocks, priority=900)
