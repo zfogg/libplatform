@@ -835,7 +835,7 @@ typedef struct {
  *
  * @ingroup platform_terminal
  */
-terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options);
+terminal_capabilities_t detect_terminal_capabilities(const terminal_options_t *options);
 
 /**
  * @brief Get current TTY information
@@ -948,7 +948,7 @@ void test_terminal_output_modes(void);
  *
  * @ingroup platform_terminal
  */
-terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, terminal_options_t options);
+terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, const terminal_options_t *options);
 
 /**
  * @brief Determine if color output should be used
@@ -965,7 +965,7 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
  *
  * @ingroup platform_terminal
  */
-bool terminal_should_color_output(int fd, terminal_options_t options);
+bool terminal_should_color_output(int fd, const terminal_options_t *options);
 
 /**
  * @brief Format a clickable, underlined OSC 8 terminal link.

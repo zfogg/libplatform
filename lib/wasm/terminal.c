@@ -168,7 +168,7 @@ bool terminal_is_piped_output(void) {
 }
 
 // Color output detection
-bool terminal_should_color_output(int fd, terminal_options_t options) {
+bool terminal_should_color_output(int fd, const terminal_options_t *options) {
   (void)options;
   (void)fd;
   return true; // WASM mirror mode supports color
@@ -218,7 +218,8 @@ asciichat_error_t terminal_flush(int fd) {
 }
 
 // Terminal capabilities detection stub
-terminal_capabilities_t detect_terminal_capabilities(void) {
+terminal_capabilities_t detect_terminal_capabilities(const terminal_options_t *options) {
+  (void)options;
   terminal_capabilities_t caps = {0};
   caps.color_level = TERM_COLOR_TRUECOLOR;
   caps.capabilities = 0;

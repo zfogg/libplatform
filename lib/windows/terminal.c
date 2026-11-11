@@ -954,7 +954,7 @@ static bool detect_windows_utf8_support(void) {
 /**
  * Detect terminal capabilities on Windows - much simpler than Unix!
  */
-terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options) {
+terminal_capabilities_t detect_terminal_capabilities(const terminal_options_t *options) {
   terminal_capabilities_t caps = {0};
 
   // Detect color support level
@@ -1011,7 +1011,7 @@ terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options)
   strncpy(caps.colorterm, colorterm ? colorterm : "", sizeof(caps.colorterm) - 1);
 
   // Set default FPS for Windows terminals
-  int fps = options.fps;
+  int fps = options ? options->fps : 0;
   if (fps > 0) {
     caps.desired_fps = (uint8_t)(fps > 144 ? 144 : fps);
   } else {
@@ -1085,12 +1085,12 @@ void test_terminal_output_modes(void) {
 /**
  * Apply color mode and render mode overrides to detected capabilities
  */
-terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, terminal_options_t options) {
+terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, const terminal_options_t *options) {
 #ifndef NDEBUG
   // In debug builds, force no-color mode for Claude Code (LLM doesn't need colors, saves tokens)
   // However, respect --color=true which explicitly forces colors ON
-  if (options.color_mode == TERM_COLOR_AUTO && platform_getenv("CLAUDECODE") &&
-      options.color != TERMINAL_COLOR_SETTING_TRUE) {
+  if (options && options->color_mode == TERM_COLOR_AUTO && platform_getenv("CLAUDECODE") &&
+      options->color != TERMINAL_COLOR_SETTING_TRUE) {
   (void)0;
     caps.color_level = TERM_COLOR_NONE;
     caps.capabilities &= ~((uint32_t)TERM_CAP_COLOR_16 | (uint32_t)TERM_CAP_COLOR_256 | (uint32_t)TERM_CAP_COLOR_TRUE);
@@ -1100,7 +1100,7 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
 #endif
 
   // Handle color mode overrides
-  switch (options.color_mode) {
+  switch (options ? options->color_mode : TERM_COLOR_AUTO) {
   case TERM_COLOR_AUTO:
     // Use detected capabilities as-is
     break;
@@ -1133,7 +1133,7 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
   }
 
   // Handle render mode overrides
-  switch (options.render_mode) {
+  switch (options ? options->render_mode : RENDER_MODE_FOREGROUND) {
   case RENDER_MODE_FOREGROUND:
     caps.capabilities &= ~(uint32_t)TERM_CAP_BACKGROUND;
     break;
@@ -1148,13 +1148,13 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
   }
 
   // Handle UTF-8 override (force UTF-8 ON if user specified --utf8 true)
-  if (options.force_utf8 == TERMINAL_UTF8_SETTING_TRUE) {
+  if (options && options->force_utf8 == TERMINAL_UTF8_SETTING_TRUE) {
     caps.utf8_support = true;
     caps.capabilities |= TERM_CAP_UTF8;
   }
 
   // Include client's render mode preference
-  caps.render_mode = options.render_mode;
+  caps.render_mode = options ? options->render_mode : RENDER_MODE_FOREGROUND;
 
   return caps;
 }

@@ -74,15 +74,18 @@ int terminal_resize_poll(terminal_resize_watcher_t *watcher, int fd, bool *chang
  * @param fd File descriptor to check (STDOUT_FILENO or STDERR_FILENO)
  * @return true if colors should be used, false otherwise
  */
-bool terminal_should_color_output(int fd, terminal_options_t options) {
+bool terminal_should_color_output(int fd, const terminal_options_t *options) {
+  if (!options) {
+    return false;
+  }
   // Check color_mode setting - if explicitly set to NONE, disable colors
-  terminal_color_mode_t color_mode = options.color_mode;
+  terminal_color_mode_t color_mode = options->color_mode;
   if (color_mode == TERM_COLOR_NONE) {
     return false; // Color mode explicitly disabled
   }
 
   // Get current color setting (auto/true/false)
-  int color_setting = options.color;
+  int color_setting = options->color;
 
   // Priority 1: --color=true - Force colors ON (overrides everything)
   if (color_setting == TERMINAL_COLOR_SETTING_TRUE) {
@@ -97,10 +100,10 @@ bool terminal_should_color_output(int fd, terminal_options_t options) {
   // Priority 3: --color=auto (default) - Smart detection
   // Special case: Show colors for --help and --version even if not a TTY
   // Check for help/version in global argv (set by main.c early)
-  if (options.argc > 1 && options.argv) {
-    for (int i = 1; i < options.argc; i++) {
-      if (strcmp(options.argv[i], "--help") == 0 || strcmp(options.argv[i], "-h") == 0 || strcmp(options.argv[i], "--version") == 0 ||
-          strcmp(options.argv[i], "-v") == 0 || strcmp(options.argv[i], "--show-capabilities") == 0) {
+  if (options->argc > 1 && options->argv) {
+    for (int i = 1; i < options->argc; i++) {
+      if (strcmp(options->argv[i], "--help") == 0 || strcmp(options->argv[i], "-h") == 0 || strcmp(options->argv[i], "--version") == 0 ||
+          strcmp(options->argv[i], "-v") == 0 || strcmp(options->argv[i], "--show-capabilities") == 0) {
         // For help/version/show-capabilities, use colors only if output is a TTY
         // (respect piping convention: no colors unless --color=true)
         int is_tty = platform_isatty(fd);
@@ -152,7 +155,7 @@ bool terminal_should_color_output(int fd, terminal_options_t options) {
  */
 terminal_color_mode_t terminal_get_effective_color_mode(const terminal_options_t *options) {
   // If colors are disabled entirely by terminal_should_color_output(), return NONE
-  if (!options || !terminal_should_color_output(STDOUT_FILENO, *options)) {
+  if (!options || !terminal_should_color_output(STDOUT_FILENO, options)) {
     return TERM_COLOR_NONE;
   }
 

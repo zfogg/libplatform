@@ -585,7 +585,7 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
  *
  * @return Complete terminal capabilities structure
  */
-terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options) {
+terminal_capabilities_t detect_terminal_capabilities(const terminal_options_t *options) {
   terminal_capabilities_t caps = {0};
 
   // Get terminal type information
@@ -652,7 +652,7 @@ terminal_capabilities_t detect_terminal_capabilities(terminal_options_t options)
 
   // Determine render mode preference - default to foreground
   // Half-block mode should only be used when explicitly requested via --render-mode
-  caps.render_mode = options.render_mode;
+  caps.render_mode = options ? options->render_mode : RENDER_MODE_FOREGROUND;
 
   // Check if background colors are supported for potential future use
   if (caps.color_level >= TERM_COLOR_16) {
@@ -756,9 +756,9 @@ void test_terminal_output_modes(void) {
  * @param caps Original detected capabilities
  * @return Modified capabilities with overrides applied
  */
-terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, terminal_options_t options) {
+terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, const terminal_options_t *options) {
   // Check if stdout is a TTY - disable colors when piping unless --color=true.
-  if (!terminal_is_stdout_tty() && options.color != TERMINAL_COLOR_SETTING_TRUE) {
+  if (!terminal_is_stdout_tty() && (!options || options->color != TERMINAL_COLOR_SETTING_TRUE)) {
     caps.color_level = TERM_COLOR_NONE;
     caps.capabilities &= ~(uint32_t)(TERM_CAP_COLOR_16 | TERM_CAP_COLOR_256 | TERM_CAP_COLOR_TRUE);
     caps.color_count = 0;
@@ -768,8 +768,8 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
 #ifndef NDEBUG
   // In debug builds, force no-color mode for Claude Code (LLM doesn't need colors, saves tokens)
   // However, respect --color=true which explicitly forces colors ON
-  if (options.color_mode == TERM_COLOR_AUTO && platform_getenv("CLAUDECODE") &&
-      options.color != TERMINAL_COLOR_SETTING_TRUE) {
+  if (options && options->color_mode == TERM_COLOR_AUTO && platform_getenv("CLAUDECODE") &&
+      options->color != TERMINAL_COLOR_SETTING_TRUE) {
     caps.color_level = TERM_COLOR_NONE;
     caps.capabilities &= ~(uint32_t)(TERM_CAP_COLOR_16 | TERM_CAP_COLOR_256 | TERM_CAP_COLOR_TRUE);
     caps.color_count = 0;
@@ -778,10 +778,10 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
 #endif
 
   // Apply color mode override if specified in options (not auto mode)
-  if (options.color_mode != TERM_COLOR_AUTO) {
+  if (options && options->color_mode != TERM_COLOR_AUTO) {
     // Map terminal_color_mode_t to terminal_color_mode_t (enum values don't align)
     terminal_color_mode_t override_level;
-    switch (options.color_mode) {
+    switch (options->color_mode) {
     case TERM_COLOR_NONE:
       override_level = TERM_COLOR_NONE;
       break;
@@ -831,10 +831,10 @@ terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, 
 
   // Apply render mode from options (user can override via --render-mode)
   // The default render_mode is RENDER_MODE_FOREGROUND which is what we want
-  caps.render_mode = options.render_mode;
+  caps.render_mode = options ? options->render_mode : RENDER_MODE_FOREGROUND;
 
   // Set default FPS based on platform
-  int fps = options.fps;
+  int fps = options ? options->fps : 0;
   if (fps > 0) {
     caps.desired_fps = (uint8_t)(fps > 144 ? 144 : fps);
   } else {
