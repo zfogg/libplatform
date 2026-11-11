@@ -4,10 +4,9 @@
  * @ingroup platform
  */
 
-#include <libplatform/init.h>
 #include <ascii-chat/asciichat_errno.h>
 
-asciichat_error_t platform_init(void) {
+int platform_init(void) {
   // No special initialization needed for WASM
   return ASCIICHAT_OK;
 }

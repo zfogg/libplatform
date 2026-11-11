@@ -11,7 +11,7 @@ void backtrace_t_free(backtrace_t *bt) {
   // No-op - no resources to free in WASM
 }
 
-void backtrace_print(log_level_t level, const char *label, const backtrace_t *bt, int skip_frames, int max_frames,
+void backtrace_print(int level, const char *label, const backtrace_t *bt, int skip_frames, int max_frames,
                      backtrace_frame_filter_t filter) {
   (void)level;
   (void)label;
@@ -22,7 +22,7 @@ void backtrace_print(log_level_t level, const char *label, const backtrace_t *bt
   // No-op - backtraces not available in WASM
 }
 
-void backtrace_print_many(log_level_t level, const char *label, const backtrace_t *bts, int count) {
+void backtrace_print_many(int level, const char *label, const backtrace_t *bts, int count) {
   (void)level;
   (void)label;
   (void)bts;
