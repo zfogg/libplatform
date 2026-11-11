@@ -513,7 +513,6 @@ void debug_sync_print_state(void) {
         break;
       line = end + 1;
     }
-  } else {
   }
 
   free(buffer);
