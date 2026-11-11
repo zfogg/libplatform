@@ -74,7 +74,7 @@ extern "C" {
  * PLATFORM_THREAD_LOCAL bool g_in_callback = false;
  * @endcode
  *
- * @note Not compatible with dynamic TLS (ascii_tls_key_*). Use one or the other.
+ * @note Not compatible with dynamic TLS (platform_tls_*). Use one or the other.
  * @note Static thread-local storage is allocated at program start.
  * @note Initialization is zero/null, per language spec.
  *
@@ -310,7 +310,7 @@ int thread_create_or_fail(platform_thread_t *thread, void *(*func)(void *), void
  *
  * @ingroup platform
  */
-int ascii_tls_key_create(tls_key_t *key, void (*destructor)(void *));
+int platform_tls_key_create(tls_key_t *key, void (*destructor)(void *));
 
 /**
  * @brief Delete a thread-local storage key
@@ -322,7 +322,7 @@ int ascii_tls_key_create(tls_key_t *key, void (*destructor)(void *));
  *
  * @ingroup platform
  */
-int ascii_tls_key_delete(tls_key_t key);
+int platform_tls_key_delete(tls_key_t key);
 
 /**
  * @brief Get thread-local value for a key
@@ -334,7 +334,7 @@ int ascii_tls_key_delete(tls_key_t key);
  *
  * @ingroup platform
  */
-void *ascii_tls_get(tls_key_t key);
+void *platform_tls_get(tls_key_t key);
 
 /**
  * @brief Set thread-local value for a key
@@ -346,7 +346,7 @@ void *ascii_tls_get(tls_key_t key);
  *
  * @ingroup platform
  */
-int ascii_tls_set(tls_key_t key, void *value);
+int platform_tls_set(tls_key_t key, void *value);
 
 #ifdef __cplusplus
 }

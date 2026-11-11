@@ -1,4 +1,5 @@
 #include <libplatform/systemd.h>
+#include <libplatform/system.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -13,7 +14,8 @@ extern int sd_journal_send(const char *format, ...) __attribute__((weak));
 /** @brief Return whether systemd service-manager integration is available. */
 bool platform_systemd_is_managed(void) {
 #ifdef HAVE_LIBSYSTEMD
-  return sd_booted != NULL && sd_notify != NULL && (getenv("INVOCATION_ID") != NULL || getenv("NOTIFY_SOCKET") != NULL);
+  return sd_booted != NULL && sd_notify != NULL &&
+         (platform_getenv("INVOCATION_ID") != NULL || platform_getenv("NOTIFY_SOCKET") != NULL);
 #else
   return false;
 #endif

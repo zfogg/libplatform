@@ -337,14 +337,14 @@ int platform_validate_key_file_permissions(const char *key_path) {
  * @return Allocated string (must be freed by caller)
  */
 static char *get_xdg_config_home(void) {
-  const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+  const char *xdg_config_home = platform_getenv("XDG_CONFIG_HOME");
 
   if (xdg_config_home && xdg_config_home[0] != '\0') {
     return platform_strdup(xdg_config_home);
   }
 
   // Fallback: ~/.config
-  const char *home = getenv("HOME");
+  const char *home = platform_getenv("HOME");
   if (!home) {
     home = "/root";
   }
@@ -375,7 +375,7 @@ static int get_xdg_config_dirs(char ***dirs_out, size_t *count_out) {
   *dirs_out = NULL;
   *count_out = 0;
 
-  const char *xdg_config_dirs = getenv("XDG_CONFIG_DIRS");
+  const char *xdg_config_dirs = platform_getenv("XDG_CONFIG_DIRS");
   if (!xdg_config_dirs || xdg_config_dirs[0] == '\0') {
     xdg_config_dirs = "/etc/xdg"; // Default
   }
@@ -548,7 +548,7 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
 
 #ifndef __APPLE__
   // Linux: Check user Linuxbrew path (~/.linuxbrew/etc/application)
-  const char *home = getenv("HOME");
+  const char *home = platform_getenv("HOME");
   if (home && home[0] != '\0') {
     ret = snprintf(full_path, sizeof(full_path), "%s/.linuxbrew/etc/application/%s", home, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
@@ -804,7 +804,7 @@ bool check_binary_in_path_uncached(const char *bin_name) {
 
   strncpy(bin_with_suffix, bin_name, sizeof(bin_with_suffix));
 
-  const char *path_env = getenv("PATH");
+  const char *path_env = platform_getenv("PATH");
   if (!path_env) {
     return false;
   }

@@ -511,15 +511,15 @@ void config_file_list_destroy(config_file_list_t *list) {
 
 const char *platform_get_home_dir(void) {
   // Try USERPROFILE first
-  const char *userprofile = getenv("USERPROFILE");
+  const char *userprofile = platform_getenv("USERPROFILE");
   if (userprofile && userprofile[0] != '\0') {
     return userprofile;
   }
 
   // Fallback to HOMEDRIVE + HOMEPATH
   static char home_buffer[MAX_PATH];
-  const char *homedrive = getenv("HOMEDRIVE");
-  const char *homepath = getenv("HOMEPATH");
+  const char *homedrive = platform_getenv("HOMEDRIVE");
+  const char *homepath = platform_getenv("HOMEPATH");
   if (homedrive && homepath) {
     snprintf(home_buffer, sizeof(home_buffer), "%s%s", homedrive, homepath);
     return home_buffer;
@@ -530,7 +530,7 @@ const char *platform_get_home_dir(void) {
 
 char *platform_get_config_dir(void) {
   char appdata[MAX_PATH];
-  const char *config_home = getenv("APPDATA");
+  const char *config_home = platform_getenv("APPDATA");
   if (config_home && config_home[0] != '\0') {
     size_t len = strlen(config_home) + strlen("\\application\\") + 1;
     char *dir = malloc(len);
@@ -577,7 +577,7 @@ int platform_get_data_dir_candidates(const char *install_prefix, platform_direct
   list_out->candidates = NULL;
   list_out->count = 0;
 
-  const char *program_data = getenv("PROGRAMDATA");
+  const char *program_data = platform_getenv("PROGRAMDATA");
   if (!program_data || program_data[0] == '\0') {
     return 0;
   }
@@ -841,7 +841,7 @@ bool check_binary_in_path_uncached(const char *bin_name) {
     strncpy(bin_with_suffix, bin_name, sizeof(bin_with_suffix));
   }
 
-  const char *path_env = getenv("PATH");
+  const char *path_env = platform_getenv("PATH");
   if (!path_env) {
     return false;
   }

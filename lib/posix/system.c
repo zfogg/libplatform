@@ -57,9 +57,9 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
  */
 const char *get_username_env(void) {
   static char username[BUFFER_SIZE_SMALL];
-  const char *user = getenv("USER");
+  const char *user = platform_getenv("USER");
   if (!user) {
-    user = getenv("USERNAME");
+    user = platform_getenv("USERNAME");
   }
   if (user) {
     strncpy(username, user, sizeof(username) - 1);

@@ -39,9 +39,6 @@ int platform_prompt_question(const char *prompt, char *buffer, size_t max_len, p
       buffer[len] = '\0';
       return 0;
     }
-    if (length + 1 >= max_len)
-      return -1;
-    buffer[length++] = (char)ch;
   }
 
   // Check for non-interactive mode
@@ -99,4 +96,3 @@ bool platform_prompt_yes_no_timeout(const char *prompt, bool default_yes, unsign
   return default_yes;
 }
 
-#endif

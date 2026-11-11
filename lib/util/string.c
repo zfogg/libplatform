@@ -5,6 +5,7 @@
  */
 
 #include <libplatform/util/string.h>
+#include <libplatform/system.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
@@ -23,14 +24,14 @@ static bool g_platform_colors_env_checked;
 static void platform_color_read_environment(void) {
   if (g_platform_colors_env_checked) return;
   g_platform_colors_env_checked = true;
-  const char *enabled = getenv("LIBPLATFORM_COLOR");
+  const char *enabled = platform_getenv("LIBPLATFORM_COLOR");
   if (enabled && (!strcmp(enabled, "0") || !strcmp(enabled, "false") || !strcmp(enabled, "no")))
     g_platform_colors_enabled = false;
-  const char *error_code = getenv("LIBPLATFORM_COLOR_ERROR");
+  const char *error_code = platform_getenv("LIBPLATFORM_COLOR_ERROR");
   if (error_code) platform_color_set_code(PLATFORM_COLOR_ERROR, error_code);
-  const char *fatal_code = getenv("LIBPLATFORM_COLOR_FATAL");
+  const char *fatal_code = platform_getenv("LIBPLATFORM_COLOR_FATAL");
   if (fatal_code) platform_color_set_code(PLATFORM_COLOR_FATAL, fatal_code);
-  const char *warn_code = getenv("LIBPLATFORM_COLOR_WARN");
+  const char *warn_code = platform_getenv("LIBPLATFORM_COLOR_WARN");
   if (warn_code) platform_color_set_code(PLATFORM_COLOR_WARN, warn_code);
 }
 

@@ -66,6 +66,7 @@
 #endif
 
 #include <libplatform/symbols.h>
+#include <libplatform/system.h>
 
 
 static bool ascii_case_equal(const char *left, const char *right) {
@@ -269,7 +270,7 @@ static const char *get_llvm_symbolizer_command(void) {
 
   // Winner: do the initialization
   {
-    const char *env_path = getenv("LLVM_SYMBOLIZER_PATH");
+    const char *env_path = platform_getenv("LLVM_SYMBOLIZER_PATH");
     bool available = false;
 
     g_llvm_symbolizer_cmd[0] = '\0';
@@ -323,7 +324,7 @@ static const char *get_addr2line_command(void) {
 
   // Winner: do the initialization
   {
-    const char *env_path = getenv("ADDR2LINE_PATH");
+    const char *env_path = platform_getenv("ADDR2LINE_PATH");
     bool available = false;
 
     g_addr2line_cmd[0] = '\0';

@@ -2,10 +2,10 @@
 #include <stddef.h>
 #include <stdatomic.h>
 
-static libplatform_app_callbacks_t g_callbacks_storage;
-static _Atomic(const libplatform_app_callbacks_t *) g_callbacks;
+static platform_app_callbacks_t g_callbacks_storage;
+static _Atomic(const platform_app_callbacks_t *) g_callbacks;
 
-void libplatform_app_callbacks_register(const libplatform_app_callbacks_t *callbacks) {
+void platform_app_callbacks_register(const platform_app_callbacks_t *callbacks) {
   if (callbacks == NULL) {
     atomic_store_explicit(&g_callbacks, NULL, memory_order_release);
     return;
@@ -14,6 +14,6 @@ void libplatform_app_callbacks_register(const libplatform_app_callbacks_t *callb
   atomic_store_explicit(&g_callbacks, &g_callbacks_storage, memory_order_release);
 }
 
-const libplatform_app_callbacks_t *libplatform_app_callbacks_get(void) {
+const platform_app_callbacks_t *platform_app_callbacks_get(void) {
   return atomic_load_explicit(&g_callbacks, memory_order_acquire);
 }

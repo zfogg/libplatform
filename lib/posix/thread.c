@@ -288,7 +288,7 @@ void thread_init(platform_thread_t *thread) {
  * @param destructor Optional destructor function called when thread exits
  * @return 0 on success, non-zero on error
  */
-int ascii_tls_key_create(tls_key_t *key, void (*destructor)(void *)) {
+int platform_tls_key_create(tls_key_t *key, void (*destructor)(void *)) {
   return pthread_key_create(key, destructor);
 }
 
@@ -297,7 +297,7 @@ int ascii_tls_key_create(tls_key_t *key, void (*destructor)(void *)) {
  * @param key TLS key to delete
  * @return 0 on success, non-zero on error
  */
-int ascii_tls_key_delete(tls_key_t key) {
+int platform_tls_key_delete(tls_key_t key) {
   return pthread_key_delete(key);
 }
 
@@ -306,7 +306,7 @@ int ascii_tls_key_delete(tls_key_t key) {
  * @param key TLS key
  * @return Thread-local value, or NULL if not set
  */
-void *ascii_tls_get(tls_key_t key) {
+void *platform_tls_get(tls_key_t key) {
   return pthread_getspecific(key);
 }
 
@@ -316,7 +316,7 @@ void *ascii_tls_get(tls_key_t key) {
  * @param value Value to store
  * @return 0 on success, non-zero on error
  */
-int ascii_tls_set(tls_key_t key, void *value) {
+int platform_tls_set(tls_key_t key, void *value) {
   return pthread_setspecific(key, value);
 }
 

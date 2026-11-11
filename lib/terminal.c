@@ -6,6 +6,7 @@
 
 #include <libplatform/terminal.h>
 #include <libplatform/system.h>
+#include <libplatform/system.h>
 #ifndef _WIN32
 #include <unistd.h>
 #include <pthread.h>
@@ -352,9 +353,9 @@ bool terminal_input_trylock(void) { return pthread_mutex_trylock(&g_terminal_inp
 void terminal_input_unlock(void) { (void)pthread_mutex_unlock(&g_terminal_input_mutex); }
 
 bool terminal_supports_utf8(void) {
-  const char *locale = getenv("LC_ALL");
-  if (!locale || !*locale) locale = getenv("LC_CTYPE");
-  if (!locale || !*locale) locale = getenv("LANG");
+  const char *locale = platform_getenv("LC_ALL");
+  if (!locale || !*locale) locale = platform_getenv("LC_CTYPE");
+  if (!locale || !*locale) locale = platform_getenv("LANG");
   if (!locale || !*locale) return true;
 
   char normalized[64];

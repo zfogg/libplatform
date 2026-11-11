@@ -211,10 +211,24 @@ target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
 endif()
-set_target_properties(libplatform PROPERTIES
-  OUTPUT_NAME platform
-  WINDOWS_EXPORT_ALL_SYMBOLS ON
-)
+set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS OFF)
+if(WIN32 AND LIBPLATFORM_BUILD_SHARED)
+  find_program(LIBPLATFORM_NM llvm-nm REQUIRED)
+  set(_libplatform_objects "${CMAKE_CURRENT_BINARY_DIR}/libplatform-objects-$<CONFIG>.txt")
+  file(GENERATE OUTPUT "${_libplatform_objects}" CONTENT "$<JOIN:$<TARGET_OBJECTS:libplatform-objects>,\n>\n")
+  set(_libplatform_def "${CMAKE_CURRENT_BINARY_DIR}/platform.def")
+  add_custom_command(
+    OUTPUT "${_libplatform_def}"
+    COMMAND ${CMAKE_COMMAND} -DNM_TOOL=${LIBPLATFORM_NM}
+      -DOBJECT_LIST_FILE=${_libplatform_objects} -DOUTPUT_FILE=${_libplatform_def}
+      -DPUBLIC_INCLUDE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/include
+      -DLIBRARY_NAME=platform -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateDefFile.cmake"
+    DEPENDS libplatform-objects "${_libplatform_objects}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateDefFile.cmake"
+    VERBATIM)
+  add_custom_target(libplatform-def DEPENDS "${_libplatform_def}")
+  add_dependencies(libplatform libplatform-def)
+  target_link_options(libplatform PRIVATE "LINKER:/DEF:${_libplatform_def}")
+endif()
 if(WIN32)
   target_link_libraries(libplatform PUBLIC dbghelp)
 elseif(NOT EMSCRIPTEN)

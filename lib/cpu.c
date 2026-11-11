@@ -3,6 +3,7 @@
 #define PLATFORM_CPU_VALUE_BUFFER_SIZE 32
 
 #include <libplatform/cpu.h>
+#include <libplatform/system.h>
 #include <stdlib.h>
 
 #ifdef _WIN32
@@ -72,6 +73,6 @@ const char *platform_simd_override(void) {
   DWORD length = GetEnvironmentVariableA("ASCII_CHAT_SIMD", value, sizeof(value));
   return length >= sizeof(value) ? "invalid" : (length ? value : NULL);
 #else
-  return getenv("ASCII_CHAT_SIMD");
+  return platform_getenv("ASCII_CHAT_SIMD");
 #endif
 }
