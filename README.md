@@ -70,6 +70,48 @@ implementations behind it:
 - `include/libplatform/` is the public interface. The application should use
   this layer instead of reaching into one of the operating-system directories.
 
+## Header map
+
+The installed header tree is intentionally explicit. Every public header has
+one job:
+
+- `agent.h` finds SSH/GPG agents; `app_callbacks.h` defines the callback seam
+  for library-safe diagnostics; `compiler.h` carries compiler compatibility;
+  and `cpu.h` reports CPU features.
+- `atomic.h` provides portable atomic values and operations; `mutex.h`,
+  `rwlock.h`, `cond.h`, and `thread.h` provide synchronization and threads;
+  `named.h` gives long-lived objects stable names; and `lifecycle.h` handles
+  one-time initialization and shutdown.
+- `backtrace.h` captures and prints platform backtraces; `symbols.h` resolves
+  addresses and symbol names; `memory.h` is the allocation seam; and `errno.h`
+  provides the platform error boundary.
+- `debug/atomic.h` tracks atomic operations; `debug/backtrace.h` owns the
+  diagnostic backtrace workflow; `debug/coverage.h` exposes coverage hooks;
+  `debug/debug_helpers.h`, `debug/helpers.h`, `debug/errno.h`, and
+  `debug/stats.h` provide shared diagnostic state; and `debug/memory.h`,
+  `debug/mutex.h`, `debug/named.h`, and `debug/sync.h` provide allocation,
+  lock, registry, and synchronization reports.
+- `filesystem.h` handles files, directories, paths, and installation data;
+  `mmap.h` handles mapped files; `pipe.h` and `wakeup.h` handle worker
+  communication; and `process.h` handles process titles and subprocesses.
+- `socket.h` abstracts network sockets; `signal.h` handles signals;
+  `system.h` and `systemd.h` cover operating-system services; `time.h` covers
+  clocks and deadlines; and `windows_compat.h` holds Windows compatibility
+  definitions.
+- `terminal.h` detects terminal capabilities and controls terminal behavior;
+  `keyboard.h` handles keyboard input and line editing; `question.h` handles
+  interactive prompts; `clipboard.h` handles clipboard reads; and `font.h`
+  provides the embedded-font registry.
+- `windows/getopt.h` supplies Windows getopt compatibility and
+  `windows/system.h` supplies Windows system details. `posix/system.h` is the
+  POSIX system boundary. `uthash.h` is the vendored hash dependency used by
+  the library's hash-backed registries.
+
+The utility headers (`format.h`, `ip.h`, `path.h`, `string.h`, and `utf8.h`)
+live under `lib/util/` and are private implementation headers. They are not
+installed as consumer-facing API; applications should use their own utility
+headers and the public libplatform APIs above.
+
 The common files own the contracts and the platform files provide the actual
 behavior. That makes the differences visible in the implementation without
 making every caller know about them.
@@ -257,10 +299,10 @@ eventually needs:
   recursive mkdir, temporary files, file streams, read/write/close/unlink,
   executable and temp-directory discovery, application config/data locations,
   and directory iteration.
-- `util/path.h`, `util/string.h`, `util/format.h`, `util/ip.h`, and
-  `util/utf8.h` provide portable path, string, formatting, IP-address, and
-  Unicode helpers. `platform_vasprintf()` and `platform_asprintf()` give
-  code a consistent allocation and formatting path.
+- The private `lib/util/` layer provides path, string, formatting, IP-address,
+  and Unicode helpers used internally. Public callers reach formatting and
+  allocation behavior through the platform APIs rather than including those
+  implementation headers.
 - `socket.h` provides socket initialization/cleanup, creation, bind/listen/
   accept/connect, send/receive, polling/select, socket options, blocking and
   timeout behavior, address helpers, error classification, and streaming
