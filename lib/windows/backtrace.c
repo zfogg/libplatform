@@ -26,7 +26,6 @@ static SRWLOCK g_dbghelp_lock = SRWLOCK_INIT;
 static bool symbol_has_details(const char *symbol) {
   return symbol && (strstr(symbol, "()") != NULL || strstr(symbol, "(unknown function)") != NULL);
 }
-
 static const char *module_name_for_address(HANDLE process, DWORD64 address, char *module_name,
                                            size_t module_name_size) {
   DWORD64 module_base = SymGetModuleBase64(process, address);
@@ -238,4 +237,5 @@ void platform_backtrace_symbols_destroy(char **strings) {
   // Free the array itself
   free(strings);
 }
+
 
