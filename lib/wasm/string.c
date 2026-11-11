@@ -105,3 +105,11 @@ int platform_strcpy(char *dest, size_t dest_size, const char *src) {
   dest[dest_size - 1] = '\0';
   return ASCIICHAT_OK;
 }
+
+int platform_strncpy(char *dest, size_t dest_size, const char *src, size_t count) {
+  if (!dest || !src || dest_size == 0 || count >= dest_size)
+    return ERROR_INVALID_PARAM;
+  memcpy(dest, src, count);
+  dest[count] = '\0';
+  return ASCIICHAT_OK;
+}
