@@ -1,10 +1,5 @@
 
-/* Storage capacities in elements; text buffers include the terminating NUL. */
-#define PLATFORM_CPU_VALUE_BUFFER_SIZE 32
-
 #include <libplatform/cpu.h>
-#include <libplatform/system.h>
-#include <stdlib.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -67,12 +62,3 @@ uint32_t platform_cpu_features(void) {
   return features;
 }
 
-const char *platform_simd_override(void) {
-#ifdef _WIN32
-  static _Thread_local char value[PLATFORM_CPU_VALUE_BUFFER_SIZE];
-  DWORD length = GetEnvironmentVariableA("ASCII_CHAT_SIMD", value, sizeof(value));
-  return length >= sizeof(value) ? "invalid" : (length ? value : NULL);
-#else
-  return platform_getenv("ASCII_CHAT_SIMD");
-#endif
-}

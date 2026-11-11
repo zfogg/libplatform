@@ -13,5 +13,3 @@ enum {
 };
 
 uint32_t platform_cpu_features(void);
-/** Optional diagnostic backend preference from ASCII_CHAT_SIMD (set before startup). */
-const char *platform_simd_override(void);
