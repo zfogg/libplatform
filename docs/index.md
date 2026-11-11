@@ -24,56 +24,6 @@ documentation and the code do not quietly drift apart.
 api
 ```
 
-## What it gives you
-
-There is a common layer for the things every native application eventually
-needs:
-
-- `thread.h`, `mutex.h`, `rwlock.h`, and `cond.h` provide portable thread and
-  synchronization primitives.
-- `atomic.h` provides the small atomic operations that need to be shared by
-  code which cannot depend on a platform-specific spelling.
-- `socket.h`, `pipe.h`, `wakeup.h`, and `clipboard.h` cover communication and
-  desktop integration boundaries.
-- `filesystem.h`, `mmap.h`, `path.h`, `process.h`, `system.h`, and `systemd.h`
-  keep files, processes, installation paths, and service integration in one
-  place.
-- `terminal.h`, `keyboard.h`, `font.h`, and `question.h` provide the terminal
-  and console behavior that tends to vary most visibly between platforms.
-- `time.h`, `cpu.h`, `compiler.h`, `windows_compat.h`, and the utility headers
-  make the boring portability details predictable.
-- `named.h` gives synchronization objects stable names when an application or
-  its debugger needs to identify them.
-
-The implementation is selected by the platform at build time. The public API
-stays the same whether the implementation underneath is POSIX, Windows,
-Apple, or the WebAssembly target.
-
-## Debugging that can live in a library
-
-The debug headers are designed to be useful to a library, not only to one
-particular executable. Applications provide callbacks through
-`app_callbacks.h`; libplatform does not need to know how an application's
-logger, allocator report, or terminal UI is wired.
-
-The synchronization debugger can track mutexes, read/write locks, condition
-variables, and the atomic activity around them. In debug builds it can report
-the number of lock, unlock, wait, signal, and broadcast actions, along with
-time spent waiting. That turns “it is stuck somewhere” into a report that says
-which primitive is hot and which thread is waiting on it.
-
-The memory tools track allocations and frees for the parts of an application
-that opt into them. The report includes outstanding allocations and their
-captured call sites. An application can keep application-specific, colored
-memory-report presentation in its own code while still using libplatform's
-portable tracking machinery.
-
-Backtrace support captures and prints call stacks on the supported operating
-systems. Symbolization uses the host platform's facilities and may need a
-symbolizer such as LLVM's tools on `PATH`. The callbacks make it possible for
-the host application to decide whether a backtrace goes to a logger, a test
-report, or a diagnostic screen.
-
 ## A normal way to use it
 
 Link libplatform, include the public headers with the `libplatform/...` path,
@@ -147,3 +97,28 @@ libplatform is meant to be the place you start instead.
 - `debug/named.h` — reports the named-object registry and metadata.
 - `debug/stats.h` — schedules and triggers debug report threads.
 - `debug/sync.h` — reports mutex, rwlock, condition-variable, and atomic state.
+
+## Debugging that can live in a library
+
+The debug headers are designed to be useful to a library, not only to one
+particular executable. Applications provide callbacks through
+`app_callbacks.h`; libplatform does not need to know how an application's
+logger, allocator report, or terminal UI is wired.
+
+The synchronization debugger can track mutexes, read/write locks, condition
+variables, and the atomic activity around them. In debug builds it can report
+the number of lock, unlock, wait, signal, and broadcast actions, along with
+time spent waiting. That turns “it is stuck somewhere” into a report that says
+which primitive is hot and which thread is waiting on it.
+
+The memory tools track allocations and frees for the parts of an application
+that opt into them. The report includes outstanding allocations and their
+captured call sites. An application can keep application-specific, colored
+memory-report presentation in its own code while still using libplatform's
+portable tracking machinery.
+
+Backtrace support captures and prints call stacks on the supported operating
+systems. Symbolization uses the host platform's facilities and may need a
+symbolizer such as LLVM's tools on `PATH`. The callbacks make it possible for
+the host application to decide whether a backtrace goes to a logger, a test
+report, or a diagnostic screen.

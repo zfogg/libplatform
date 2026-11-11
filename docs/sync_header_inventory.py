@@ -17,8 +17,13 @@ def main() -> None:
     index = DOCS_INDEX.read_text(encoding="utf-8")
     marker = "## Header map"
     index_start = index.index(marker)
+    index_end = index.index("## Debugging that can live in a library", index_start)
+    suffix = index[index_end:]
+    legacy_start = suffix.find("\n- `agent.h`")
+    if legacy_start >= 0:
+        suffix = suffix[:legacy_start]
     DOCS_INDEX.write_text(
-        index[:index_start] + marker + "\n\n" + inventory + "\n",
+        index[:index_start] + marker + "\n\n" + inventory + "\n\n" + suffix.lstrip("\n"),
         encoding="utf-8",
     )
 
