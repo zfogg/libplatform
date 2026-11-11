@@ -145,7 +145,7 @@ elseif(APPLE)
     lib/macos/system.c
     lib/macos/font.c
   )
-elseif(UNIX AND NOT APPLE)
+elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_sources(libplatform-objects PRIVATE
     lib/keyboard.c
     lib/posix/thread.c

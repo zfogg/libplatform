@@ -4,9 +4,8 @@
  * @ingroup platform
  */
 
-#include <libplatform/abstraction.h>
 #include <libplatform/filesystem.h>
-#include <libplatform/wasm_console.h>
+#include <ascii-chat/os/wasm_console.h>
 #include <ascii-chat/debug/named.h>
 #include <ascii-chat/log/log.h>
 #include <ascii-chat/asciichat_errno.h>
@@ -35,13 +34,13 @@ FILE *platform_tmpfile(void) {
   return tmpfile();
 }
 
-asciichat_error_t platform_mkdir_recursive(const char *path, int mode) {
+int platform_mkdir_recursive(const char *path, int mode) {
   (void)path;
   (void)mode;
   return ERROR_PLATFORM_INIT; // Not implemented for WASM
 }
 
-asciichat_error_t platform_find_config_file(const char *filename, config_file_list_t *list_out) {
+int platform_find_config_file(const char *filename, config_file_list_t *list_out) {
   (void)filename;
   if (list_out) {
     list_out->files = NULL;
@@ -104,7 +103,8 @@ char *platform_get_data_dir(void) {
   return NULL; // No data directory in WASM
 }
 
-asciichat_error_t platform_get_data_dir_candidates(platform_directory_list_t *list_out) {
+int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
+  (void)install_prefix;
   if (!list_out) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "list_out cannot be NULL");
   }

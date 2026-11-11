@@ -5,29 +5,37 @@
  */
 
 #include <libplatform/terminal.h>
-#include <libplatform/abstraction.h>
 #include <ascii-chat/debug/backtrace.h>
 #include <ascii-chat/asciichat_errno.h>
 #include <time.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <libplatform/filesystem.h>
+#include <libplatform/keyboard.h>
+
+void platform_backtrace_print(int skip_frames, void (*write_line)(const char *, void *), void *context) {
+  (void)skip_frames;
+  (void)write_line;
+  (void)context;
+}
+
+void platform_directory_list_destroy(platform_directory_list_t *list) {
+  if (list) {
+    list->candidates = NULL;
+    list->count = 0;
+  }
+}
+
+keyboard_line_edit_result_t keyboard_read_line_interactive(keyboard_line_edit_opts_t *opts) {
+  (void)opts;
+  return LINE_EDIT_NO_INPUT;
+}
 
 // Backtrace stubs (not supported in WASM)
 int platform_backtrace(void **buffer, int size) {
   (void)buffer;
   (void)size;
   return 0; // No backtrace support in WASM
-}
-
-char **platform_backtrace_symbols(void *const *buffer, int size) {
-  (void)buffer;
-  (void)size;
-  return NULL; // No backtrace symbols in WASM
-}
-
-void platform_backtrace_symbols_destroy(char **symbols) {
-  (void)symbols;
-  // No-op
 }
 
 void platform_print_backtrace_symbols(const char *label, char **symbols, int count, int skip_frames, int max_frames,
@@ -47,7 +55,7 @@ void platform_print_backtrace(int skip_frames) {
 }
 
 // Localtime stub
-asciichat_error_t platform_localtime(const time_t *timer, struct tm *result) {
+int platform_localtime(const time_t *timer, struct tm *result) {
   if (!timer || !result) {
     return ERROR_INVALID_PARAM;
   }

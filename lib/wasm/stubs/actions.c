@@ -4,8 +4,8 @@
  * @ingroup platform
  */
 
-#include <ascii-chat/options/actions.h>
 #include <ascii-chat/asciichat_errno.h>
+#include <ascii-chat/options/actions.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -59,7 +59,7 @@ void action_check_update_immediate(void) {
 }
 
 // Additional platform stubs
-asciichat_error_t platform_enable_keepawake(void) {
+int platform_enable_keepawake(void) {
   return ASCIICHAT_OK; // No-op in browser (browser manages power)
 }
 

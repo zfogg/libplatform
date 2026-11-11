@@ -4,7 +4,6 @@
  * @ingroup platform
  */
 
-#include <libplatform/abstraction.h>
 #include <ascii-chat/asciichat_errno.h>
 #include <string.h>
 #include <stddef.h>
@@ -59,7 +58,7 @@ char *platform_strdup(const char *s) {
   return strdup(s);
 }
 
-asciichat_error_t platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
+int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
   if (!dest || !src) {
     return ERROR_INVALID_PARAM;
   }
@@ -70,7 +69,7 @@ asciichat_error_t platform_memcpy(void *dest, size_t dest_size, const void *src,
   return ASCIICHAT_OK;
 }
 
-asciichat_error_t platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
+int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
   if (!dest) {
     return ERROR_INVALID_PARAM;
   }
@@ -89,7 +88,7 @@ int platform_strncasecmp(const char *s1, const char *s2, size_t n) {
   return strncasecmp(s1, s2, n);
 }
 
-asciichat_error_t platform_strcpy(char *dest, size_t dest_size, const char *src) {
+int platform_strcpy(char *dest, size_t dest_size, const char *src) {
   if (!dest || !src) {
     return ERROR_INVALID_PARAM;
   }

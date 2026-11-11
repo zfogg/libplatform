@@ -7,8 +7,7 @@
 /* Storage capacities in elements; text buffers include the terminating NUL. */
 #define PLATFORM_WASM_TERMINAL_BUF_BUFFER_SIZE 32
 
-#include <ascii-chat/platform/abstraction.h>
-#include <ascii-chat/platform/terminal.h>
+#include <libplatform/terminal.h>
 #include <ascii-chat/asciichat_errno.h>
 #include <ascii-chat/common/limits.h>
 #include <ascii-chat/options/options.h>
@@ -68,25 +67,29 @@ int platform_get_terminal_size(int *cols, int *rows) {
   return 0;
 }
 
-asciichat_error_t terminal_get_size_fd(int fd, terminal_size_t *size) {
+int terminal_get_size_fd(int fd, terminal_size_t *size) {
   (void)fd;
   return terminal_get_size(size);
 }
 
-asciichat_error_t terminal_get_size(terminal_size_t *size) {
+int terminal_get_size(terminal_size_t *size) {
   (void)size;
   return SET_ERRNO(ERROR_NOT_SUPPORTED, "Terminal operations not supported in WASM");
 }
 
-asciichat_error_t terminal_cursor_hide(void) {
+int terminal_cursor_hide(void) {
   return ASCIICHAT_OK;
 }
 
-asciichat_error_t terminal_cursor_show(void) {
+int terminal_cursor_show(void) {
   return ASCIICHAT_OK;
 }
 
-unsigned short int terminal_get_effective_width(void) {
+unsigned short int terminal_get_effective_width(int width_option, unsigned short fallback_width) {
+  (void)fallback_width;
+  if (width_option > 0) {
+    return (unsigned short int)width_option;
+  }
   int width = GET_OPTION(width);
   if (width > 0) {
     return (unsigned short int)width;
@@ -94,7 +97,11 @@ unsigned short int terminal_get_effective_width(void) {
   return OPT_WIDTH_DEFAULT;
 }
 
-unsigned short int terminal_get_effective_height(void) {
+unsigned short int terminal_get_effective_height(int height_option, unsigned short fallback_height) {
+  (void)fallback_height;
+  if (height_option > 0) {
+    return (unsigned short int)height_option;
+  }
   int height = GET_OPTION(height);
   if (height > 0) {
     return (unsigned short int)height;
@@ -140,7 +147,7 @@ int platform_set_cursor_position(int row, int col) {
 }
 
 // get_terminal_size wrapper
-asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short int *height) {
+int get_terminal_size(unsigned short int *width, unsigned short int *height) {
   if (!width || !height) {
     return ERROR_INVALID_PARAM;
   }
@@ -154,7 +161,8 @@ asciichat_error_t get_terminal_size(unsigned short int *width, unsigned short in
 }
 
 // Terminal UTF-8 support detection
-bool terminal_should_use_utf8(void) {
+bool terminal_should_use_utf8(terminal_utf8_setting_t user_setting) {
+  (void)user_setting;
   return GET_OPTION(force_utf8) != UTF8_SETTING_FALSE;
 }
 
@@ -202,7 +210,8 @@ bool terminal_should_force_stderr(void) {
   return false; // Don't force stderr in WASM
 }
 
-bool terminal_can_prompt_user(void) {
+bool terminal_can_prompt_user(bool user_setting) {
+  (void)user_setting;
   return false; // Cannot prompt in WASM
 }
 
@@ -212,7 +221,7 @@ bool terminal_has_dark_background(void) {
 }
 
 // Terminal flush stub
-asciichat_error_t terminal_flush(int fd) {
+int terminal_flush(int fd) {
   (void)fd;
   return ASCIICHAT_OK;
 }
@@ -257,7 +266,16 @@ bool terminal_query_background_color(uint8_t *bg_r, uint8_t *bg_g, uint8_t *bg_b
 #include <unistd.h>
 #include <stdio.h>
 
-asciichat_error_t terminal_set_echo(bool enabled) {
+void detect_terminal_capabilities_into(const terminal_options_t *options, terminal_capabilities_t *out) {
+  if (out) *out = detect_terminal_capabilities(options);
+}
+
+void apply_color_mode_override_into(const terminal_capabilities_t *caps, const terminal_options_t *options,
+                                    terminal_capabilities_t *out) {
+  if (caps && out) *out = apply_color_mode_override(*caps, options);
+}
+
+int terminal_set_echo(bool enabled) {
   // Send ANSI escape sequence for echo control (xterm ignores but passes through)
   if (!enabled) {
     write(STDOUT_FILENO, "\033[?25l", 6); // Hide cursor
@@ -267,25 +285,26 @@ asciichat_error_t terminal_set_echo(bool enabled) {
   return ASCIICHAT_OK;
 }
 
-bool terminal_should_use_control_sequences(int fd) {
+bool terminal_should_use_control_sequences(int fd, bool user_setting) {
   (void)fd;
+  (void)user_setting;
   return true; // Always use ANSI sequences in browser
 }
 
-asciichat_error_t terminal_clear_screen(void) {
+int terminal_clear_screen(void) {
   // Send ANSI clear screen escape sequence
   write(STDOUT_FILENO, "\033[2J", 4);
   return ASCIICHAT_OK;
 }
 
-asciichat_error_t terminal_cursor_home(int fd) {
+int terminal_cursor_home(int fd) {
   (void)fd;
   // Send ANSI cursor home escape sequence
   write(STDOUT_FILENO, "\033[H", 3);
   return ASCIICHAT_OK;
 }
 
-asciichat_error_t terminal_move_cursor_relative(int offset) {
+int terminal_move_cursor_relative(int offset) {
   if (offset == 0) {
     return ASCIICHAT_OK;
   }
