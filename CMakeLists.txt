@@ -145,6 +145,11 @@ elseif(APPLE)
     lib/macos/system.c
     lib/macos/font.c
   )
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_sources(libplatform-objects PRIVATE
+      lib/ios/lws_spawn_stub.c
+    )
+  endif()
 elseif(UNIX AND NOT APPLE)
   target_sources(libplatform-objects PRIVATE
     lib/keyboard.c
