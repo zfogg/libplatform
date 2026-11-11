@@ -50,14 +50,15 @@ LeaveCriticalSection(&lock);
 DeleteCriticalSection(&lock);
 WSACleanup();
 #elif defined(__APPLE__)
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+#include <os/lock.h>
+os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
 int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-pthread_mutex_lock(&lock);
+os_unfair_lock_lock(&lock);
 connect(socket_fd, (const struct sockaddr *)&address, sizeof(address));
 close(socket_fd);
-pthread_mutex_unlock(&lock);
-pthread_mutex_destroy(&lock);
+os_unfair_lock_unlock(&lock);
 #else /* Linux and other POSIX targets */
+#include <pthread.h>
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 pthread_mutex_lock(&lock);
