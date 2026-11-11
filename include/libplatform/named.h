@@ -21,6 +21,7 @@
  *
  * USAGE EXAMPLES:
  * ===============
+ * @code
  * // Pointer-based (for heap objects, structs)
  * ringbuffer_t *rb = ringbuffer_create(...);
  * NAMED_REGISTER(rb, "recv_audio");       // auto name: "recv_audio.3"
@@ -38,6 +39,7 @@
  * // Describing in logs
  * log_info("Data received on %s", NAME_DESCRIBE_SOCKET(fd));
  * // Output: "socket: client_socket.2 (0x8)"
+ * @endcode
  *
  * @author Zachary Fogg <me@zfo.gg>
  * @date February 2026
