@@ -77,11 +77,65 @@ code {
 }
 
 pre {
-  background: #3c3943;
-  color: #f8edf8;
-  border: 1px solid #57505f;
+  background: #edf5f7;
+  color: #293842;
+  border: 1px solid #b8cbd2;
   border-radius: 7px;
   padding: 1rem;
+}
+
+/* Hawkmoth/Pygments C blocks use the same ``pre`` element as examples. Keep
+ * them distinctly light so syntax colors remain readable against the site. */
+div.highlight,
+div.highlight pre {
+  background: #edf5f7 !important;
+  color: #293842 !important;
+  border-color: #b8cbd2;
+}
+
+div.highlight pre {
+  text-shadow: none;
+}
+
+div.highlight .c,
+div.highlight .ch,
+div.highlight .cm,
+div.highlight .c1,
+div.highlight .cs {
+  color: #607782;
+}
+
+div.highlight .k,
+div.highlight .kc,
+div.highlight .kd,
+div.highlight .kn,
+div.highlight .kp,
+div.highlight .kr,
+div.highlight .kt {
+  color: #7b3f82;
+  font-weight: 600;
+}
+
+div.highlight .nf,
+div.highlight .nb,
+div.highlight .nc,
+div.highlight .nd {
+  color: #1e6378;
+}
+
+div.highlight .s,
+div.highlight .sa,
+div.highlight .sb,
+div.highlight .sc,
+div.highlight .s1,
+div.highlight .s2 {
+  color: #9b4c62;
+}
+
+div.highlight .m,
+div.highlight .mi,
+div.highlight .mf {
+  color: #8a5a20;
 }
 
 div.admonition,
