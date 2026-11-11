@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 static bool g_platform_colors_enabled = true;
+static bool g_platform_truecolor_supported = true;
 static char g_platform_color_codes[PLATFORM_COLOR_COUNT][24] = {
     "\033[90m", "\033[1;31m", "\033[36m", "\033[32m",
     "\033[31m", "\033[33m", "\033[35m", "\033[0m"};
@@ -32,6 +33,7 @@ static void platform_color_read_environment(void) {
 }
 
 void platform_color_set_enabled(bool enabled) { g_platform_colors_enabled = enabled; }
+void platform_color_set_truecolor_supported(bool supported) { g_platform_truecolor_supported = supported; }
 
 void platform_color_set_code(platform_color_t color, const char *ansi_code) {
   if (color < 0 || color >= PLATFORM_COLOR_COUNT || !ansi_code) return;
@@ -41,7 +43,9 @@ void platform_color_set_code(platform_color_t color, const char *ansi_code) {
 const char *platform_colored_string(bool enabled, platform_color_t color, const char *text) {
   if (!text) return "";
   platform_color_read_environment();
-  if (!enabled || !g_platform_colors_enabled || color < 0 || color >= PLATFORM_COLOR_COUNT) return text;
+  if (!enabled || !g_platform_colors_enabled || !g_platform_truecolor_supported || color < 0 ||
+      color >= PLATFORM_COLOR_COUNT)
+    return text;
   char *buffer = g_platform_colored_buffers[g_platform_colored_buffer_index++ % 4];
   (void)snprintf(buffer, sizeof(g_platform_colored_buffers[0]), "%s%s%s", g_platform_color_codes[color], text,
                  g_platform_color_codes[PLATFORM_COLOR_RESET]);

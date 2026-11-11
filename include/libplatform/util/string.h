@@ -33,6 +33,8 @@ typedef enum platform_color {
 
 /** Configure the process-wide default used by platform_colored_string(). */
 void platform_color_set_enabled(bool enabled);
+/** Tell platform formatting whether the active terminal supports truecolor. */
+void platform_color_set_truecolor_supported(bool supported);
 /** Override one ANSI sequence. The string is copied by the library. */
 void platform_color_set_code(platform_color_t color, const char *ansi_code);
 /** Apply a configured color when enabled is true; otherwise return plain text. */
