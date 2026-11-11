@@ -834,6 +834,7 @@ typedef struct {
  * @ingroup platform_terminal
  */
 terminal_capabilities_t detect_terminal_capabilities(const terminal_options_t *options);
+void detect_terminal_capabilities_into(const terminal_options_t *options, terminal_capabilities_t *out);
 
 /**
  * @brief Get current TTY information
@@ -947,6 +948,8 @@ void test_terminal_output_modes(void);
  * @ingroup platform_terminal
  */
 terminal_capabilities_t apply_color_mode_override(terminal_capabilities_t caps, const terminal_options_t *options);
+void apply_color_mode_override_into(const terminal_capabilities_t *caps, const terminal_options_t *options,
+                                    terminal_capabilities_t *out);
 
 /**
  * @brief Determine if color output should be used

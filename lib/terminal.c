@@ -5,6 +5,19 @@
  */
 
 #include <libplatform/terminal.h>
+
+void detect_terminal_capabilities_into(const terminal_options_t *options, terminal_capabilities_t *out) {
+  if (out) {
+    *out = detect_terminal_capabilities(options);
+  }
+}
+
+void apply_color_mode_override_into(const terminal_capabilities_t *caps, const terminal_options_t *options,
+                                    terminal_capabilities_t *out) {
+  if (caps && out) {
+    *out = apply_color_mode_override(*caps, options);
+  }
+}
 #include <libplatform/system.h>
 #include <libplatform/system.h>
 #ifndef _WIN32
