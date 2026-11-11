@@ -14,7 +14,7 @@
 static bool g_platform_colors_enabled = true;
 static bool g_platform_truecolor_supported = true;
 static char g_platform_color_codes[PLATFORM_COLOR_COUNT][24] = {
-    "\033[90m", "\033[1;31m", "\033[36m", "\033[32m",
+    "\033[90m", "\033[1;35m", "\033[36m", "\033[32m",
     "\033[31m", "\033[33m", "\033[35m", "\033[0m"};
 static _Thread_local char g_platform_colored_buffers[4][512];
 static _Thread_local unsigned g_platform_colored_buffer_index;
@@ -28,6 +28,8 @@ static void platform_color_read_environment(void) {
     g_platform_colors_enabled = false;
   const char *error_code = getenv("LIBPLATFORM_COLOR_ERROR");
   if (error_code) platform_color_set_code(PLATFORM_COLOR_ERROR, error_code);
+  const char *fatal_code = getenv("LIBPLATFORM_COLOR_FATAL");
+  if (fatal_code) platform_color_set_code(PLATFORM_COLOR_FATAL, fatal_code);
   const char *warn_code = getenv("LIBPLATFORM_COLOR_WARN");
   if (warn_code) platform_color_set_code(PLATFORM_COLOR_WARN, warn_code);
 }
