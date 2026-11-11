@@ -800,8 +800,8 @@ static void cond_deadlock_check_snapshot(const cond_deadlock_snapshot_t *cond, c
   char cond_buf[DEBUG_MUTEX_COND_BUFFER_SIZE] = {0};
   int cond_written =
       snprintf(cond_buf, sizeof(cond_buf),
-                    "Stuck cond '%s': %lu thread(s) waiting %s with no signal (most recent waiter: 0x%lx)\n", name,
-                    cond->waiting_count, stuck_str, (unsigned long)cond->last_waiting_key);
+                    "Stuck cond '%s': %llu thread(s) waiting %s with no signal (most recent waiter: 0x%lx)\n", name,
+                    (unsigned long long)cond->waiting_count, stuck_str, (unsigned long)cond->last_waiting_key);
 
   cond_written +=
       snprintf(cond_buf + cond_written, sizeof(cond_buf) - cond_written, "  wait entered at %s:%d %s()\n",

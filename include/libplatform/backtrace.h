@@ -12,7 +12,7 @@ extern "C" {
 int platform_backtrace_capture(void **frames, int capacity);
 
 /* Returns one heap-allocated, human-readable string per frame plus a NULL terminator. */
-char **platform_backtrace_symbols(void *const *frames, int count);
+char **platform_backtrace_symbols(void *const *frames, int count, const char *const *owned_dirs);
 void platform_backtrace_symbols_destroy(char **symbols);
 
 /* Optional application-owned output hook; the library never logs or writes output itself. */

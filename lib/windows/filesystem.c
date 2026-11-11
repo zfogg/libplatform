@@ -185,7 +185,6 @@ return ERROR_FILE_NOT_FOUND;
 
 int platform_is_regular_file(const char *path) {
   if (!path) {
-    -1;
     return 0;
   }
 
@@ -199,7 +198,6 @@ int platform_is_regular_file(const char *path) {
 
 int platform_is_directory(const char *path) {
   if (!path) {
-    -1;
     return 0;
   }
 
@@ -490,7 +488,6 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
 
 void config_file_list_destroy(config_file_list_t *list) {
   if (!list) {
-    -1;
     return;
   }
 
@@ -763,17 +760,14 @@ int platform_path_normalize(const char *input, char *output, size_t output_size)
 
 bool platform_get_executable_path(char *exe_path, size_t path_size) {
   if (!exe_path || path_size == 0) {
-    -1;
     return false;
   }
 
   DWORD len = GetModuleFileNameA(NULL, exe_path, (DWORD)path_size);
   if (len == 0) {
-    -1;
     return false;
   }
   if (len >= path_size) {
-    -1;
     return false;
   }
   return true;

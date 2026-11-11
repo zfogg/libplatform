@@ -107,17 +107,39 @@ static bool source_path_is_absolute(const char *path) {
 }
 
 int symbol_format_source_path(const char *module_name, const char *source_path, char *output,
-                                            size_t output_size, bool *external) {
+                                            size_t output_size, bool *external, const char *const *owned_dirs) {
   if (!output || output_size == 0 || !external) {
     return EINVAL;
   }
 
   const char *path = source_path ? source_path : "unknown";
+  if (!owned_dirs) {
+    *external = source_path_is_absolute(path);
+    size_t required_size = strlen(path) + 1;
+    if (required_size > output_size) {
+      return EOVERFLOW;
+    }
+    memcpy(output, path, required_size);
+    return 0;
+  }
   const char *project_relative = extract_project_relative_path(path);
-  // Source files in this checkout also belong to test and tooling executables.
-  *external = project_relative == path || source_path_is_absolute(path);
-  const char *display_path = *external ? path_last_components(path, 5) : project_relative;
-  bool truncated = *external && display_path != path;
+  const char *owned_prefix = NULL;
+  size_t owned_prefix_length = 0;
+  if (owned_dirs) {
+    for (size_t i = 0; owned_dirs[i]; i++) {
+      size_t prefix_length = strlen(owned_dirs[i]);
+      if (prefix_length > owned_prefix_length && strncmp(path, owned_dirs[i], prefix_length) == 0 &&
+          (path[prefix_length] == '/' || path[prefix_length] == '\\')) {
+        owned_prefix = owned_dirs[i];
+        owned_prefix_length = prefix_length;
+      }
+    }
+  }
+  *external = project_relative == path ||
+              (owned_prefix && owned_dirs && owned_prefix != owned_dirs[0] && source_path_is_absolute(path));
+  const char *display_path = owned_prefix ? path + owned_prefix_length + 1
+                                          : (*external ? path_last_components(path, 5) : project_relative);
+  bool truncated = *external && display_path != path && !owned_prefix;
   size_t prefix_size = truncated ? 4 : 0; // Ellipsis plus the omitted path separator.
   size_t required_size = prefix_size + strlen(display_path) + 1;
   if (required_size > output_size) {
@@ -277,8 +299,8 @@ static const char *get_llvm_symbolizer_command(void) {
 
     if (env_path && env_path[0] != '\0') {
       if (symbolizer_path_is_executable(env_path)) {
-        strncpy(g_llvm_symbolizer_cmd, env_path, sizeof(g_llvm_symbolizer_cmd));
-        available = true;
+        available = platform_strncpy(g_llvm_symbolizer_cmd, sizeof(g_llvm_symbolizer_cmd), env_path,
+                                     sizeof(g_llvm_symbolizer_cmd) - 1) == 0;
   (void)0;
       } else {
   (void)0;
@@ -331,8 +353,8 @@ static const char *get_addr2line_command(void) {
 
     if (env_path && env_path[0] != '\0') {
       if (symbolizer_path_is_executable(env_path)) {
-        strncpy(g_addr2line_cmd, env_path, sizeof(g_addr2line_cmd));
-        available = true;
+        available = platform_strncpy(g_addr2line_cmd, sizeof(g_addr2line_cmd), env_path,
+                                     sizeof(g_addr2line_cmd) - 1) == 0;
   (void)0;
       } else {
   (void)0;
@@ -561,7 +583,8 @@ void symbol_cache_print_stats(void) {
  * @param addr Original address (for fallback display)
  * @return Formatted symbol string (caller must free), or NULL on error
  */
-static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *module_name) {
+static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *module_name,
+                                          const char *const *owned_dirs) {
   char func_name[PLATFORM_SYMBOLS_FUNC_NAME_BUFFER_SIZE] = "??";
   char file_location[PLATFORM_SYMBOLS_FILE_LOCATION_BUFFER_SIZE] = "??:0";
   char blank_line[SYMBOL_SEPARATOR_BUFFER_SIZE];
@@ -591,8 +614,8 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
 
   char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
   bool external = false;
-  if (symbol_format_source_path(module_name, file_location, rel_path, sizeof(rel_path), &external) != 0) {
-    strncpy(rel_path, "unknown", sizeof(rel_path));
+  if (symbol_format_source_path(module_name, file_location, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
+    platform_strncpy(rel_path, sizeof(rel_path), "unknown", sizeof(rel_path) - 1);
   }
 
   // Allocate result buffer (AFTER copying rel_path to local storage)
@@ -608,7 +631,7 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
 
   // Remove () from function name if present (llvm-symbolizer includes them)
   char clean_func[PLATFORM_SYMBOLS_CLEAN_FUNC_BUFFER_SIZE];
-  strncpy(clean_func, func_name, sizeof(clean_func));
+  platform_strncpy(clean_func, sizeof(clean_func), func_name, sizeof(clean_func) - 1);
   char *paren = strstr(clean_func, "()");
   if (paren) {
     *paren = '\0';
@@ -638,7 +661,7 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
  * Groups addresses by binary and by the platform-selected address convention.
  * PE/COFF uses image-relative addresses; ELF and Mach-O use virtual addresses.
  */
-static char **run_llvm_symbolizer_batch(void *const *buffer, int size) {
+static char **run_llvm_symbolizer_batch(void *const *buffer, int size, const char *const *owned_dirs) {
   if (size <= 0 || !buffer) {
     return NULL;
   }
@@ -701,7 +724,8 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size) {
 
     if (group_idx < 0 && num_groups < 8) {
       group_idx = num_groups++;
-      strncpy(groups[group_idx].binary_path, match.path, sizeof(groups[group_idx].binary_path));
+      platform_strncpy(groups[group_idx].binary_path, sizeof(groups[group_idx].binary_path), match.path,
+                       sizeof(groups[group_idx].binary_path) - 1);
       groups[group_idx].relative_addresses = match.relative_address;
       groups[group_idx].count = 0;
     }
@@ -779,7 +803,7 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size) {
     // Parse results in order
     for (int j = 0; j < groups[g].count; j++) {
       int orig_idx = groups[g].original_indices[j];
-      char *parsed = parse_llvm_symbolizer_result(fp, buffer[orig_idx], binary_name);
+      char *parsed = parse_llvm_symbolizer_result(fp, buffer[orig_idx], binary_name, owned_dirs);
 
       if (parsed) {
         // Prepend binary name in brackets
@@ -812,7 +836,7 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size) {
  * @param size Number of addresses
  * @return Array of symbol strings (must be freed by caller)
  */
-static char **run_addr2line_batch(void *const *buffer, int size) {
+static char **run_addr2line_batch(void *const *buffer, int size, const char *const *owned_dirs) {
   if (size <= 0 || !buffer) {
   (void)0;
     return NULL;
@@ -921,8 +945,8 @@ static char **run_addr2line_batch(void *const *buffer, int size) {
     exe_name = exe_name ? exe_name + 1 : exe_path;
     char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
     bool external = false;
-    if (symbol_format_source_path(exe_name, file_line, rel_path, sizeof(rel_path), &external) != 0) {
-      strncpy(rel_path, "unknown", sizeof(rel_path));
+    if (symbol_format_source_path(exe_name, file_line, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
+      platform_strncpy(rel_path, sizeof(rel_path), "unknown", sizeof(rel_path) - 1);
     }
 
     // Allocate result buffer (AFTER copying rel_path to local storage)
@@ -958,7 +982,7 @@ static char **run_addr2line_batch(void *const *buffer, int size) {
   return result;
 }
 
-char **symbol_cache_resolve_batch(void *const *buffer, int size) {
+char **symbol_cache_resolve_batch(void *const *buffer, int size, const char *const *owned_dirs) {
   if (size <= 0 || !buffer) {
   (void)0;
     return NULL;
@@ -969,9 +993,9 @@ char **symbol_cache_resolve_batch(void *const *buffer, int size) {
   if (!lifecycle_is_initialized(&g_symbol_cache_lc)) {
     // Cache not initialized - fall back to uncached resolution
     // This happens during early initialization before platform_init() completes
-    char **result = run_llvm_symbolizer_batch(buffer, size);
+    char **result = run_llvm_symbolizer_batch(buffer, size, owned_dirs);
     if (!result) {
-      result = run_addr2line_batch(buffer, size);
+      result = run_addr2line_batch(buffer, size, owned_dirs);
     }
     return result;
   }
@@ -1034,10 +1058,10 @@ char **symbol_cache_resolve_batch(void *const *buffer, int size) {
     // Use the detected symbolizer type
     switch (g_symbolizer_type) {
     case SYMBOLIZER_LLVM:
-      resolved = run_llvm_symbolizer_batch(uncached_addrs, uncached_count);
+      resolved = run_llvm_symbolizer_batch(uncached_addrs, uncached_count, owned_dirs);
       break;
     case SYMBOLIZER_ADDR2LINE:
-      resolved = run_addr2line_batch(uncached_addrs, uncached_count);
+      resolved = run_addr2line_batch(uncached_addrs, uncached_count, owned_dirs);
       break;
     case SYMBOLIZER_NONE:
     default:

@@ -159,7 +159,7 @@ void backtrace_capture(backtrace_t *bt);
  *
  * @param bt Backtrace structure to symbolize (must not be NULL)
  */
-void backtrace_symbolize(backtrace_t *bt);
+void backtrace_symbolize(backtrace_t *bt, const char *const *owned_dirs);
 
 /**
  * @brief Capture and symbolize in one call

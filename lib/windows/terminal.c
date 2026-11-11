@@ -1007,8 +1007,10 @@ terminal_capabilities_t detect_terminal_capabilities(const terminal_options_t *o
   const char *term = platform_getenv("TERM");
   const char *colorterm = platform_getenv("COLORTERM");
 
-  strncpy(caps.term_type, term ? term : "windows-console", sizeof(caps.term_type) - 1);
-  strncpy(caps.colorterm, colorterm ? colorterm : "", sizeof(caps.colorterm) - 1);
+  (void)platform_strncpy(caps.term_type, sizeof(caps.term_type), term ? term : "windows-console",
+                         sizeof(caps.term_type) - 1);
+  (void)platform_strncpy(caps.colorterm, sizeof(caps.colorterm), colorterm ? colorterm : "",
+                         sizeof(caps.colorterm) - 1);
 
   // Set default FPS for Windows terminals
   int fps = options ? options->fps : 0;
