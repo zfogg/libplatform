@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct embedded_font { char name[32]; const uint8_t *data; size_t size; UT_hash_handle hash; } embedded_font_t;
+typedef struct embedded_font { char name[32]; const uint8_t *data; size_t size; UT_hash_handle hh; } embedded_font_t;
 static embedded_font_t *g_embedded_fonts;
 
 void platform_font_register(const char *name, const uint8_t *data, size_t size) {
