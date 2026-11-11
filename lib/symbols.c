@@ -50,8 +50,8 @@
 #include <errno.h>
 #include <limits.h>
 #include <libplatform/rwlock.h>
-#include <libplatform/util/path.h>
-#include <libplatform/util/string.h>
+#include "util/path.h"
+#include "util/string.h"
 #include <libplatform/process.h>
 #include <libplatform/system.h>
 #include <libplatform/terminal.h>

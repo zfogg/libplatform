@@ -14,11 +14,11 @@
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <libplatform/time.h>
-#include <libplatform/util/path.h>
-#include <libplatform/util/ip.h>
-#include <libplatform/util/utf8.h>
+#include "util/path.h"
+#include "util/ip.h"
+#include "util/utf8.h"
 #include <libplatform/symbols.h>
 #include <unistd.h>
 #include <poll.h>

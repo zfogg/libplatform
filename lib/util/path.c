@@ -10,9 +10,9 @@
 /* Existing buffer budgets in bytes, including NUL for text storage. */
 #define PATH_COMPONENT_BUFFER_SIZE 256
 
-#include <libplatform/util/path.h>
+#include "util/path.h"
 #include <libplatform/filesystem.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>

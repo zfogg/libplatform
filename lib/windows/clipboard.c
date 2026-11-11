@@ -3,7 +3,7 @@
 #include <shellapi.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 
 static platform_clipboard_format_paths_fn g_path_formatter;
 

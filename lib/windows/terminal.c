@@ -14,7 +14,7 @@
 #include <libplatform/terminal.h>
 #include <libplatform/filesystem.h>
 #include <libplatform/system.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>

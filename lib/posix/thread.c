@@ -8,8 +8,8 @@
 
 #include <libplatform/thread.h>
 #include <libplatform/time.h>
-#include <libplatform/util/path.h>
-#include <libplatform/util/string.h>
+#include "util/path.h"
+#include "util/string.h"
 #include <libplatform/debug/named.h>
 #include <libplatform/debug/mutex.h>
 #include <pthread.h>

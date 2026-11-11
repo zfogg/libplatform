@@ -13,11 +13,11 @@
 
 #include <windows.h>
 #include <libplatform/system.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <libplatform/named.h>
 #include <libplatform/thread.h>
 #include <libplatform/named.h>
-#include <libplatform/util/path.h>
+#include "util/path.h"
 #include <libplatform/time.h>
 #include <process.h>
 #include <stdint.h>

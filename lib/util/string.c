@@ -4,7 +4,7 @@
  * @brief 🔤 String manipulation utilities: ASCII escaping, trimming, case conversion, and formatting
  */
 
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <libplatform/system.h>
 #include <string.h>
 #include <ctype.h>

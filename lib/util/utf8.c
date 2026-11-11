@@ -1,4 +1,4 @@
-#include <libplatform/util/utf8.h>
+#include "util/utf8.h"
 #include <utf8proc.h>
 
 bool utf8_is_valid(const char *text) {

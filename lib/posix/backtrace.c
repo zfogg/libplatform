@@ -7,8 +7,8 @@
 #include <libplatform/backtrace.h>
 #include "backtrace_internal.h"
 #include <libplatform/symbols.h>
-#include <libplatform/util/string.h>
-#include <libplatform/util/path.h>
+#include "util/string.h"
+#include "util/path.h"
 #include <execinfo.h>
 #include <stdlib.h>
 #include <stdint.h>

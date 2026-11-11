@@ -11,7 +11,7 @@
 #include <libplatform/backtrace.h>
 #include "backtrace_internal.h"
 #include <libplatform/symbols.h>
-#include <libplatform/util/path.h>
+#include "util/path.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

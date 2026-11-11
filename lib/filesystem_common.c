@@ -10,7 +10,7 @@
 #include <libplatform/mutex.h>
 #include <libplatform/lifecycle.h>
 #include <libplatform/uthash.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>

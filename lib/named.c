@@ -17,8 +17,8 @@
 #include <libplatform/uthash.h>
 #include <libplatform/lifecycle.h>
 #include <libplatform/thread.h>
-#include <libplatform/util/path.h>
-#include <libplatform/util/string.h>
+#include "util/path.h"
+#include "util/string.h"
 #include <libplatform/system.h>
 
 #include <stdio.h>

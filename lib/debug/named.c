@@ -13,10 +13,10 @@
 
 #include <libplatform/debug/named.h>
 #include <libplatform/rwlock.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <libplatform/thread.h>
 #include <libplatform/uthash.h>
-#include <libplatform/util/path.h>
+#include "util/path.h"
 #include <libplatform/lifecycle.h>
 
 #include <stdio.h>

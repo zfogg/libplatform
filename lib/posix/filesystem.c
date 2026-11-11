@@ -11,7 +11,7 @@
 #define PLATFORM_POSIX_FILESYSTEM_BIN_WITH_SUFFIX_BUFFER_SIZE 512
 
 #include <libplatform/filesystem.h>
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <libplatform/system.h>
 #include <sys/stat.h>
 #include <sys/types.h>

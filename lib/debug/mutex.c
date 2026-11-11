@@ -24,8 +24,8 @@
 #include <libplatform/debug/named.h>
 
 #include <libplatform/time.h>
-#include <libplatform/util/string.h>
-#include <libplatform/util/path.h>
+#include "util/string.h"
+#include "util/path.h"
 
 #include <libplatform/mutex.h>
 #include <libplatform/cond.h>

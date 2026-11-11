@@ -1,7 +1,7 @@
 #pragma once
 
 /**
- * @file libplatform/util/format.h
+ * @file lib/util/format.h
  * @brief 📊 String Formatting Utilities
  * @ingroup util
  * @addtogroup util

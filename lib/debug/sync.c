@@ -38,7 +38,7 @@
 #include <libplatform/mutex.h> // Must come after cond.h since cond.h includes it
 #include <libplatform/rwlock.h>
 #include <libplatform/time.h>
-#include <libplatform/util/path.h>
+#include "util/path.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>

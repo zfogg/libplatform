@@ -49,10 +49,10 @@
 #include <libplatform/terminal.h>
 #include <libplatform/thread.h>
 #include <libplatform/uthash.h>
-#include <libplatform/util/format.h>
+#include "util/format.h"
 #include <libplatform/lifecycle.h>
-#include <libplatform/util/path.h>
-#include <libplatform/util/string.h>
+#include "util/path.h"
+#include "util/string.h"
 #include <libplatform/time.h>
 
 #ifndef BUFFER_SIZE_SMALL

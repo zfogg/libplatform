@@ -6,7 +6,7 @@
 
 #ifndef _WIN32
 
-#include <libplatform/util/string.h>
+#include "util/string.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
