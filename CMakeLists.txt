@@ -10,6 +10,7 @@ endif()
 project(libplatform VERSION 0.1.0 LANGUAGES C)
 
 option(LIBPLATFORM_BUILD_TESTS "Build libplatform tests" ON)
+option(LIBPLATFORM_BUILD_SHARED "Build libplatform as a shared library" ${BUILD_SHARED_LIBS})
 set(LIBPLATFORM_UTF8PROC_TARGET "" CACHE STRING
   "Existing CMake target providing utf8proc; consumers should pass their shared target")
 set(LIBPLATFORM_UTF8PROC_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/utf8proc" CACHE PATH
@@ -46,7 +47,7 @@ endif()
 
 add_library(libplatform-objects OBJECT)
 set_target_properties(libplatform-objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
-if(BUILD_SHARED_LIBS)
+if(LIBPLATFORM_BUILD_SHARED)
   add_library(libplatform SHARED $<TARGET_OBJECTS:libplatform-objects>)
 else()
   add_library(libplatform STATIC $<TARGET_OBJECTS:libplatform-objects>)
@@ -139,6 +140,7 @@ elseif(APPLE)
     lib/posix/keyboard.c
     lib/posix/signal.c
     lib/posix/question.c
+    lib/posix/wakeup.c
     lib/macos/system.c
     lib/macos/font.c
   )
@@ -163,6 +165,7 @@ elseif(UNIX AND NOT APPLE)
     lib/posix/keyboard.c
     lib/posix/signal.c
     lib/posix/question.c
+    lib/posix/wakeup.c
     lib/linux/system.c
     lib/linux/systemd.c
     lib/linux/font.c
