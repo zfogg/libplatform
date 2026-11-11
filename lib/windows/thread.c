@@ -58,7 +58,6 @@ static void initialize_symbol_handler(void) {
         }
       }
       g_thread_symbols_initialized = TRUE;
-
     }
   }
 }
@@ -219,7 +218,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
             BOOL isOurCode = FALSE;
             const char *relPath = NULL;
             if (hasLineInfo && line.FileName) {
-              relPath = extract_project_relative_path(line.FileName);
+              relPath = extract_project_relative_path(line.FileName, NULL);
               if (relPath != line.FileName && relPath && *relPath != '\0') {
                 isOurCode = TRUE;
               }
@@ -328,7 +327,7 @@ static void build_stack_trace_message(char *buffer, size_t buffer_size, PCONTEXT
       line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
       DWORD lineDisplacement = 0;
       if (SymGetLineFromAddr64(hProcess, stackFrame.AddrPC.Offset, &lineDisplacement, &line)) {
-        const char *relPath = line.FileName ? extract_project_relative_path(line.FileName) : "unknown";
+        const char *relPath = line.FileName ? extract_project_relative_path(line.FileName, NULL) : "unknown";
         offset +=
             safe_snprintf(buffer + offset, buffer_size - offset, "  #%02d 0x%016llX %s + 0x%llX [%s:%lu]\n", frameNum,
                           stackFrame.AddrPC.Offset, pSym->Name, symDisplacement, relPath, line.LineNumber);
@@ -591,7 +590,6 @@ int platform_thread_create(platform_thread_t *thread, const char *name, void *(*
   initialize_symbol_handler();
 
 #ifdef DEBUG_THREADS
-
 
 #endif
 

@@ -58,7 +58,6 @@
 #include <libplatform/filesystem.h>
 #include <stdio.h>
 
-
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -67,7 +66,6 @@
 
 #include <libplatform/symbols.h>
 #include <libplatform/system.h>
-
 
 static bool ascii_case_equal(const char *left, const char *right) {
   while (*left && *right) {
@@ -106,8 +104,8 @@ static bool source_path_is_absolute(const char *path) {
                   path[0] == '/' || path[0] == '\\');
 }
 
-int symbol_format_source_path(const char *module_name, const char *source_path, char *output,
-                                            size_t output_size, bool *external, const char *const *owned_dirs) {
+int symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size,
+                              bool *external, const char *const *owned_dirs) {
   if (!output || output_size == 0 || !external) {
     return EINVAL;
   }
@@ -122,7 +120,7 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
     memcpy(output, path, required_size);
     return 0;
   }
-  const char *project_relative = extract_project_relative_path(path);
+  const char *project_relative = extract_project_relative_path(path, NULL);
   const char *owned_prefix = NULL;
   size_t owned_prefix_length = 0;
   if (owned_dirs) {
@@ -137,8 +135,8 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
   }
   *external = project_relative == path ||
               (owned_prefix && owned_dirs && owned_prefix != owned_dirs[0] && source_path_is_absolute(path));
-  const char *display_path = owned_prefix ? path + owned_prefix_length + 1
-                                          : (*external ? path_last_components(path, 5) : project_relative);
+  const char *display_path =
+      owned_prefix ? path + owned_prefix_length + 1 : (*external ? path_last_components(path, 5) : project_relative);
   bool truncated = *external && display_path != path && !owned_prefix;
   size_t prefix_size = truncated ? 4 : 0; // Ellipsis plus the omitted path separator.
   size_t required_size = prefix_size + strlen(display_path) + 1;
@@ -301,16 +299,16 @@ static const char *get_llvm_symbolizer_command(void) {
       if (symbolizer_path_is_executable(env_path)) {
         available = platform_strncpy(g_llvm_symbolizer_cmd, sizeof(g_llvm_symbolizer_cmd), env_path,
                                      sizeof(g_llvm_symbolizer_cmd) - 1) == 0;
-  (void)0;
+        (void)0;
       } else {
-  (void)0;
+        (void)0;
       }
     }
 
     if (!available && platform_is_binary_in_path(LLVM_SYMBOLIZER_BIN)) {
       available = true;
       g_llvm_symbolizer_cmd[0] = '\0'; // Use binary name from PATH
-  (void)0;
+      (void)0;
     }
 
     atomic_store(&g_llvm_symbolizer_available, available);
@@ -353,18 +351,18 @@ static const char *get_addr2line_command(void) {
 
     if (env_path && env_path[0] != '\0') {
       if (symbolizer_path_is_executable(env_path)) {
-        available = platform_strncpy(g_addr2line_cmd, sizeof(g_addr2line_cmd), env_path,
-                                     sizeof(g_addr2line_cmd) - 1) == 0;
-  (void)0;
+        available =
+            platform_strncpy(g_addr2line_cmd, sizeof(g_addr2line_cmd), env_path, sizeof(g_addr2line_cmd) - 1) == 0;
+        (void)0;
       } else {
-  (void)0;
+        (void)0;
       }
     }
 
     if (!available && platform_is_binary_in_path(ADDR2LINE_BIN)) {
       available = true;
       g_addr2line_cmd[0] = '\0'; // Use binary name from PATH
-  (void)0;
+      (void)0;
     }
 
     atomic_store(&g_addr2line_available, available);
@@ -388,13 +386,13 @@ static symbolizer_type_t detect_symbolizer(void) {
   // We handle ASLR ourselves using dyld APIs on macOS
   const char *llvm_symbolizer = get_llvm_symbolizer_command();
   if (llvm_symbolizer) {
-  (void)0;
+    (void)0;
     return SYMBOLIZER_LLVM;
   }
 
   const char *addr2line_cmd = get_addr2line_command();
   if (addr2line_cmd) {
-  (void)0;
+    (void)0;
     return SYMBOLIZER_ADDR2LINE;
   }
   (void)0;
@@ -641,12 +639,12 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
     snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%p", addr);
   } else if (has_func && has_file) {
     snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s() (%s)%s", clean_func, rel_path,
-                  external ? " (external code)" : "");
+             external ? " (external code)" : "");
   } else if (has_func) {
     snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s()", clean_func);
   } else {
     snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s (unknown function)%s", rel_path,
-                  external ? " (external code)" : "");
+             external ? " (external code)" : "");
   }
 
   return result;
@@ -668,7 +666,7 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size, const cha
 
   const char *symbolizer_cmd = get_llvm_symbolizer_command();
   if (!symbolizer_cmd) {
-  (void)0;
+    (void)0;
     return NULL;
   }
 
@@ -764,11 +762,10 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size, const cha
     char cmd[PLATFORM_SYMBOLS_CMD_BUFFER_SIZE];
     int offset =
         snprintf(cmd, sizeof(cmd), "%s --demangle --no-debuginfod --output-style=LLVM --relativenames %s-e %s ",
-                      symbolizer_cmd, groups[g].relative_addresses ? "--relative-address " : "", escaped_binary_path);
+                 symbolizer_cmd, groups[g].relative_addresses ? "--relative-address " : "", escaped_binary_path);
 
     for (int j = 0; j < groups[g].count && offset < (int)sizeof(cmd) - 32; j++) {
-      int n =
-          snprintf(cmd + offset, sizeof(cmd) - (size_t)offset, "0x%lx ", (unsigned long)groups[g].addresses[j]);
+      int n = snprintf(cmd + offset, sizeof(cmd) - (size_t)offset, "0x%lx ", (unsigned long)groups[g].addresses[j]);
       if (n > 0) {
         offset += n;
       }
@@ -779,7 +776,7 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size, const cha
 
     // Note: No LOG_IO here because output is read and consumed by this function
     FILE *fp = NULL;
-  if (platform_popen("llvm-symbolizer", cmd, "r", &fp) != 0 || !fp) {
+    if (platform_popen("llvm-symbolizer", cmd, "r", &fp) != 0 || !fp) {
       // popen() failed - fill with fallback addresses instead of leaving NULL
       for (int j = 0; j < groups[g].count; j++) {
         int orig_idx = groups[g].original_indices[j];
@@ -838,13 +835,13 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size, const cha
  */
 static char **run_addr2line_batch(void *const *buffer, int size, const char *const *owned_dirs) {
   if (size <= 0 || !buffer) {
-  (void)0;
+    (void)0;
     return NULL;
   }
 
   const char *addr2line_cmd = get_addr2line_command();
   if (!addr2line_cmd) {
-  (void)0;
+    (void)0;
     return NULL;
   }
 
@@ -857,27 +854,27 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
   // SECURITY: Validate executable path to prevent command injection
   // Paths from system APIs should be safe, but validate to be thorough
   if (!validate_shell_safe(exe_path, ".-/\\:")) {
-  (void)0;
+    (void)0;
     return NULL;
   }
 
   // Escape exe_path for shell (auto-detects platform and quoting needs)
   char escaped_exe_path_buf[PLATFORM_MAX_PATH_LENGTH * 2];
   if (!escape_path_for_shell(exe_path, escaped_exe_path_buf, sizeof(escaped_exe_path_buf))) {
-  (void)0;
+    (void)0;
     return NULL;
   }
   const char *escaped_exe_path = escaped_exe_path_buf;
 
   if (!validate_shell_safe(addr2line_cmd, ".-/\\:_")) {
-  (void)0;
+    (void)0;
     return NULL;
   }
 
   // Escape addr2line command for shell (auto-detects platform and quoting needs)
   char escaped_addr2line_buf[PLATFORM_MAX_PATH_LENGTH * 2];
   if (!escape_path_for_shell(addr2line_cmd, escaped_addr2line_buf, sizeof(escaped_addr2line_buf))) {
-  (void)0;
+    (void)0;
     return NULL;
   }
   const char *escaped_addr2line_cmd = escaped_addr2line_buf;
@@ -886,7 +883,7 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
   char cmd[PLATFORM_SYMBOLS_CMD_SHORT_BUFFER_SIZE];
   int offset = snprintf(cmd, sizeof(cmd), "%s -e %s -f -C -i ", escaped_addr2line_cmd, escaped_exe_path);
   if (offset <= 0 || offset >= (int)sizeof(cmd)) {
-  (void)0;
+    (void)0;
     return NULL;
   }
 
@@ -894,7 +891,7 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
   for (int i = 0; i < size; i++) {
     int n = snprintf(cmd + offset, sizeof(cmd) - (size_t)offset, "0x%llx ", (unsigned long long)buffer[i]);
     if (n <= 0 || offset + n >= (int)sizeof(cmd)) {
-  (void)0;
+      (void)0;
       break;
     }
     offset += n;
@@ -910,7 +907,7 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
   // Note: No LOG_IO here because output is read and consumed by this function
   FILE *fp = NULL;
   if (platform_popen("addr2line", cmd, "r", &fp) != 0 || !fp) {
-  (void)0;
+    (void)0;
     // Fill result array with fallback values instead of leaving NULL entries
     for (int i = 0; i < size; i++) {
       result[i] = malloc(SYMBOL_ADDRESS_BUFFER_SIZE);
@@ -963,10 +960,10 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
       // Best case - both function and file:line known
       if (strstr(rel_path, ":") != NULL) {
         snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s in %s()%s", rel_path, func_name,
-                      external ? " (external code)" : "");
+                 external ? " (external code)" : "");
       } else {
         snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s() at %s%s", func_name, rel_path,
-                      external ? " (external code)" : "");
+                 external ? " (external code)" : "");
       }
     } else if (has_func) {
       // Function known but file unknown (common for library functions)
@@ -974,7 +971,7 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
     } else {
       // File known but function unknown (rare)
       snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s (unknown function)%s", rel_path,
-                    external ? " (external code)" : "");
+               external ? " (external code)" : "");
     }
   }
 
@@ -984,7 +981,7 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
 
 char **symbol_cache_resolve_batch(void *const *buffer, int size, const char *const *owned_dirs) {
   if (size <= 0 || !buffer) {
-  (void)0;
+    (void)0;
     return NULL;
   }
 
@@ -1077,13 +1074,13 @@ char **symbol_cache_resolve_batch(void *const *buffer, int size, const char *con
           result[orig_idx] = platform_strdup(resolved[i]);
           // If strdup failed, use sentinel string instead of NULL
           if (!result[orig_idx]) {
-  (void)0;
+            (void)0;
             result[orig_idx] = platform_strdup(NULL_SENTINEL);
           }
           // Only insert into cache if strdup succeeded (and it's not the sentinel)
           if (result[orig_idx] && strcmp(result[orig_idx], NULL_SENTINEL) != 0) {
             if (!symbol_cache_insert(uncached_addrs[i], resolved[i])) {
-  (void)0;
+              (void)0;
             }
           }
           free(resolved[i]);
@@ -1094,7 +1091,7 @@ char **symbol_cache_resolve_batch(void *const *buffer, int size, const char *con
           }
         }
         if (!result[orig_idx]) {
-  (void)0;
+          (void)0;
         }
       }
 
@@ -1113,7 +1110,7 @@ char **symbol_cache_resolve_batch(void *const *buffer, int size, const char *con
           }
         }
         if (!result[orig_idx]) {
-  (void)0;
+          (void)0;
         }
       }
     }

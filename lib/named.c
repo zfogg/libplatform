@@ -234,7 +234,7 @@ static void named_entry_init(named_entry_t *entry, const char *type, const char 
   entry->generation = ++named_generation;
   entry->type = entry_strdup(type);
   entry->format_spec = entry_strdup(format_spec);
-  entry->file = file ? entry_strdup(extract_project_relative_path(file)) : NULL;
+  entry->file = file ? entry_strdup(extract_project_relative_path(file, NULL)) : NULL;
   entry->line = line;
   entry->func = func ? entry_strdup(func) : NULL;
 }
@@ -390,7 +390,7 @@ void named_unregister(uintptr_t key) {
     HASH_FIND(hh, g_named_registry.entries, &key, sizeof(uintptr_t), entry);
   }
   if (changed)
-  rwlock_wrunlock(&g_named_registry.entries_lock);
+    rwlock_wrunlock(&g_named_registry.entries_lock);
 }
 
 const char *named_update_name(uintptr_t key, const char *new_base_name) {
@@ -579,8 +579,8 @@ int named_registry_for_each(named_iter_callback_t callback, void *user_data, boo
   return 0;
 }
 
-int named_registry_try_snapshot(size_t capacity, size_t *required, bool *completed,
-                                              named_snapshot_fn copy, void *data) {
+int named_registry_try_snapshot(size_t capacity, size_t *required, bool *completed, named_snapshot_fn copy,
+                                void *data) {
   if (!required || !completed || !copy)
     return 1;
   *completed = false;
