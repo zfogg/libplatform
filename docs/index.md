@@ -1,5 +1,7 @@
 # libplatform
 
+[View the source on GitHub](https://github.com/zfogg/libplatform)
+
 libplatform is a small, opinionated foundation for C and C++ programs that
 need to run on the major operating systems without turning every useful bit of
 code into a nest of `#ifdef`s. It gives an application one set of names for
