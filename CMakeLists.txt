@@ -172,6 +172,29 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/linux/font.c
   )
 elseif(EMSCRIPTEN)
+  # The browser replacements below intentionally supersede generic helpers
+  # that are added by the common source list above.  Keeping both object files
+  # in this static archive creates duplicate symbols (and, more importantly,
+  # lets terminal/system code accidentally bypass the browser implementation).
+  get_target_property(_libplatform_common_sources libplatform-objects SOURCES)
+  foreach(_wasm_replaced_source
+    lib/filesystem_common.c
+    lib/keyboard.c
+    lib/lifecycle.c
+    lib/system_common.c
+    lib/terminal.c
+    lib/backtrace.c
+    lib/wasm/stubs/audio.c
+    lib/wasm/stubs/backtrace.c
+    lib/wasm/stubs/comprehensive.c
+    lib/wasm/stubs/misc.c)
+    list(REMOVE_ITEM _libplatform_common_sources
+      ${_wasm_replaced_source}
+      ${CMAKE_CURRENT_SOURCE_DIR}/${_wasm_replaced_source})
+  endforeach()
+  set_property(TARGET libplatform-objects PROPERTY SOURCES ${_libplatform_common_sources})
+  unset(_libplatform_common_sources)
+  unset(_wasm_replaced_source)
   target_sources(libplatform-objects PRIVATE
     lib/symbols.c
     lib/wasm/backtrace.c
@@ -184,13 +207,9 @@ elseif(EMSCRIPTEN)
     lib/wasm/thread.c
     lib/wasm/time.c
     lib/wasm/stubs/actions.c
-    lib/wasm/stubs/audio.c
-    lib/wasm/stubs/backtrace.c
-    lib/wasm/stubs/comprehensive.c
     lib/wasm/stubs/crypto.c
     lib/wasm/stubs/log.c
     lib/wasm/stubs/manpage.c
-    lib/wasm/stubs/misc.c
     lib/wasm/stubs/mode_defaults.c
     lib/wasm/stubs/network.c
     lib/wasm/stubs/stats.c

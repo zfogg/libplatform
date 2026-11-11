@@ -35,7 +35,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 // ============================================================================
 // Per-thread Lock Stack Storage
 // ============================================================================
@@ -691,12 +690,12 @@ void mutex_stack_detect_deadlocks(void) {
       int msg_len = 0;
 
       // Leading newline and header box
-      msg_len += snprintf(cycle_msg + msg_len, sizeof(cycle_msg) - msg_len, "\n%s\n",
-                          "╔═════════════════════════════════╗");
-      msg_len += snprintf(cycle_msg + msg_len, sizeof(cycle_msg) - msg_len, "%s\n",
-                          "║  DEADLOCK: Circular Wait Cycle  ║");
-      msg_len += snprintf(cycle_msg + msg_len, sizeof(cycle_msg) - msg_len, "%s\n",
-                          "╚═════════════════════════════════╝");
+      msg_len +=
+          snprintf(cycle_msg + msg_len, sizeof(cycle_msg) - msg_len, "\n%s\n", "╔═════════════════════════════════╗");
+      msg_len +=
+          snprintf(cycle_msg + msg_len, sizeof(cycle_msg) - msg_len, "%s\n", "║  DEADLOCK: Circular Wait Cycle  ║");
+      msg_len +=
+          snprintf(cycle_msg + msg_len, sizeof(cycle_msg) - msg_len, "%s\n", "╚═════════════════════════════════╝");
 
       // Print each thread in the cycle
       for (int k = 0; k < cycle_len; k++) {
@@ -800,17 +799,16 @@ static void cond_deadlock_check_snapshot(const cond_deadlock_snapshot_t *cond, c
   char cond_buf[DEBUG_MUTEX_COND_BUFFER_SIZE] = {0};
   int cond_written =
       snprintf(cond_buf, sizeof(cond_buf),
-                    "Stuck cond '%s': %llu thread(s) waiting %s with no signal (most recent waiter: 0x%lx)\n", name,
-                    (unsigned long long)cond->waiting_count, stuck_str, (unsigned long)cond->last_waiting_key);
+               "Stuck cond '%s': %llu thread(s) waiting %s with no signal (most recent waiter: 0x%lx)\n", name,
+               (unsigned long long)cond->waiting_count, stuck_str, (unsigned long)cond->last_waiting_key);
 
   cond_written +=
       snprintf(cond_buf + cond_written, sizeof(cond_buf) - cond_written, "  wait entered at %s:%d %s()\n",
-                    extract_project_relative_path(cond->last_wait_file), cond->last_wait_line, cond->last_wait_func);
+               extract_project_relative_path(cond->last_wait_file, NULL), cond->last_wait_line, cond->last_wait_func);
 
   if (cond_written >= 0 && cond->last_wait_mutex) {
     snprintf(cond_buf + cond_written, sizeof(cond_buf) - cond_written,
-                  "  associated mutex: %p (cannot safely inspect without lock ownership)",
-                  (void *)cond->last_wait_mutex);
+             "  associated mutex: %p (cannot safely inspect without lock ownership)", (void *)cond->last_wait_mutex);
   }
 }
 
@@ -874,8 +872,8 @@ void debug_sync_check_cond_deadlocks(void) {
   bool completed = false;
   size_t required = 0;
   cond_deadlock_batch_t batch = {0};
-  if (named_registry_try_snapshot(0, &required, &completed, copy_cond_deadlock_entry, &batch) != 0 ||
-      !required || required > SIZE_MAX / sizeof(*batch.entries))
+  if (named_registry_try_snapshot(0, &required, &completed, copy_cond_deadlock_entry, &batch) != 0 || !required ||
+      required > SIZE_MAX / sizeof(*batch.entries))
     return;
   // Registry metadata must not re-enter allocation tracking. Object state and
   // names are copied while pinned, and diagnostics run after releasing the lock.

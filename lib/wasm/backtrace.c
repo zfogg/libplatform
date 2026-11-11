@@ -30,7 +30,8 @@ void backtrace_print_many(int level, const char *label, const backtrace_t *bts, 
   // No-op
 }
 
-void backtrace_symbolize(backtrace_t *bt) {
+void backtrace_symbolize(backtrace_t *bt, const char *const *owned_dirs) {
   (void)bt;
+  (void)owned_dirs;
   // No-op - symbolization not available in WASM
 }

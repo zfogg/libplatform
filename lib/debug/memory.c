@@ -62,7 +62,11 @@
 #define SAFE_SSCANF sscanf
 #define SAFE_MEMCPY(dst, dst_size, src, size) memcpy((dst), (src), (size))
 #define SAFE_GETENV platform_getenv
-#define SAFE_STRNCPY(dst, src, size) do { strncpy((dst), (src), (size)); (dst)[(size) - 1] = '\0'; } while (0)
+#define SAFE_STRNCPY(dst, src, size)                                                                                   \
+  do {                                                                                                                 \
+    strncpy((dst), (src), (size));                                                                                     \
+    (dst)[(size) - 1] = '\0';                                                                                          \
+  } while (0)
 #define SAFE_REALLOC(ptr, size, type) ((type)realloc((ptr), (size)))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define LOG_RATE_FAST 0
@@ -77,7 +81,9 @@ static bool g_memory_report_colors;
 static const char *colored_string(platform_color_t color, const char *text) {
   return platform_colored_string(g_memory_report_colors, color, text);
 }
-static const char *colorize_named_string(const char *text) { return text ? text : ""; }
+static const char *colorize_named_string(const char *text) {
+  return text ? text : "";
+}
 #define log_warn(...) ((void)0)
 #define log_warn_every(...) ((void)0)
 
@@ -281,7 +287,7 @@ static bool should_ignore_allocation(const char *file, int line, uint64_t tid, s
  */
 static alloc_site_t *get_or_create_site(const char *file, int line) {
   uint64_t tid = thread_current_id();
-  const char *relative_file = extract_project_relative_path(file);
+  const char *relative_file = extract_project_relative_path(file, NULL);
 
   char key[BUFFER_SIZE_SMALL + 32];
   safe_snprintf(key, sizeof(key), "%s:%d:%lu", relative_file, line, tid);
@@ -327,7 +333,7 @@ static alloc_site_t *get_or_create_site(const char *file, int line) {
  * Look up an allocation site by file, line, and thread ID (called while holding g_mem.mutex)
  */
 static alloc_site_t *lookup_site(const char *file, int line, uint64_t tid) {
-  const char *relative_file = extract_project_relative_path(file);
+  const char *relative_file = extract_project_relative_path(file, NULL);
   char key[BUFFER_SIZE_SMALL + 32];
   safe_snprintf(key, sizeof(key), "%s:%d:%lu", relative_file, line, tid);
 
@@ -442,7 +448,7 @@ void *debug_malloc(size_t size, const char *file, int line) {
       block->ptr = ptr;
       block->size = size;
       block->is_aligned = false;
-      const char *normalized_file = extract_project_relative_path(file);
+      const char *normalized_file = extract_project_relative_path(file, NULL);
       SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
       block->line = line;
       block->tid = thread_current_id();
@@ -511,7 +517,7 @@ void debug_track_aligned(void *ptr, size_t size, const char *file, int line) {
       block->ptr = ptr;
       block->size = size;
       block->is_aligned = true;
-      const char *normalized_file = extract_project_relative_path(file);
+      const char *normalized_file = extract_project_relative_path(file, NULL);
       SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
       block->line = line;
       block->tid = thread_current_id();
@@ -672,7 +678,7 @@ void *debug_calloc(size_t count, size_t size, const char *file, int line) {
       block->ptr = ptr;
       block->size = total;
       block->is_aligned = false;
-      const char *normalized_file = extract_project_relative_path(file);
+      const char *normalized_file = extract_project_relative_path(file, NULL);
       SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
       block->line = line;
       block->tid = thread_current_id();
@@ -861,7 +867,7 @@ void *debug_realloc(void *ptr, size_t size, const char *file, int line) {
       memset(&curr->backtrace, 0, sizeof(curr->backtrace));
       backtrace_capture(&curr->backtrace);
       curr->ptr = new_ptr;
-      const char *normalized_file = extract_project_relative_path(file);
+      const char *normalized_file = extract_project_relative_path(file, NULL);
       SAFE_STRNCPY(curr->file, normalized_file, sizeof(curr->file) - 1);
       curr->file[sizeof(curr->file) - 1] = '\0';
       curr->line = line;
@@ -889,7 +895,7 @@ void *debug_realloc(void *ptr, size_t size, const char *file, int line) {
         block->ptr = new_ptr;
         block->size = size;
         block->is_aligned = false;
-        const char *normalized_file = extract_project_relative_path(file);
+        const char *normalized_file = extract_project_relative_path(file, NULL);
         SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
         block->line = line;
         block->tid = thread_current_id();
@@ -1218,7 +1224,7 @@ void debug_memory_report(bool colors) {
 
           // Keys end in :line:tid; earlier colons can belong to Windows drive letters.
           // Shorten before copying so an absolute root cannot consume the file buffer.
-          const char *relative_key = extract_project_relative_path(site->key);
+          const char *relative_key = extract_project_relative_path(site->key, NULL);
           char file[sizeof(site->key)] = {0};
           int line = 0;
           uint64_t tid = 0;
@@ -1324,7 +1330,6 @@ void debug_memory_report(bool colors) {
     }
     free(trace_snapshot);
 #undef TRACE_SNAPSHOT_LIMIT
-
 
     // SKIP cleanup site cache at shutdown
     // We used to clean up the hash table here, but HASH_DEL inside HASH_ITER causes
