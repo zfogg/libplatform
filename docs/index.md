@@ -93,50 +93,53 @@ libplatform is meant to be the place you start instead.
 
 ## Header map
 
-Every installed header is listed here explicitly:
+### Common headers
 
 - `agent.h` — discovers SSH and GPG agent endpoints.
-- `app_callbacks.h` — defines application callbacks for library diagnostics.
-- `atomic.h` — provides portable atomic values, loads, stores, and exchanges.
-- `backtrace.h` — captures, symbolizes, and prints platform backtraces.
+- `app_callbacks.h` — defines callbacks for library-owned diagnostics.
+- `atomic.h` — provides portable atomic values and operations.
+- `backtrace.h` — captures and prints platform backtraces.
 - `clipboard.h` — reads clipboard text through an application formatter.
-- `compiler.h` — supplies compiler and language compatibility definitions.
+- `compiler.h` — provides compiler and language compatibility definitions.
 - `cond.h` — provides condition variables, waits, signals, and broadcasts.
 - `cpu.h` — detects SSE2, SSSE3, AVX2, NEON, SVE, and CRC32 features.
 - `errno.h` — exposes the platform error boundary.
-- `filesystem.h` — provides files, directories, paths, permissions, and data locations.
+- `filesystem.h` — provides files, directories, permissions, and data paths.
 - `font.h` — provides the embedded-font registry and lookup operations.
-- `keyboard.h` — provides nonblocking keyboard input, editing, and text decoding.
+- `keyboard.h` — provides keyboard input, editing, and text decoding.
 - `lifecycle.h` — coordinates one-time initialization and shutdown.
-- `memory.h` — defines the portable memory allocation seam.
+- `memory.h` — defines the portable allocation seam.
 - `mmap.h` — maps and unmaps files and memory regions.
 - `mutex.h` — provides mutual exclusion and try-lock operations.
-- `named.h` — gives synchronization and application objects stable names.
+- `named.h` — gives long-lived objects stable names.
 - `pipe.h` — provides portable anonymous pipe operations.
 - `process.h` — manages process titles and subprocess execution.
 - `question.h` — asks interactive questions and reads answers.
-- `rwlock.h` — provides reader/writer locks and their timing operations.
+- `rwlock.h` — provides reader/writer locks and timing operations.
 - `signal.h` — installs and manages portable signal handlers.
 - `socket.h` — creates, configures, connects, polls, and closes sockets.
 - `symbols.h` — resolves addresses and formats symbol names.
-- `system.h` — provides environment, descriptor, clock, sleep, and startup APIs.
-- `systemd.h` — sends service readiness and watchdog notifications on systemd hosts.
-- `terminal.h` — detects terminal capabilities, colors, dimensions, and control sequences.
+- `system.h` — provides environment, descriptors, clocks, sleeps, and startup.
+- `systemd.h` — sends service readiness and watchdog notifications.
+- `terminal.h` — detects terminal capabilities and controls terminal output.
 - `thread.h` — creates, joins, detaches, and identifies platform threads.
 - `time.h` — provides monotonic time, deadlines, and sleep helpers.
-- `uthash.h` — vendors the hash-table dependency used by internal registries.
+- `uthash.h` — vendors the hash-table dependency used by registries.
 - `wakeup.h` — wakes worker threads portably.
-- `windows_compat.h` — supplies compatibility definitions for Windows builds.
+- `windows_compat.h` — supplies Windows compatibility definitions.
+
+### Platform-specific headers
+
 - `posix/system.h` — exposes the POSIX system adapter boundary.
-- `windows/getopt.h` — supplies getopt and getopt-long compatibility on Windows.
+- `windows/getopt.h` — provides getopt and getopt-long compatibility on Windows.
 - `windows/system.h` — exposes Windows-specific system adapter details.
 
-The debug headers are also individually public:
+### Debug headers
 
 - `debug/atomic.h` — registers and reports atomic-operation statistics.
 - `debug/backtrace.h` — captures, filters, formats, and prints diagnostic traces.
 - `debug/coverage.h` — exposes coverage instrumentation hooks.
-- `debug/debug_helpers.h` — shares initialization and diagnostic helper routines.
+- `debug/debug_helpers.h` — provides shared initialization and debug helpers.
 - `debug/errno.h` — reports debug error and errno state.
 - `debug/helpers.h` — provides common debug formatting and callback helpers.
 - `debug/memory.h` — tracks allocations, frees, peaks, and live blocks.
