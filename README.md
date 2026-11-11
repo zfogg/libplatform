@@ -1,5 +1,7 @@
 # libplatform
 
+[Read the documentation](https://zfogg.github.io/libplatform/)
+
 libplatform is the part of a C or C++ application that you usually end up
 writing after you have already spent too much time writing it badly.
 
