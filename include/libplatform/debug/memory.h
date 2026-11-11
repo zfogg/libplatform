@@ -108,7 +108,7 @@ void debug_memory_set_quiet_mode(bool quiet);
  *   - lib/ui/window.c:89 - 124 KiB
  * @endcode
  */
-void debug_memory_report(void);
+void debug_memory_report(bool colors);
 
 /**
  * @brief Allocate memory with debug tracking
@@ -231,7 +231,7 @@ static inline void debug_memory_set_quiet_mode(bool quiet) {
   (void)quiet;
 }
 
-static inline void debug_memory_report(void) {}
+static inline void debug_memory_report(bool colors) { (void)colors; }
 
 static inline void *debug_malloc(size_t size, const char *file, int line) {
   (void)file;

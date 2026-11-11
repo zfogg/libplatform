@@ -66,8 +66,17 @@
 #define SAFE_REALLOC(ptr, size, type) ((type)realloc((ptr), (size)))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define LOG_RATE_FAST 0
-typedef enum { LOG_COLOR_GREY, LOG_COLOR_FATAL, LOG_COLOR_DEBUG, LOG_COLOR_INFO, LOG_COLOR_ERROR, LOG_COLOR_WARN, LOG_COLOR_DEV } log_color_t;
-static const char *colored_string(log_color_t color, const char *text) { (void)color; return text ? text : ""; }
+#define LOG_COLOR_GREY PLATFORM_COLOR_GREY
+#define LOG_COLOR_FATAL PLATFORM_COLOR_FATAL
+#define LOG_COLOR_DEBUG PLATFORM_COLOR_DEBUG
+#define LOG_COLOR_INFO PLATFORM_COLOR_INFO
+#define LOG_COLOR_ERROR PLATFORM_COLOR_ERROR
+#define LOG_COLOR_WARN PLATFORM_COLOR_WARN
+#define LOG_COLOR_DEV PLATFORM_COLOR_DEV
+static bool g_memory_report_colors;
+static const char *colored_string(platform_color_t color, const char *text) {
+  return platform_colored_string(g_memory_report_colors, color, text);
+}
 static const char *colorize_named_string(const char *text) { return text ? text : ""; }
 #define log_warn(...) ((void)0)
 #define log_warn_every(...) ((void)0)
@@ -915,7 +924,8 @@ void debug_memory_set_quiet_mode(bool quiet) {
   g_mem.quiet_mode = quiet;
 }
 
-void debug_memory_report(void) {
+void debug_memory_report(bool colors) {
+  g_memory_report_colors = colors;
   bool quiet = g_mem.quiet_mode;
 
   // Reset suppression counters at start of report

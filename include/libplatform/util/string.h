@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdbool.h>
 #ifdef _WIN32
 #include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
@@ -17,6 +18,25 @@ ssize_t platform_getline(char **lineptr, size_t *n, FILE *stream);
 char *platform_strdup(const char *s);
 int platform_strcasecmp(const char *s1, const char *s2);
 int platform_strncasecmp(const char *s1, const char *s2, size_t n);
+
+typedef enum platform_color {
+  PLATFORM_COLOR_GREY,
+  PLATFORM_COLOR_FATAL,
+  PLATFORM_COLOR_DEBUG,
+  PLATFORM_COLOR_INFO,
+  PLATFORM_COLOR_ERROR,
+  PLATFORM_COLOR_WARN,
+  PLATFORM_COLOR_DEV,
+  PLATFORM_COLOR_RESET,
+  PLATFORM_COLOR_COUNT
+} platform_color_t;
+
+/** Configure the process-wide default used by platform_colored_string(). */
+void platform_color_set_enabled(bool enabled);
+/** Override one ANSI sequence. The string is copied by the library. */
+void platform_color_set_code(platform_color_t color, const char *ansi_code);
+/** Apply a configured color when enabled is true; otherwise return plain text. */
+const char *platform_colored_string(bool enabled, platform_color_t color, const char *text);
 int platform_strcasecmp(const char *s1, const char *s2);
 int platform_strncasecmp(const char *s1, const char *s2, size_t n);
 size_t platform_strlcpy(char *dst, const char *src, size_t size);
