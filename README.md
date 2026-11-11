@@ -112,6 +112,18 @@ live under `lib/util/` and are private implementation headers. They are not
 installed as consumer-facing API; applications should use their own utility
 headers and the public libplatform APIs above.
 
+For completeness, the installed common headers are `agent.h`,
+`app_callbacks.h`, `atomic.h`, `backtrace.h`, `clipboard.h`, `compiler.h`,
+`cond.h`, `cpu.h`, `errno.h`, `filesystem.h`, `font.h`, `keyboard.h`,
+`lifecycle.h`, `memory.h`, `mmap.h`, `mutex.h`, `named.h`, `pipe.h`,
+`process.h`, `question.h`, `rwlock.h`, `signal.h`, `socket.h`, `symbols.h`,
+`system.h`, `systemd.h`, `terminal.h`, `thread.h`, `time.h`, `uthash.h`,
+`wakeup.h`, and `windows_compat.h`. The platform-specific public headers are
+`posix/system.h`, `windows/getopt.h`, and `windows/system.h`. The public debug
+headers are `debug/atomic.h`, `debug/backtrace.h`, `debug/coverage.h`,
+`debug/debug_helpers.h`, `debug/errno.h`, `debug/helpers.h`, `debug/memory.h`,
+`debug/mutex.h`, `debug/named.h`, `debug/stats.h`, and `debug/sync.h`.
+
 The common files own the contracts and the platform files provide the actual
 behavior. That makes the differences visible in the implementation without
 making every caller know about them.
