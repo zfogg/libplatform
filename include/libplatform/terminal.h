@@ -1211,6 +1211,7 @@ bool terminal_should_force_stderr(void);
  *
  * @ingroup platform_terminal
  */
+bool terminal_should_force_stderr(void);
 
 /**
  * @brief Choose output file descriptor for logging based on level and interactivity

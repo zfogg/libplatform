@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <libplatform/system.h>
+#include <libplatform/uthash.h>
 #include <libplatform/util/string.h>
 #include <libplatform/filesystem.h>
 #include <time.h>

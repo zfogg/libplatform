@@ -22,9 +22,7 @@
 #include <stddef.h>
 #include <errno.h>             // For ETIMEDOUT
 
-#ifdef LIBPLATFORM_STANDALONE
 static uint64_t time_ns_to_ms(uint64_t ns) { return (ns + 999999ULL) / 1000000ULL; }
-#endif
 
 /**
  * @brief Initialize a condition variable with a name

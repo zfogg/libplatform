@@ -76,6 +76,13 @@ const platform_application_config_t *platform_application_config(void);
 #ifdef _WIN32
 #include <io.h>    /* Windows I/O functions */
 #include <fcntl.h> /* File control options */
+
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+#endif
 #else
 #include <unistd.h> /* POSIX standard I/O and file descriptor functions */
 #include <fcntl.h>  /* POSIX file control options */

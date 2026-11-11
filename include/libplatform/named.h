@@ -820,7 +820,7 @@ uintptr_t thread_to_key(uintptr_t thread);
  * In release builds (NDEBUG), this is a no-op.
  */
 #define NAMED_REGISTER_THREAD(thread, name, parent_ptr)                                                                \
-  named_register(thread_to_key((thread)), (name), "thread", "0x%tx", __FILE__, __LINE__, __func__,                     \
+  named_register(thread_to_key((uintptr_t)(thread)), (name), "thread", "0x%tx", __FILE__, __LINE__, __func__,         \
                  (uintptr_t)(const void *)(parent_ptr))
 
 /**
@@ -828,7 +828,7 @@ uintptr_t thread_to_key(uintptr_t thread);
  * @param thread platform_thread_t handle (NOT a pointer)
  * @ingroup debug_util
  */
-#define NAMED_UNREGISTER_THREAD(thread) named_unregister(thread_to_key((thread)))
+#define NAMED_UNREGISTER_THREAD(thread) named_unregister(thread_to_key((uintptr_t)(thread)))
 
 // ============================================================================
 // Type-Specific Description Macros

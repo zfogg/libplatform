@@ -1,3 +1,4 @@
+/** Windows console prompt implementation. */
 
 /* Storage capacities in elements; text buffers include the terminating NUL. */
 #define PLATFORM_WINDOWS_QUESTION_TEST_RESPONSE_BUFFER_SIZE 256
@@ -18,14 +19,12 @@
 #include <string.h>
 
 bool platform_is_interactive(void) {
-  // Callers may guard prompts before they consume an automated response.
   return _isatty(_fileno(stdin)) != 0;
 }
 
 int platform_prompt_question(const char *prompt, char *buffer, size_t max_len, prompt_opts_t opts) {
-  if (!prompt || !buffer || max_len < 2) {
+  if (!prompt || !buffer || max_len < 2 || !platform_is_interactive())
     return -1;
-  }
 
   // Consume explicit answers before checking terminal availability.
   {
@@ -40,6 +39,9 @@ int platform_prompt_question(const char *prompt, char *buffer, size_t max_len, p
       buffer[len] = '\0';
       return 0;
     }
+    if (length + 1 >= max_len)
+      return -1;
+    buffer[length++] = (char)ch;
   }
 
   // Check for non-interactive mode
@@ -96,3 +98,5 @@ bool platform_prompt_yes_no_timeout(const char *prompt, bool default_yes, unsign
   if (callbacks->usage) callbacks->usage(callbacks->kind_name && callbacks->notice_kind ? callbacks->kind_name(callbacks->notice_kind()) : "confirmation", default_yes ? "accepted" : "declined");
   return default_yes;
 }
+
+#endif
