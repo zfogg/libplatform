@@ -24,3 +24,8 @@ The header includes ``unistd.h`` and ``limits.h`` for the POSIX implementation
 boundary. The portable functions that consume this boundary are documented on
 the :doc:`api-common` page, especially in ``system.h``, ``process.h``,
 ``filesystem.h``, and ``socket.h``.
+
+The header is also autodocumented below so future POSIX declarations added to
+it appear here automatically:
+
+.. c:autodoc:: libplatform/posix/system.h
