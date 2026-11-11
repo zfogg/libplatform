@@ -8,6 +8,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+void platform_font_register(const char *name, const uint8_t *data, size_t size);
+bool platform_font_get_data(const char *name, const uint8_t **data, size_t *size);
+void platform_font_clear(void);
+
 // Resolve a font spec to a usable form for the current platform.
 // spec:        NULL/empty → platform default; bundled name; family name; or absolute path.
 // out:         resolved file path or unresolved specification. macOS passes unknown

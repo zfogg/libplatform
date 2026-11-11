@@ -239,22 +239,3 @@ void platform_backtrace_symbols_destroy(char **strings) {
   free(strings);
 }
 
-void platform_backtrace_print_simple(int skip_frames, platform_backtrace_write_fn write, void *context) {
-  void *buffer[LIBPLATFORM_BACKTRACE_MAX_FRAMES];
-  int depth = platform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
-
-  if (depth > 0) {
-    char **symbols = platform_backtrace_symbols((void *const *)buffer, depth);
-    if (symbols) {
-      int start = 1 + skip_frames;
-      for (int i = start; i < depth; i++) {
-        if (write) {
-          char line[1024];
-          snprintf(line, sizeof(line), "  [%d] %s", i - start, symbols[i] ? symbols[i] : "???");
-          write(line, context);
-        }
-      }
-      platform_backtrace_symbols_destroy(symbols);
-    }
-  }
-}

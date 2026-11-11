@@ -91,7 +91,6 @@ void platform_backtrace_symbols_destroy(char **strings) {
 }
 #endif
 
-#ifndef _WIN32
 void platform_backtrace_print(int skip_frames, platform_backtrace_write_fn write, void *context) {
   void *buffer[LIBPLATFORM_BACKTRACE_MAX_FRAMES];
   int depth = platform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);
@@ -110,4 +109,3 @@ void platform_backtrace_print(int skip_frames, platform_backtrace_write_fn write
     }
   }
 }
-#endif

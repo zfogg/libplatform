@@ -87,7 +87,7 @@ void platform_backtrace_symbols_destroy(char **strings) {
   symbol_cache_free_symbols(strings);
 }
 
-void platform_backtrace_print_simple(int skip_frames, platform_backtrace_write_fn write,
+void platform_backtrace_print(int skip_frames, platform_backtrace_write_fn write,
                                      void *context) {
   void *buffer[LIBPLATFORM_BACKTRACE_MAX_FRAMES];
   int depth = platform_backtrace_capture(buffer, LIBPLATFORM_BACKTRACE_MAX_FRAMES);

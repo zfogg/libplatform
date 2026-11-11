@@ -74,6 +74,7 @@ target_sources(libplatform-objects PRIVATE
   lib/atomic.c
   lib/named.c
   lib/cpu.c
+  lib/font.c
 )
 target_sources(libplatform-objects PRIVATE
   lib/util/path.c

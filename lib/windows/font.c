@@ -12,11 +12,6 @@
 #include <string.h>
 #include <windows.h>
 
-extern const unsigned char g_font_matrix_resurrected[];
-extern const size_t g_font_matrix_resurrected_size;
-extern const unsigned char g_font_default[];
-extern const size_t g_font_default_size;
-
 // Default monospace fonts to try, in order of preference
 static const char *g_default_fonts[] = {"consola.ttf", // Consolas
                                         "cour.ttf",    // Courier New
@@ -82,6 +77,10 @@ static bool resolve_registry_font(HKEY root, const char *requested_name, const c
 
 int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
                                         const uint8_t **out_font_data, size_t *out_font_data_size) {
+  const uint8_t *matrix_data = NULL, *default_data = NULL;
+  size_t matrix_size = 0, default_size = 0;
+  platform_font_get_data("matrix", &matrix_data, &matrix_size);
+  platform_font_get_data("default", &default_data, &default_size);
   if (!out || out_size == 0 || !out_is_path || !out_font_data || !out_font_data_size) {
     return -1;
   }
@@ -94,15 +93,15 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
   if (_stricmp(effective_spec, "matrix") == 0) {
     snprintf(out, out_size, "matrix");
     *out_is_path = false;
-    *out_font_data = g_font_matrix_resurrected;
-    *out_font_data_size = g_font_matrix_resurrected_size;
+    *out_font_data = matrix_data;
+    *out_font_data_size = matrix_size;
     return 0;
   }
   if (_stricmp(effective_spec, "default") == 0) {
     snprintf(out, out_size, "default");
     *out_is_path = false;
-    *out_font_data = g_font_default;
-    *out_font_data_size = g_font_default_size;
+    *out_font_data = default_data;
+    *out_font_data_size = default_size;
     return 0;
   }
 

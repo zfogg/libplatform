@@ -8,6 +8,7 @@
 /* Storage capacities in elements; text buffers include the terminating NUL. */
 
 #include <libplatform/font.h>
+
 #include <libplatform/filesystem.h>
 #include <ascii-chat/font.h>
 #include <ascii-chat/log/log.h>
@@ -27,6 +28,10 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   // If no font is specified, use the bundled default font (DejaVu Sans Mono) for render-file output.
   // This ensures render-file always has a suitable fallback font available.
   const char *eff = (spec && spec[0]) ? spec : "default";
+  const uint8_t *matrix_data = NULL, *default_data = NULL;
+  size_t matrix_size = 0, default_size = 0;
+  platform_font_get_data("matrix", &matrix_data, &matrix_size);
+  platform_font_get_data("default", &default_data, &default_size);
 
   if (out_font_data)
     *out_font_data = NULL;
@@ -45,9 +50,9 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   // Check for bundled font names ("matrix" or "default")
   if (strcmp(eff, "matrix") == 0) {
     if (out_font_data)
-      *out_font_data = g_font_matrix_resurrected;
+      *out_font_data = matrix_data;
     if (out_font_data_size)
-      *out_font_data_size = g_font_matrix_resurrected_size;
+      *out_font_data_size = matrix_size;
     // Also provide a temporary file path for the bundled font.
     static char tmp_path[PLATFORM_MAX_PATH_LENGTH] = {0};
     if (tmp_path[0] == '\0' && out_font_data && *out_font_data) {
@@ -68,9 +73,9 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
 
   if (strcmp(eff, "default") == 0) {
     if (out_font_data)
-      *out_font_data = g_font_default;
+      *out_font_data = default_data;
     if (out_font_data_size)
-      *out_font_data_size = g_font_default_size;
+      *out_font_data_size = default_size;
     // Also provide a temporary file path for the bundled font.
     static char tmp_path_default[PLATFORM_MAX_PATH_LENGTH] = {0};
     if (tmp_path_default[0] == '\0' && out_font_data && *out_font_data) {

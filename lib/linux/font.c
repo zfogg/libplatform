@@ -5,6 +5,7 @@
  */
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <libplatform/font.h>
+
 #include <ascii-chat/font.h>
 #include <ascii-chat/log/log.h>
 #ifndef USE_MUSL
@@ -60,6 +61,10 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   // If no font is specified, use the bundled default font (DejaVu Sans Mono) for render-file output.
   // This ensures render-file always has a suitable fallback font available.
   const char *eff = (spec && spec[0]) ? spec : "default";
+  const uint8_t *matrix_data = NULL, *default_data = NULL;
+  size_t matrix_size = 0, default_size = 0;
+  platform_font_get_data("matrix", &matrix_data, &matrix_size);
+  platform_font_get_data("default", &default_data, &default_size);
 
   if (out_font_data)
     *out_font_data = NULL;
@@ -78,29 +83,27 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   // Check for bundled font names ("matrix" or "default")
   if (strcmp(eff, "matrix") == 0) {
     if (out_font_data)
-      *out_font_data = g_font_matrix_resurrected;
+      *out_font_data = matrix_data;
     if (out_font_data_size)
-      *out_font_data_size = g_font_matrix_resurrected_size;
+      *out_font_data_size = matrix_size;
     snprintf(out, out_size, "matrix");
     *out_is_path = false;
     log_info("USING MATRIX FONT - g_font_matrix_resurrected=%p (size=%zu), g_font_default=%p "
              "(size=%zu)",
-             (void *)g_font_matrix_resurrected, g_font_matrix_resurrected_size, (void *)g_font_default,
-             g_font_default_size);
+             (void *)matrix_data, matrix_size, (void *)default_data, default_size);
     return ASCIICHAT_OK;
   }
 
   if (strcmp(eff, "default") == 0) {
     if (out_font_data)
-      *out_font_data = g_font_default;
+      *out_font_data = default_data;
     if (out_font_data_size)
-      *out_font_data_size = g_font_default_size;
+      *out_font_data_size = default_size;
     snprintf(out, out_size, "default");
     *out_is_path = false;
     log_info("USING DEFAULT FONT - g_font_default=%p (size=%zu), g_font_matrix_resurrected=%p "
              "(size=%zu)",
-             (void *)g_font_default, g_font_default_size, (void *)g_font_matrix_resurrected,
-             g_font_matrix_resurrected_size);
+             (void *)default_data, default_size, (void *)matrix_data, matrix_size);
     return ASCIICHAT_OK;
   }
 
@@ -116,9 +119,9 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   if (err != ASCIICHAT_OK) {
     log_warn("system font resolution failed, using bundled default font");
     if (out_font_data)
-      *out_font_data = g_font_default;
+      *out_font_data = default_data;
     if (out_font_data_size)
-      *out_font_data_size = g_font_default_size;
+      *out_font_data_size = default_size;
     out[0] = '\0';
     *out_is_path = false;
     err = ASCIICHAT_OK;
@@ -129,9 +132,9 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   // musl static builds: fontconfig not available, use bundled default font
   log_debug("using bundled default font (musl build, no fontconfig)");
   if (out_font_data)
-    *out_font_data = g_font_default;
+    *out_font_data = default_data;
   if (out_font_data_size)
-    *out_font_data_size = g_font_default_size;
+    *out_font_data_size = default_size;
   out[0] = '\0';
   *out_is_path = false;
   return ASCIICHAT_OK;
