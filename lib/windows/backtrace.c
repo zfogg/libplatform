@@ -12,6 +12,7 @@
 #include "backtrace_internal.h"
 #include <libplatform/symbols.h>
 #include "util/path.h"
+#include "util/string.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,8 +43,7 @@ static const char *module_name_for_address(HANDLE process, DWORD64 address, char
   if (!basename) {
     basename = strrchr(module_path, '/');
   }
-  strncpy(module_name, basename ? basename + 1 : module_path, module_name_size);
-  module_name[module_name_size - 1] = '\0';
+  (void)platform_strncpy(module_name, module_name_size, basename ? basename + 1 : module_path, module_name_size - 1);
   return module_name;
 }
 
@@ -195,7 +195,7 @@ char **platform_backtrace_symbols(void *const *buffer, int size) {
         bool external = false;
         if (symbol_format_source_path(resolved_module, line_info.FileName, source_path, sizeof(source_path),
                                       &external) != 0) {
-          strncpy(source_path, "unknown", sizeof(source_path));
+          (void)platform_strncpy(source_path, sizeof(source_path), "unknown", sizeof(source_path) - 1);
         }
         snprintf(symbol_buffer, sizeof(symbol_buffer), "%s%s%s%s() (%s:%ld)%s", resolved_module ? "[" : "",
                  resolved_module ? resolved_module : "", resolved_module ? "] " : "", symbol_info->Name, source_path,

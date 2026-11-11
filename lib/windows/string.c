@@ -240,8 +240,7 @@ int platform_strcpy(char *dest, size_t dest_size, const char *src) {
     return -1;
   }
 
-  strncpy(dest, src, dest_size);
-  dest[dest_size - 1] = '\0';
+  (void)platform_strncpy(dest, dest_size, src, src_len);
   return 0;
 }
 
