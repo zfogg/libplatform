@@ -17,6 +17,7 @@
 #ifndef _WIN32
 
 #include <libplatform/cond.h>
+#include <libplatform/time.h>
 #include <time.h>
 #include <stddef.h>
 #include <pthread.h>

@@ -144,6 +144,7 @@ void platform_cleanup_binary_path_cache(void) {
   }
 }
 
+#if !defined(__unix__) && !defined(__APPLE__)
 bool platform_is_binary_in_path(const char *bin_name) {
   if (!bin_name || bin_name[0] == '\0') {
     return false;
@@ -184,6 +185,7 @@ bool platform_is_binary_in_path(const char *bin_name) {
 
   return found;
 }
+#endif
 
 /**
  * @brief Get the path to the current executable
@@ -192,7 +194,7 @@ bool platform_is_binary_in_path(const char *bin_name) {
  * @return true on success, false on failure
  */
 // On Windows, platform_get_executable_path is in windows/filesystem.c
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__unix__) && !defined(__APPLE__)
 bool platform_get_executable_path(char *exe_path, size_t path_size) {
   if (!exe_path || path_size == 0) {
     return false;

@@ -56,7 +56,6 @@ add_library(libplatform::libplatform ALIAS libplatform)
 target_compile_definitions(libplatform-objects PRIVATE LIBPLATFORM_STANDALONE=1)
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c
-  lib/backtrace.c
   lib/filesystem_common.c
   lib/application.c
   lib/app_callbacks.c

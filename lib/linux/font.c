@@ -6,14 +6,29 @@
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <libplatform/font.h>
 
-#include <ascii-chat/font.h>
+#ifndef LIBPLATFORM_STANDALONE
 #include <ascii-chat/log/log.h>
+#else
+#define log_debug(...) ((void)0)
+#define log_info(...) ((void)0)
+#define log_warn(...) ((void)0)
+#endif
 #ifndef USE_MUSL
 #include <fontconfig/fontconfig.h>
 #endif
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <stddef.h>
+
+#ifdef LIBPLATFORM_STANDALONE
+#define ASCIICHAT_OK 0
+#define ERROR_INVALID_PARAM 1
+#define ERROR_NOT_FOUND 2
+#define SET_ERRNO(...) (-1)
+#else
+#include <ascii-chat/asciichat_errno.h>
+#endif
 
 // Fallback font name for fontconfig when a requested font is not found.
 // DejaVu Sans Mono ships with the vast majority of distros.
@@ -28,7 +43,7 @@ static bool file_exists(const char *p) {
 }
 
 #ifndef USE_MUSL
-static asciichat_error_t resolve_via_fontconfig(const char *name, char *out, size_t sz) {
+static int resolve_via_fontconfig(const char *name, char *out, size_t sz) {
   FcConfig *fc = FcInitLoadConfigAndFonts();
   FcPattern *pat = FcNameParse((const FcChar8 *)name);
   if (!pat)
@@ -56,8 +71,8 @@ static asciichat_error_t resolve_via_fontconfig(const char *name, char *out, siz
 }
 #endif
 
-asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
-                                        const uint8_t **out_font_data, size_t *out_font_data_size) {
+int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
+                          const uint8_t **out_font_data, size_t *out_font_data_size) {
   // If no font is specified, use the bundled default font (DejaVu Sans Mono) for render-file output.
   // This ensures render-file always has a suitable fallback font available.
   const char *eff = (spec && spec[0]) ? spec : "default";
@@ -109,7 +124,7 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
 
 #ifndef USE_MUSL
   *out_is_path = true;
-  asciichat_error_t err = resolve_via_fontconfig(eff, out, out_size);
+  int err = resolve_via_fontconfig(eff, out, out_size);
   if (err != ASCIICHAT_OK && strcmp(eff, k_fallback) != 0) {
     log_warn("'%s' not found, trying '%s'", eff, k_fallback);
     err = resolve_via_fontconfig(k_fallback, out, out_size);

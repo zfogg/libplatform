@@ -14,6 +14,22 @@
 #include <string.h>
 #include <errno.h>
 
+/* libplatform is also built as a standalone dependency.  Keep diagnostics
+ * optional there; the host application supplies its logging macros when the
+ * full logging subsystem is available. */
+#ifndef log_debug
+#define log_debug(...) ((void)0)
+#endif
+#ifndef log_warn
+#define log_warn(...) ((void)0)
+#endif
+#ifndef log_dev
+#define log_dev(...) ((void)0)
+#endif
+#ifndef SAFE_STRERROR
+#define SAFE_STRERROR strerror
+#endif
+
 #define SET_ERRNO(...) (-1)
 #define SET_ERRNO_SYS(...) (-1)
 #define ERROR_INVALID_PARAM 1
