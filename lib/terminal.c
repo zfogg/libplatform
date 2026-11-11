@@ -97,49 +97,8 @@ bool terminal_should_color_output(int fd, const terminal_options_t *options) {
     return false; // NEVER colorize
   }
 
-  // Priority 3: --color=auto (default) - Smart detection
-  // Special case: Show colors for --help and --version even if not a TTY
-  // Check for help/version in global argv (set by main.c early)
-  if (options->argc > 1 && options->argv) {
-    for (int i = 1; i < options->argc; i++) {
-      if (strcmp(options->argv[i], "--help") == 0 || strcmp(options->argv[i], "-h") == 0 || strcmp(options->argv[i], "--version") == 0 ||
-          strcmp(options->argv[i], "-v") == 0 || strcmp(options->argv[i], "--show-capabilities") == 0) {
-        // For help/version/show-capabilities, use colors only if output is a TTY
-        // (respect piping convention: no colors unless --color=true)
-        int is_tty = platform_isatty(fd);
-        if (!is_tty) {
-          // Piping detected - fall through to check environment overrides
-          break;
-        }
-
-        // It's a TTY - show colors for help. Check environment overrides.
-        if (platform_getenv("ASCII_CHAT_COLOR")) {
-          return true; // ASCII_CHAT_COLOR env var forces colors
-        }
-
-        // CLAUDECODE environment variable (LLM automation) - disable colors
-        if (platform_getenv("CLAUDECODE")) {
-          return false; // NO colors in Claude Code environment
-        }
-
-        // For help output to TTY, show colors by default
-        return true;
-      }
-    }
-  }
-
-  // Check environment variable overrides
-  if (platform_getenv("ASCII_CHAT_COLOR")) {
-    return true; // ASCII_CHAT_COLOR env var forces colors
-  }
-
-  // CLAUDECODE environment variable (LLM automation) - disable colors
-  if (platform_getenv("CLAUDECODE")) {
-    return false; // NO colors in Claude Code environment
-  }
-
-  // Check if output is a TTY (pipe detection)
-  // Default: Use colors only if we have TTY and no environment overrides
+  // Auto mode follows the destination terminal. Application-specific flags
+  // and environment policy belong to the application, not libplatform.
   return platform_isatty(fd);
 }
 

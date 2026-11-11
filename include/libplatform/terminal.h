@@ -702,8 +702,6 @@ typedef struct terminal_options {
   int height;
   int fps;
   bool snapshot_mode;
-  int argc;
-  char *const *argv;
 } terminal_options_t;
 
 void terminal_input_lock(void);
