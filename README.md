@@ -112,17 +112,60 @@ live under `lib/util/` and are private implementation headers. They are not
 installed as consumer-facing API; applications should use their own utility
 headers and the public libplatform APIs above.
 
-For completeness, the installed common headers are `agent.h`,
-`app_callbacks.h`, `atomic.h`, `backtrace.h`, `clipboard.h`, `compiler.h`,
-`cond.h`, `cpu.h`, `errno.h`, `filesystem.h`, `font.h`, `keyboard.h`,
-`lifecycle.h`, `memory.h`, `mmap.h`, `mutex.h`, `named.h`, `pipe.h`,
-`process.h`, `question.h`, `rwlock.h`, `signal.h`, `socket.h`, `symbols.h`,
-`system.h`, `systemd.h`, `terminal.h`, `thread.h`, `time.h`, `uthash.h`,
-`wakeup.h`, and `windows_compat.h`. The platform-specific public headers are
-`posix/system.h`, `windows/getopt.h`, and `windows/system.h`. The public debug
-headers are `debug/atomic.h`, `debug/backtrace.h`, `debug/coverage.h`,
-`debug/debug_helpers.h`, `debug/errno.h`, `debug/helpers.h`, `debug/memory.h`,
-`debug/mutex.h`, `debug/named.h`, `debug/stats.h`, and `debug/sync.h`.
+### Common headers
+
+- `agent.h` — discovers SSH and GPG agent endpoints.
+- `app_callbacks.h` — defines callbacks for library-owned diagnostics.
+- `atomic.h` — provides portable atomic values and operations.
+- `backtrace.h` — captures and prints platform backtraces.
+- `clipboard.h` — reads clipboard text through an application formatter.
+- `compiler.h` — provides compiler and language compatibility definitions.
+- `cond.h` — provides condition variables, waits, signals, and broadcasts.
+- `cpu.h` — detects SSE2, SSSE3, AVX2, NEON, SVE, and CRC32 features.
+- `errno.h` — exposes the platform error boundary.
+- `filesystem.h` — provides files, directories, permissions, and data paths.
+- `font.h` — provides the embedded-font registry and lookup operations.
+- `keyboard.h` — provides keyboard input, editing, and text decoding.
+- `lifecycle.h` — coordinates one-time initialization and shutdown.
+- `memory.h` — defines the portable allocation seam.
+- `mmap.h` — maps and unmaps files and memory regions.
+- `mutex.h` — provides mutual exclusion and try-lock operations.
+- `named.h` — gives long-lived objects stable names.
+- `pipe.h` — provides portable anonymous pipe operations.
+- `process.h` — manages process titles and subprocess execution.
+- `question.h` — asks interactive questions and reads answers.
+- `rwlock.h` — provides reader/writer locks and timing operations.
+- `signal.h` — installs and manages portable signal handlers.
+- `socket.h` — creates, configures, connects, polls, and closes sockets.
+- `symbols.h` — resolves addresses and formats symbol names.
+- `system.h` — provides environment, descriptors, clocks, sleeps, and startup.
+- `systemd.h` — sends service readiness and watchdog notifications.
+- `terminal.h` — detects terminal capabilities and controls terminal output.
+- `thread.h` — creates, joins, detaches, and identifies platform threads.
+- `time.h` — provides monotonic time, deadlines, and sleep helpers.
+- `uthash.h` — vendors the hash-table dependency used by registries.
+- `wakeup.h` — wakes worker threads portably.
+- `windows_compat.h` — supplies Windows compatibility definitions.
+
+### Platform-specific headers
+
+- `posix/system.h` — exposes the POSIX system adapter boundary.
+- `windows/getopt.h` — provides getopt and getopt-long compatibility on Windows.
+- `windows/system.h` — exposes Windows-specific system adapter details.
+
+### Debug headers
+
+- `debug/atomic.h` — registers and reports atomic-operation statistics.
+- `debug/backtrace.h` — captures, filters, formats, and prints diagnostic traces.
+- `debug/coverage.h` — exposes coverage instrumentation hooks.
+- `debug/debug_helpers.h` — provides shared initialization and debug helpers.
+- `debug/errno.h` — reports debug error and errno state.
+- `debug/helpers.h` — provides common debug formatting and callback helpers.
+- `debug/memory.h` — tracks allocations, frees, peaks, and live blocks.
+- `debug/mutex.h` — tracks mutex ownership, waits, and deadlock state.
+- `debug/named.h` — reports the named-object registry and metadata.
+- `debug/stats.h` — schedules and triggers debug report threads.
+- `debug/sync.h` — reports mutex, rwlock, condition-variable, and atomic state.
 
 The common files own the contracts and the platform files provide the actual
 behavior. That makes the differences visible in the implementation without
