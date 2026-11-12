@@ -201,7 +201,10 @@ static bool send_background_query(void) {
 }
 
 bool keyboard_request_background(void) {
-  return keyboard_is_initialized() && send_background_query();
+  bool result = keyboard_is_initialized() && send_background_query();
+  if (result)
+    keyboard_stream_query_started();
+  return result;
 }
 
 bool keyboard_query_background(uint8_t *r, uint8_t *g, uint8_t *b) {

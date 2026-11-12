@@ -81,6 +81,8 @@ keyboard_key_t keyboard_text_utf16(uint16_t *pending_high, uint16_t unit) {
 static atomic_int parser_guard = 0;
 static atomic_uint_least64_t background_rgb = 0;
 static atomic_uint_least64_t background_ns = 0;
+static atomic_bool background_query_pending = false;
+static atomic_uint_fast64_t background_query_deadline_us = 0;
 static keyboard_key_t deferred[KEYBOARD_DEFERRED_KEY_CAPACITY];
 static unsigned deferred_head, deferred_count;
 static bool querying_background;
@@ -154,7 +156,14 @@ void keyboard_stream_reset(void) {
   memset(&text_decoder, 0, sizeof(text_decoder));
   pending_escape = discarding_osc = osc_escape = false;
   queued_key = KEY_NONE;
+  atomic_store(&background_query_pending, false);
+  atomic_store(&background_query_deadline_us, 0);
   parser_unlock();
+}
+
+void keyboard_stream_query_started(void) {
+  atomic_store(&background_query_deadline_us, platform_get_monotonic_time_us() + 500000);
+  atomic_store(&background_query_pending, true);
 }
 
 static keyboard_key_t keyboard_stream_read_unlocked(int (*read_byte)(void)) {
@@ -167,6 +176,10 @@ static keyboard_key_t keyboard_stream_read_unlocked(int (*read_byte)(void)) {
     int byte = read_byte();
     if (!byte) {
       if (length == 1 && !pasting && (platform_get_monotonic_time_us() * 1000ULL) - started >= 50 * NS_PER_MS_INT) {
+        if (atomic_load(&background_query_pending) &&
+            platform_get_monotonic_time_us() < atomic_load(&background_query_deadline_us))
+          return KEY_NONE;
+        atomic_store(&background_query_pending, false);
         length = 0;
         pending_escape = false;
         return KEY_ESCAPE;
@@ -239,6 +252,7 @@ static keyboard_key_t keyboard_stream_read_unlocked(int (*read_byte)(void)) {
           atomic_store(&background_rgb, rgb);
           atomic_store(&background_ns, completed_ns);
         }
+        atomic_store(&background_query_pending, false);
 }
       length = 0;
       bool escape = pending_escape;
@@ -357,6 +371,7 @@ bool keyboard_stream_query_background(int (*read_byte)(void), bool (*send_query)
   querying_background = true;
   bool received = false;
   if (deferred_count < 1024 && send_query()) {
+    keyboard_stream_query_started();
     do {
       keyboard_key_t key = keyboard_stream_read_unlocked(read_byte);
       if (key != KEY_NONE)
