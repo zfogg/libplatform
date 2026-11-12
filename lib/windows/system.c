@@ -5,6 +5,7 @@
 #include <libplatform/socket.h>
 #include <libplatform/terminal.h>
 #include <windows.h>
+#include <wincrypt.h>
 #include <psapi.h>
 #include <fcntl.h>
 #include <io.h>
@@ -18,6 +19,8 @@
 #include <sys/stat.h>
 #include <direct.h>
 #include <process.h>
+
+#pragma comment(lib, "crypt32.lib")
 
 const char *platform_getenv(const char *name) {
   static _Thread_local char value[32768];
@@ -239,11 +242,45 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
 }
 
 int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
-  if (pem_data_out)
-    *pem_data_out = NULL;
-  if (pem_size_out)
-    *pem_size_out = 0;
-  return -1;
+  if (!pem_data_out || !pem_size_out)
+    return -1;
+  *pem_data_out = NULL;
+  *pem_size_out = 0;
+
+  HCERTSTORE store = CertOpenSystemStoreA((HCRYPTPROV_LEGACY)0, "ROOT");
+  if (!store)
+    return -1;
+
+  size_t total = 0;
+  PCCERT_CONTEXT cert = NULL;
+  while ((cert = CertEnumCertificatesInStore(store, cert)) != NULL) {
+    DWORD needed = 0;
+    if (!CryptBinaryToStringA(cert->pbCertEncoded, cert->cbCertEncoded, CRYPT_STRING_BASE64HEADER, NULL, &needed))
+      continue;
+    total += (size_t)needed;
+  }
+  if (total == 0) {
+    CertCloseStore(store, 0);
+    return -1;
+  }
+
+  char *pem = malloc(total + 1);
+  if (!pem) {
+    CertCloseStore(store, 0);
+    return -1;
+  }
+  size_t written = 0;
+  cert = NULL;
+  while ((cert = CertEnumCertificatesInStore(store, cert)) != NULL) {
+    DWORD needed = (DWORD)(total - written);
+    if (CryptBinaryToStringA(cert->pbCertEncoded, cert->cbCertEncoded, CRYPT_STRING_BASE64HEADER, pem + written, &needed))
+      written += (size_t)needed;
+  }
+  CertCloseStore(store, 0);
+  pem[written] = '\0';
+  *pem_data_out = pem;
+  *pem_size_out = written;
+  return 0;
 }
 
 int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size_t ipv4_out_size) {
