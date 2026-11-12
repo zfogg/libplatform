@@ -426,8 +426,10 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
 
   uint8_t priority = 0;
   char full_path[MAX_PATH];
+  const platform_application_config_t *app_config = platform_application_config();
+  const char *config_directory = app_config->config_directory;
 
-  // Priority 0: %APPDATA%\application (user config)
+  // Priority 0: %APPDATA%\<config-directory> (user config)
   char *config_dir = platform_get_config_dir();
   if (config_dir) {
     int ret = snprintf(full_path, sizeof(full_path), "%s%s", config_dir, filename);
@@ -447,10 +449,10 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
 
   free(config_dir);
 
-  // Priority 1: %LOCALAPPDATA%\application
+  // Priority 1: %LOCALAPPDATA%\<config-directory>
   char localappdata[MAX_PATH];
   if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localappdata))) {
-    int ret = snprintf(full_path, sizeof(full_path), "%s\\application\\%s", localappdata, filename);
+    int ret = snprintf(full_path, sizeof(full_path), "%s\\%s\\%s", localappdata, config_directory, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -465,10 +467,10 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
     }
   }
 
-  // Priority 2: %PROGRAMDATA%\application (system config)
+  // Priority 2: %PROGRAMDATA%\<config-directory> (system config)
   char programdata[MAX_PATH];
   if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_COMMON_APPDATA, NULL, 0, programdata))) {
-    int ret = snprintf(full_path, sizeof(full_path), "%s\\application\\%s", programdata, filename);
+    int ret = snprintf(full_path, sizeof(full_path), "%s\\%s\\%s", programdata, config_directory, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -526,24 +528,26 @@ const char *platform_get_home_dir(void) {
 }
 
 char *platform_get_config_dir(void) {
+  const platform_application_config_t *app_config = platform_application_config();
+  const char *config_directory = app_config->config_directory;
   char appdata[MAX_PATH];
   const char *config_home = platform_getenv("APPDATA");
   if (config_home && config_home[0] != '\0') {
-    size_t len = strlen(config_home) + strlen("\\application\\") + 1;
+    size_t len = strlen(config_home) + strlen(config_directory) + strlen("\\") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s\\application\\", config_home);
+    snprintf(dir, len, "%s\\%s\\", config_home, config_directory);
     return dir;
   }
   if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appdata))) {
-    size_t len = strlen(appdata) + strlen("\\application\\") + 1;
+    size_t len = strlen(appdata) + strlen(config_directory) + strlen("\\") + 1;
     char *dir = malloc(len);
     if (!dir) {
       return NULL;
     }
-    snprintf(dir, len, "%s\\application\\", appdata);
+    snprintf(dir, len, "%s\\%s\\", appdata, config_directory);
     return dir;
   }
 
