@@ -123,7 +123,6 @@ if(WIN32)
   )
 elseif(APPLE)
   target_sources(libplatform-objects PRIVATE
-    lib/posix/system.c
     lib/posix/thread.c
     lib/posix/string.c
     lib/posix/filesystem.c
@@ -148,7 +147,6 @@ elseif(APPLE)
   )
 elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_sources(libplatform-objects PRIVATE
-    lib/posix/system.c
     lib/keyboard.c
     lib/posix/thread.c
     lib/posix/string.c
