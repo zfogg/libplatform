@@ -23,7 +23,7 @@ const char *platform_getenv(const char *name) {
   static _Thread_local char value[32768];
   size_t required = 0;
 
-  if (!name || !name[0] || getenv_s(&required, NULL, 0, name) != 0 || required > sizeof(value)) {
+  if (!name || !name[0] || getenv_s(&required, NULL, 0, name) != 0 || required == 0 || required > sizeof(value)) {
     return NULL;
   }
   return getenv_s(&required, value, sizeof(value), name) == 0 ? value : NULL;
