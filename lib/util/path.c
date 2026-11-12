@@ -504,12 +504,12 @@ bool path_looks_like_path(const char *value) {
     return true;
   }
 
-  if (strchr(value, PATH_DELIM)) {
+  if (strchr(value, PATH_DELIM) || strchr(value, '/') || strchr(value, '\\')) {
     return true;
   }
 
 #ifdef _WIN32
-  if (isalpha((unsigned char)value[0]) && value[1] == ':' && value[2] == PATH_DELIM) {
+  if (isalpha((unsigned char)value[0]) && value[1] == ':' && (value[2] == '/' || value[2] == '\\')) {
     return true;
   }
 #endif
