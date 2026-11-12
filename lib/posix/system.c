@@ -57,6 +57,26 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <mach-o/dyld.h>
 #endif
 
+/* POSIX fallbacks for APIs whose platform-specific implementations are not
+ * required by the static CLI build. */
+int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
+  (void)install_prefix;
+  if (list_out) {
+    list_out->candidates = NULL;
+    list_out->count = 0;
+  }
+  return list_out ? 0 : -1;
+}
+
+int platform_enable_keepawake(void) { return 0; }
+
+void platform_disable_keepawake(void) {}
+
+int platform_clipboard_read(char *output, size_t capacity) {
+  if (output && capacity > 0) output[0] = '\0';
+  return -1;
+}
+
 /**
  * @brief Get username from environment variables
  * @return Username string or "unknown" if not found
