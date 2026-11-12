@@ -20,6 +20,12 @@
 #include "util/path.h"
 #include "util/string.h"
 #include <libplatform/system.h>
+#ifdef _WIN32
+#include <windows.h>
+#define LIBPLATFORM_FETCH_ADD(counter) ((uint64_t)InterlockedExchangeAdd64((volatile LONG64 *)&(counter), 1))
+#else
+#define LIBPLATFORM_FETCH_ADD(counter) __sync_fetch_and_add(&(counter), 1)
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -290,13 +296,13 @@ const char *named_register(uintptr_t key, const char *base_name, const char *typ
   if (parent_key == 0) {
     uint64_t counter = 0;
     if (strcmp(type, "mutex") == 0) {
-      counter = __sync_fetch_and_add(&mutex_counter, 1);
+      counter = LIBPLATFORM_FETCH_ADD(mutex_counter);
     } else if (strcmp(type, "rwlock") == 0) {
-      counter = __sync_fetch_and_add(&rwlock_counter, 1);
+      counter = LIBPLATFORM_FETCH_ADD(rwlock_counter);
     } else if (strcmp(type, "cond") == 0) {
-      counter = __sync_fetch_and_add(&cond_counter, 1);
+      counter = LIBPLATFORM_FETCH_ADD(cond_counter);
     } else if (strcmp(type, "atomic") == 0) {
-      counter = __sync_fetch_and_add(&atomic_counter, 1);
+      counter = LIBPLATFORM_FETCH_ADD(atomic_counter);
     }
     snprintf(name_buffer, sizeof(name_buffer), "%s.%" PRIu64, final_base_name, counter);
   } else {

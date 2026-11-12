@@ -136,7 +136,6 @@ elseif(APPLE)
     lib/posix/errno.c
     lib/posix/memory.c
     lib/posix/mmap.c
-    lib/posix/backtrace.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/signal.c
@@ -161,7 +160,6 @@ elseif(UNIX AND NOT APPLE)
     lib/posix/errno.c
     lib/posix/memory.c
     lib/posix/mmap.c
-    lib/posix/backtrace.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/signal.c
@@ -212,7 +210,9 @@ target_compile_features(libplatform PUBLIC c_std_11)
 target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
-  target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
+  if(NOT MSVC)
+    target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
+  endif()
 endif()
 set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS OFF)
 if(WIN32 AND LIBPLATFORM_BUILD_SHARED)
