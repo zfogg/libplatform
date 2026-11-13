@@ -61,7 +61,6 @@ typedef int asciichat_error_t;
 #endif
 
 #include <libplatform/system.h>
-#include <libplatform/filesystem.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
@@ -102,6 +101,8 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
+
+int platform_open(const char *name, const char *pathname, int flags, ...);
 
 /**
  * @brief Get username from environment variables
