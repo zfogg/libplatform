@@ -140,6 +140,7 @@ elseif(APPLE)
   target_sources(libplatform-objects PRIVATE
     lib/posix/thread.c
     lib/posix/string.c
+    lib/posix/system.c
     lib/posix/filesystem.c
     lib/posix/clipboard.c
     lib/posix/keepawake.c
