@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 
+# A parent project may already have configured libplatform from a shared source
+# tree.  CMake targets are global, so a second FetchContent evaluation must be
+# a no-op instead of attempting to recreate the library targets.
+if(TARGET libplatform OR TARGET libplatform-objects OR TARGET libplatform::libplatform)
+  return()
+endif()
+
 # libplatform is tested with LLVM/Clang.  Keep the compiler selectable by a
 # toolchain or an explicit -D override, but make Clang the default for a
 # normal standalone configure.
