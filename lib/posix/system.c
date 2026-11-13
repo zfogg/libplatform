@@ -10,6 +10,15 @@
 
 #ifndef _WIN32
 
+#ifndef ASCIICHAT_OK
+#define ASCIICHAT_OK 0
+#define SET_ERRNO(...) (-1)
+#define SET_ERRNO_SYS(...) (-1)
+typedef int asciichat_error_t;
+#define BUFFER_SIZE_SMALL 1024
+#define HOSTNAME_BUFFER_SIZE 256
+#endif
+
 #include <libplatform/system.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
@@ -746,12 +755,6 @@ asciichat_error_t platform_resolve_hostname_to_ipv4(const char *hostname, char *
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for hostname resolution");
   }
 
-  char ascii_hostname[HOSTNAME_BUFFER_SIZE];
-  asciichat_error_t normalized = hostname_to_ascii(hostname, ascii_hostname, sizeof(ascii_hostname));
-  if (normalized != ASCIICHAT_OK)
-    return normalized;
-  hostname = ascii_hostname;
-
   struct addrinfo hints, *result = NULL;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_INET;       // IPv4 only
@@ -759,15 +762,7 @@ asciichat_error_t platform_resolve_hostname_to_ipv4(const char *hostname, char *
   hints.ai_flags = 0;
   hints.ai_protocol = 0;
 
-  int ret;
-  {
-    ASCII_OTEL_SCOPE(DNS_RESOLVE);
-    if (otel_scope.retained)
-      gotel_attr_string(&otel_scope.scope, "dns.question.name", hostname);
-    ret = getaddrinfo(hostname, NULL, &hints, &result);
-    if (ret && otel_scope.retained)
-      gotel_error(&otel_scope.scope, "dns.error", "DNS lookup failed");
-  }
+  int ret = getaddrinfo(hostname, NULL, &hints, &result);
   if (ret != 0) {
     return SET_ERRNO_SYS(ERROR_NETWORK, "Failed to resolve hostname: %s", hostname);
   }
