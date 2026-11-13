@@ -89,7 +89,6 @@ target_sources(libplatform-objects PRIVATE
   lib/named.c
   lib/cpu.c
   lib/font.c
-  lib/backtrace.c
 )
 target_sources(libplatform-objects PRIVATE
   lib/util/path.c
@@ -113,6 +112,7 @@ if(WIN32)
     lib/keyboard.c
     lib/windows/thread.c
     lib/windows/backtrace.c
+    lib/backtrace.c
     lib/windows/string.c
     lib/windows/filesystem.c
     lib/windows/terminal.c
