@@ -82,6 +82,12 @@
 #include <stdbool.h>
 
 /**
+ * @brief Check whether a module belongs to ascii-chat
+ * @param module_name Module basename or path
+ */
+bool symbol_module_is_project(const char *module_name);
+
+/**
  * @brief Check whether a module belongs to the supplied module set
  * @param module_name Module basename or path
  */
@@ -99,8 +105,7 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
  * Project sources use repository-relative paths. External sources retain at
  * most four parent directories and the filename.
  */
-int symbol_format_source_path(const char *module_name, const char *source_path, char *output,
-                              size_t output_size, bool *external, const char *const *owned_dirs);
+int symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size, bool *external, const char *const *owned_dirs);
 
 /* ============================================================================
  * Symbol Cache Lifecycle

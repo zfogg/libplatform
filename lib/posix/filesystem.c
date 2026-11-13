@@ -28,24 +28,6 @@
 #include <mach-o/dyld.h>
 #endif
 
-const char *platform_getenv(const char *name) {
-  return name ? getenv(name) : NULL;
-}
-
-int platform_open(const char *name, const char *pathname, int flags, ...) {
-  (void)name;
-  if (!pathname)
-    return -1;
-  mode_t mode = 0;
-  if (flags & O_CREAT) {
-    va_list args;
-    va_start(args, flags);
-    mode = (mode_t)va_arg(args, int);
-    va_end(args);
-  }
-  return open(pathname, flags, mode);
-}
-
 // ============================================================================
 // Directory Management
 // ============================================================================
@@ -273,7 +255,7 @@ int platform_rmdir_recursive(const char *path) {
     char full_path[PLATFORM_MAX_PATH_LENGTH];
     int len = snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
     if (len < 0 || len >= (int)sizeof(full_path)) {
-continue;
+      continue;
     }
 
     /* Check if it's a directory using stat */
@@ -287,7 +269,7 @@ continue;
     } else {
       /* Delete file */
       if (unlink(full_path) != 0) {
-result = EIO;
+        result = EIO;
       }
     }
   }
@@ -661,6 +643,16 @@ char *platform_get_data_dir(void) {
   return NULL;
 }
 
+int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
+  (void)install_prefix;
+  if (!list_out) {
+    return -1;
+  }
+  list_out->candidates = NULL;
+  list_out->count = 0;
+  return 0;
+}
+
 // ============================================================================
 // Platform Path Utilities
 // ============================================================================
@@ -848,17 +840,21 @@ bool platform_is_binary_in_path(const char *bin_name) {
 
 #ifdef __linux__
 bool platform_get_executable_path(char *exe_path, size_t path_size) {
-  if (!exe_path || path_size < 2) return false;
+  if (!exe_path || path_size < 2)
+    return false;
   ssize_t len = readlink("/proc/self/exe", exe_path, path_size - 1);
-  if (len < 0 || (size_t)len >= path_size - 1) return false;
+  if (len < 0 || (size_t)len >= path_size - 1)
+    return false;
   exe_path[len] = '\0';
   return true;
 }
 #elif defined(__APPLE__)
 bool platform_get_executable_path(char *exe_path, size_t path_size) {
-  if (!exe_path || path_size < 2 || path_size > UINT32_MAX) return false;
+  if (!exe_path || path_size < 2 || path_size > UINT32_MAX)
+    return false;
   uint32_t length = (uint32_t)path_size;
-  if (_NSGetExecutablePath(exe_path, &length) != 0 || length >= path_size) return false;
+  if (_NSGetExecutablePath(exe_path, &length) != 0 || length >= path_size)
+    return false;
   exe_path[length] = '\0';
   return true;
 }

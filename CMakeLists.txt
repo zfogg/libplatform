@@ -62,6 +62,7 @@ target_sources(libplatform-objects PRIVATE
   lib/lifecycle.c
   lib/mutex.c
   lib/cond.c
+  lib/rwlock.c
   lib/system_common.c
   lib/keyboard.c
   lib/terminal.c
@@ -149,6 +150,10 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/keyboard.c
     lib/posix/thread.c
     lib/posix/string.c
+    lib/posix/filesystem.c
+    lib/posix/clipboard.c
+    lib/posix/keepawake.c
+    lib/posix/terminal.c
     lib/posix/system.c
     lib/posix/agent.c
     lib/posix/socket.c
@@ -271,3 +276,4 @@ if(LIBPLATFORM_BUILD_TESTS)
   target_link_libraries(libplatform-test PRIVATE libplatform)
   add_test(NAME libplatform-test COMMAND libplatform-test)
 endif()
+

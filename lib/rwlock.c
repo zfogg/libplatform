@@ -24,6 +24,10 @@
 
 #include <stdio.h>
 
+#undef rwlock_on_rdlock
+#undef rwlock_on_wrlock
+#undef rwlock_on_unlock
+
 #ifndef NDEBUG
 
 /**
@@ -133,13 +137,11 @@ int rwlock_format_state(const rwlock_t *rwlock, char *buffer, size_t size) {
   }
 
   if (rwlock->rdlock_count > 0 || rwlock->wrlock_count > 0 || rwlock->unlock_count > 0) {
-    snprintf(count_str, sizeof(count_str), "[ops: rdlock=%llu wrlock=%llu unlock=%llu]",
-             (unsigned long long)rwlock->rdlock_count, (unsigned long long)rwlock->wrlock_count,
+    snprintf(count_str, sizeof(count_str), "[ops: rdlock=%llu wrlock=%llu unlock=%llu]", (unsigned long long)rwlock->rdlock_count, (unsigned long long)rwlock->wrlock_count,
              (unsigned long long)rwlock->unlock_count);
   }
 
-  offset += snprintf(buffer + offset, size - offset, "%s %s %s %s %s", rdlock_str, wrlock_str, unlock_str, held_str,
-                     count_str);
+  offset += snprintf(buffer + offset, size - offset, "%s %s %s %s %s", rdlock_str, wrlock_str, unlock_str, held_str, count_str);
   return offset;
 }
 
@@ -159,7 +161,6 @@ void rwlock_log_state(const rwlock_t *rwlock, const char *file, int line, const 
     return;
   char buf[PLATFORM_RWLOCK_BUF_BUFFER_SIZE];
   rwlock_format_state(rwlock, buf, sizeof(buf));
-
 }
 
 #endif // !NDEBUG
