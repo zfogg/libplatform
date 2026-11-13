@@ -36,7 +36,7 @@ typedef int asciichat_error_t;
 #define SAFE_STRERROR(err) strerror(err)
 #endif
 #ifndef SAFE_STRNCPY
-#define SAFE_STRNCPY(dst, src, size) (strncpy((dst), (src), (size)), (dst)[(size)-1] = '\0')
+#define SAFE_STRNCPY(dst, src, size) (strncpy((dst), (src), (size)), (dst)[(size) - 1] = '\0')
 #endif
 #ifndef NS_PER_SEC_INT
 #define NS_PER_SEC_INT 1000000000LL
@@ -107,6 +107,44 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #endif
 
 int platform_open(const char *name, const char *pathname, int flags, ...);
+
+/**
+ * @brief Get an environment variable after validating its UTF-8 contents.
+ */
+const char *platform_getenv(const char *name) {
+  const char *value = name ? getenv(name) : NULL;
+  if (value && !utf8_is_valid(value)) {
+    log_warn("Environment variable '%s' contains invalid UTF-8, ignoring", name);
+    return NULL;
+  }
+  return value;
+}
+
+/**
+ * @brief Open a file and register its descriptor with the platform diagnostics.
+ */
+int platform_open(const char *name, const char *pathname, int flags, ...) {
+  if (!name || !pathname) {
+    return -1;
+  }
+
+  int fd;
+  if (flags & O_CREAT) {
+    va_list args;
+    va_start(args, flags);
+    const int mode = va_arg(args, int);
+    va_end(args);
+    fd = open(pathname, flags, mode);
+  } else {
+    fd = open(pathname, flags);
+  }
+
+  if (fd >= 0) {
+    NAMED_REGISTER_FD(fd, name);
+    log_dev("Opened file descriptor %d for %s at path %s", fd, name, pathname);
+  }
+  return fd;
+}
 
 /**
  * @brief Get username from environment variables
@@ -626,8 +664,7 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
   if (info) {
 #ifndef NDEBUG
     // Only capture backtraces in Debug builds
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p", sig, signal_name,
-              info->si_code, info->si_addr);
+    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p", sig, signal_name, info->si_code, info->si_addr);
     // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
     backtrace_log_frames(4, 0, 1);
 #else
@@ -744,8 +781,7 @@ asciichat_error_t platform_strcpy(char *dest, size_t dest_size, const char *src)
 
   size_t src_len = strlen(src);
   if (src_len >= dest_size) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "Source string too long for destination buffer: %zu >= %zu", src_len,
-                     dest_size);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Source string too long for destination buffer: %zu >= %zu", src_len, dest_size);
   }
 
   // Use strncpy with bounds checking and ensure null termination
@@ -1160,8 +1196,7 @@ bool terminal_release_subprocess_gate(int fd) {
   do {
     written = write(fd, "x", 1);
   } while (written < 0 && errno == EINTR);
-  if (written < 0 && errno == EPIPE && !already_pending && sigpending(&pending) == 0 &&
-      sigismember(&pending, SIGPIPE) == 1) {
+  if (written < 0 && errno == EPIPE && !already_pending && sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1) {
     int received;
     sigwait(&blocked, &received);
   }
@@ -1169,8 +1204,7 @@ bool terminal_release_subprocess_gate(int fd) {
   return written == 1;
 }
 
-int platform_execute_subprocess(const char *executable, const char **argv, char *output_buffer, size_t output_size,
-                                bool (*cancel)(void *), void *data) {
+int platform_execute_subprocess(const char *executable, const char **argv, char *output_buffer, size_t output_size, bool (*cancel)(void *), void *data) {
   if (!executable || !argv || !argv[0]) {
     log_error("Invalid subprocess parameters");
     return -1;
@@ -1196,8 +1230,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
     gate_open = foreground == getpgrp() || (subprocess_terminal_owner > 0 && foreground == subprocess_terminal_owner);
     terminal_input_unlock();
   }
-  if (gate_open && (pipe(start_pipe) != 0 || fcntl(start_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
-                    fcntl(start_pipe[1], F_SETFD, FD_CLOEXEC) < 0)) {
+  if (gate_open && (pipe(start_pipe) != 0 || fcntl(start_pipe[0], F_SETFD, FD_CLOEXEC) < 0 || fcntl(start_pipe[1], F_SETFD, FD_CLOEXEC) < 0)) {
     if (start_pipe[0] >= 0)
       close(start_pipe[0]);
     if (start_pipe[1] >= 0)
@@ -1363,8 +1396,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
           foreground_attributes.c_lflag &= ~(tcflag_t)TOSTOP;
           cleared_tostop = tcsetattr(tty, TCSANOW, &foreground_attributes) == 0;
         }
-        if (have_terminal_attributes && (!(terminal_attributes.c_lflag & TOSTOP) || cleared_tostop) &&
-            subprocess_set_foreground(tty, pid) == 0) {
+        if (have_terminal_attributes && (!(terminal_attributes.c_lflag & TOSTOP) || cleared_tostop) && subprocess_set_foreground(tty, pid) == 0) {
           terminal_owned = true;
           subprocess_terminal_owner = pid;
           if (gate_open) {
