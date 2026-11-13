@@ -349,16 +349,6 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
  * Returns NULL if the environment variable contains invalid UTF-8 sequences,
  * helping prevent corruption from malformed environment data.
  */
-const char *platform_getenv(const char *name) {
-  const char *value = getenv(name);
-  if (value && !utf8_is_valid(value)) {
-    // Invalid UTF-8 detected - log warning and return NULL
-    log_warn("Environment variable '%s' contains invalid UTF-8, ignoring", name);
-    return NULL;
-  }
-  return value;
-}
-
 /**
  * @brief Set environment variable
  * @param name Environment variable name
@@ -499,31 +489,6 @@ void platform_set_last_error(int error) {
  * @param ... Mode (if O_CREAT is specified)
  * @return File descriptor on success, -1 on failure
  */
-int platform_open(const char *name, const char *pathname, int flags, ...) {
-  if (!name) {
-    return -1;
-  }
-
-  int fd = -1;
-  int mode = 0;
-  if (flags & O_CREAT) {
-    va_list args;
-    va_start(args, flags);
-    mode = va_arg(args, int);
-    va_end(args);
-    fd = open(pathname, flags, mode);
-  } else {
-    fd = open(pathname, flags);
-  }
-
-  if (fd >= 0) {
-    NAMED_REGISTER_FD(fd, name);
-    log_dev("Opened file descriptor %d for %s at path %s", fd, name, pathname);
-  }
-
-  return fd;
-}
-
 /**
  * @brief Open file descriptor with platform-safe mode
  * @param name Debug name for the stream
