@@ -74,7 +74,6 @@ target_sources(libplatform-objects PRIVATE
   lib/named.c
   lib/cpu.c
   lib/font.c
-  lib/backtrace.c
 )
 target_sources(libplatform-objects PRIVATE
   lib/util/path.c
@@ -150,8 +149,7 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/keyboard.c
     lib/posix/thread.c
     lib/posix/string.c
-    lib/posix/filesystem.c
-    lib/posix/terminal.c
+    lib/posix/system.c
     lib/posix/agent.c
     lib/posix/socket.c
     lib/posix/process.c
@@ -164,10 +162,8 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/backtrace.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
-    lib/posix/signal.c
     lib/posix/question.c
     lib/posix/wakeup.c
-    lib/posix/system.c
     lib/linux/system.c
     lib/linux/systemd.c
     lib/linux/font.c

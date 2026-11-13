@@ -64,6 +64,7 @@ typedef int asciichat_error_t;
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
+#include <libplatform/debug/backtrace.h>
 #include "util/string.h"
 #include <libplatform/time.h>
 #include "util/path.h"
@@ -100,6 +101,11 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
+
+#ifndef LOG_ERROR
+#define LOG_ERROR 4
+#endif
+
 
 /**
  * @brief Get username from environment variables
@@ -1161,18 +1167,6 @@ asciichat_error_t platform_restore_timer_resolution(void) {
 // Serialize foreground ownership checks and changes across concurrent loaders.
 static pthread_mutex_t subprocess_terminal_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pid_t subprocess_terminal_owner = -1;
-
-void terminal_input_lock(void) {
-  pthread_mutex_lock(&subprocess_terminal_mutex);
-}
-
-bool terminal_input_trylock(void) {
-  return pthread_mutex_trylock(&subprocess_terminal_mutex) == 0;
-}
-
-void terminal_input_unlock(void) {
-  pthread_mutex_unlock(&subprocess_terminal_mutex);
-}
 
 static int subprocess_set_foreground(int fd, pid_t group) {
   sigset_t block, previous;
