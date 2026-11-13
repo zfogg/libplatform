@@ -10,8 +10,20 @@
 #include <libplatform/font.h>
 
 #include <libplatform/filesystem.h>
+#ifndef LIBPLATFORM_STANDALONE
+#include <ascii-chat/asciichat_errno.h>
+#include <ascii-chat/log/log.h>
+#else
+#define ASCIICHAT_OK 0
+#define ERROR_INVALID_PARAM 1
+#define ERROR_NOT_FOUND 2
+#define SET_ERRNO(...) (-1)
+#define log_debug(...) ((void)0)
+#endif
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 static bool is_absolute_path(const char *s) {
   return s && s[0] == '/';
@@ -21,8 +33,8 @@ static bool file_exists(const char *p) {
   return stat(p, &st) == 0;
 }
 
-asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
-                                        const uint8_t **out_font_data, size_t *out_font_data_size) {
+int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
+                          const uint8_t **out_font_data, size_t *out_font_data_size) {
   // If no font is specified, use the bundled default font (DejaVu Sans Mono) for render-file output.
   // This ensures render-file always has a suitable fallback font available.
   const char *eff = (spec && spec[0]) ? spec : "default";
