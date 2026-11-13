@@ -3,7 +3,7 @@
  * @brief WASM lifecycle management using atomic operations (no mutexes)
  */
 
-#include <ascii-chat/util/lifecycle.h>
+#include <libplatform/lifecycle.h>
 #include <ascii-chat/atomic.h>
 #include <stdbool.h>
 
