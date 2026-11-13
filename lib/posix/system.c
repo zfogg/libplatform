@@ -42,13 +42,16 @@ typedef int asciichat_error_t;
 #define NS_PER_SEC_INT 1000000000LL
 #endif
 #ifndef time_timespec_to_ns
-#define time_timespec_to_ns(ts) ((uint64_t)(ts).tv_sec * (uint64_t)NS_PER_SEC_INT + (uint64_t)(ts).tv_nsec)
+#define time_timespec_to_ns(ts) ((uint64_t)(ts)->tv_sec * (uint64_t)NS_PER_SEC_INT + (uint64_t)(ts)->tv_nsec)
 #endif
 #ifndef time_ns_to_us
 #define time_ns_to_us(ns) ((uint64_t)(ns) / 1000ULL)
 #endif
 #ifndef platform_cleanup_binary_path_cache
 #define platform_cleanup_binary_path_cache() ((void)0)
+#endif
+#ifndef socket_init
+#define socket_init() 0
 #endif
 #ifndef log_debug
 #define log_debug(...) ((void)0)
