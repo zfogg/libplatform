@@ -47,6 +47,25 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <netdb.h>
+
+#ifdef LIBPLATFORM_STANDALONE
+// The standalone libplatform target does not include ascii-chat's errno
+// layer. Keep the POSIX system implementation self-contained for consumers
+// that link libplatform directly.
+typedef int asciichat_error_t;
+#define ASCIICHAT_OK 0
+#define ERROR_CRYPTO 1
+#define ERROR_INVALID_PARAM 2
+#define ERROR_INVALID_STATE 3
+#define ERROR_MEMORY 4
+#define ERROR_NETWORK 5
+#define ERROR_PLATFORM_INIT 6
+#define SET_ERRNO(...) (-1)
+#define SET_ERRNO_SYS(...) (-1)
+#define SAFE_MALLOC(type, count) ((type *)malloc(sizeof(type) * (count)))
+#define SAFE_STRNCPY(dest, size, src) strncpy((dest), (src), (size))
+#define SAFE_STRERROR(error) strerror(error)
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
