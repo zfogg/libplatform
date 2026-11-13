@@ -61,6 +61,7 @@ typedef int asciichat_error_t;
 #endif
 
 #include <libplatform/system.h>
+#include <libplatform/filesystem.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
