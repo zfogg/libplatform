@@ -24,6 +24,11 @@ set(LIBPLATFORM_UTF8PROC_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/utf8proc" 
   "utf8proc source directory used when LIBPLATFORM_UTF8PROC_TARGET is not supplied")
 include(GNUInstallDirs)
 
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(LIBPLATFORM_FONTCONFIG REQUIRED IMPORTED_TARGET fontconfig)
+endif()
+
 if(NOT LIBPLATFORM_UTF8PROC_TARGET)
   if(TARGET utf8proc::utf8proc)
     set(LIBPLATFORM_UTF8PROC_TARGET utf8proc::utf8proc)
@@ -60,6 +65,9 @@ else()
   add_library(libplatform STATIC $<TARGET_OBJECTS:libplatform-objects>)
 endif()
 add_library(libplatform::libplatform ALIAS libplatform)
+if(TARGET PkgConfig::LIBPLATFORM_FONTCONFIG)
+  target_link_libraries(libplatform PUBLIC PkgConfig::LIBPLATFORM_FONTCONFIG)
+endif()
 target_compile_definitions(libplatform-objects PRIVATE LIBPLATFORM_STANDALONE=1)
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c
