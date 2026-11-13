@@ -10,7 +10,6 @@
 #include <libplatform/font.h>
 
 #include <libplatform/filesystem.h>
-#include <ascii-chat/log/log.h>
 #include <string.h>
 #include <sys/stat.h>
 
