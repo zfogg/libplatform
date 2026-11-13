@@ -89,6 +89,7 @@ target_sources(libplatform-objects PRIVATE
   lib/named.c
   lib/cpu.c
   lib/font.c
+  lib/backtrace.c
 )
 target_sources(libplatform-objects PRIVATE
   lib/util/path.c
