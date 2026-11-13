@@ -8,6 +8,12 @@
 #include <ascii-chat/asciichat_errno.h>
 #include <libplatform/socket.h>
 
+int socket_init(void) {
+  return 0;
+}
+
+void socket_cleanup(void) {}
+
 int platform_popen(const char *name, const char *command, const char *mode, FILE **out_stream) {
   (void)name;
   (void)command;

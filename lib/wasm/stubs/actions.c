@@ -70,6 +70,14 @@ void platform_disable_keepawake(void) {
 // Keyboard input stubs
 #include <libplatform/keyboard.h>
 
+int keyboard_init(void) {
+  return ASCIICHAT_OK;
+}
+
+bool keyboard_is_initialized(void) {
+  return false;
+}
+
 bool keyboard_request_background(void) {
   return false;
 }

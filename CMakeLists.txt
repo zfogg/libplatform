@@ -180,7 +180,6 @@ elseif(EMSCRIPTEN)
   get_target_property(_libplatform_common_sources libplatform-objects SOURCES)
   foreach(_wasm_replaced_source
     lib/filesystem_common.c
-    lib/keyboard.c
     lib/lifecycle.c
     lib/system_common.c
     lib/terminal.c
