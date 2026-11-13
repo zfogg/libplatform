@@ -1162,20 +1162,7 @@ asciichat_error_t platform_restore_timer_resolution(void) {
  * Execute a subprocess using fork+exec (POSIX implementation)
  */
 // Serialize foreground ownership checks and changes across concurrent loaders.
-static pthread_mutex_t subprocess_terminal_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pid_t subprocess_terminal_owner = -1;
-
-void terminal_input_lock(void) {
-  pthread_mutex_lock(&subprocess_terminal_mutex);
-}
-
-bool terminal_input_trylock(void) {
-  return pthread_mutex_trylock(&subprocess_terminal_mutex) == 0;
-}
-
-void terminal_input_unlock(void) {
-  pthread_mutex_unlock(&subprocess_terminal_mutex);
-}
 
 static int subprocess_set_foreground(int fd, pid_t group) {
   sigset_t block, previous;
@@ -1233,10 +1220,10 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   int start_pipe[2] = {-1, -1};
   bool gate_open = false;
   if (tty >= 0 && isatty(STDIN_FILENO)) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     pid_t foreground = tcgetpgrp(tty);
     gate_open = foreground == getpgrp() || (subprocess_terminal_owner > 0 && foreground == subprocess_terminal_owner);
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (gate_open && (pipe(start_pipe) != 0 || fcntl(start_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
                     fcntl(start_pipe[1], F_SETFD, FD_CLOEXEC) < 0)) {
@@ -1390,7 +1377,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
       }
     }
     if ((gate_open || terminal_stopped) && !exited) {
-      pthread_mutex_lock(&subprocess_terminal_mutex);
+      terminal_input_lock();
       pid_t foreground = tcgetpgrp(tty);
       if (terminal_stopped && terminal_owned && foreground == pid) {
         terminal_stopped = false;
@@ -1434,7 +1421,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
           terminal_stopped = false;
         }
       }
-      pthread_mutex_unlock(&subprocess_terminal_mutex);
+      terminal_input_unlock();
     }
   }
   if (capture)
@@ -1442,12 +1429,12 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   if (gate_open)
     close(start_pipe[1]);
   if (terminal_owned) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     if (tcgetpgrp(tty) == pid && subprocess_set_foreground(tty, getpgrp()) == 0 && have_terminal_attributes)
       tcsetattr(tty, TCSANOW, &terminal_attributes);
     if (subprocess_terminal_owner == pid)
       subprocess_terminal_owner = -1;
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (tty >= 0)
     close(tty);
