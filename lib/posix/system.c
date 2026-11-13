@@ -17,6 +17,13 @@
 typedef int asciichat_error_t;
 #define BUFFER_SIZE_SMALL 1024
 #define HOSTNAME_BUFFER_SIZE 256
+#define SAFE_MALLOC(size, type) ((type)malloc(size))
+#define SAFE_FREE(ptr) free(ptr)
+#define SAFE_STRERROR(err) strerror(err)
+#define log_debug(...) ((void)0)
+#define log_dev(...) ((void)0)
+#define log_warn(...) ((void)0)
+#define log_error(...) ((void)0)
 #endif
 
 #include <libplatform/system.h>
