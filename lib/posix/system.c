@@ -26,6 +26,22 @@ typedef int asciichat_error_t;
 #define log_error(...) ((void)0)
 #endif
 
+#ifndef SAFE_MALLOC
+#define SAFE_MALLOC(size, type) ((type)malloc(size))
+#endif
+#ifndef SAFE_FREE
+#define SAFE_FREE(ptr) free(ptr)
+#endif
+#ifndef SAFE_STRERROR
+#define SAFE_STRERROR(err) strerror(err)
+#endif
+#ifndef log_debug
+#define log_debug(...) ((void)0)
+#define log_dev(...) ((void)0)
+#define log_warn(...) ((void)0)
+#define log_error(...) ((void)0)
+#endif
+
 #include <libplatform/system.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
