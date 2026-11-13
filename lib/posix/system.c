@@ -106,6 +106,7 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #define LOG_ERROR 4
 #endif
 
+int platform_open(const char *name, const char *pathname, int flags, ...);
 
 /**
  * @brief Get username from environment variables
@@ -354,16 +355,6 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
  * Returns NULL if the environment variable contains invalid UTF-8 sequences,
  * helping prevent corruption from malformed environment data.
  */
-const char *platform_getenv(const char *name) {
-  const char *value = getenv(name);
-  if (value && !utf8_is_valid(value)) {
-    // Invalid UTF-8 detected - log warning and return NULL
-    log_warn("Environment variable '%s' contains invalid UTF-8, ignoring", name);
-    return NULL;
-  }
-  return value;
-}
-
 /**
  * @brief Set environment variable
  * @param name Environment variable name
@@ -504,31 +495,6 @@ void platform_set_last_error(int error) {
  * @param ... Mode (if O_CREAT is specified)
  * @return File descriptor on success, -1 on failure
  */
-int platform_open(const char *name, const char *pathname, int flags, ...) {
-  if (!name) {
-    return -1;
-  }
-
-  int fd = -1;
-  int mode = 0;
-  if (flags & O_CREAT) {
-    va_list args;
-    va_start(args, flags);
-    mode = va_arg(args, int);
-    va_end(args);
-    fd = open(pathname, flags, mode);
-  } else {
-    fd = open(pathname, flags);
-  }
-
-  if (fd >= 0) {
-    NAMED_REGISTER_FD(fd, name);
-    log_dev("Opened file descriptor %d for %s at path %s", fd, name, pathname);
-  }
-
-  return fd;
-}
-
 /**
  * @brief Open file descriptor with platform-safe mode
  * @param name Debug name for the stream
@@ -662,7 +628,8 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
     // Only capture backtraces in Debug builds
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p", sig, signal_name,
               info->si_code, info->si_addr);
-    backtrace_log_frames(LOG_ERROR, 0, 1);
+    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
+    backtrace_log_frames(4, 0, 1);
 #else
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p\nBacktrace disabled in "
               "Release builds",
@@ -672,7 +639,8 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
 #ifndef NDEBUG
     // Only capture backtraces in Debug builds
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)", sig, signal_name);
-    backtrace_log_frames(LOG_ERROR, 0, 1);
+    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
+    backtrace_log_frames(4, 0, 1);
 #else
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nBacktrace disabled in Release builds", sig, signal_name);
 #endif
@@ -1165,7 +1133,6 @@ asciichat_error_t platform_restore_timer_resolution(void) {
  * Execute a subprocess using fork+exec (POSIX implementation)
  */
 // Serialize foreground ownership checks and changes across concurrent loaders.
-static pthread_mutex_t subprocess_terminal_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pid_t subprocess_terminal_owner = -1;
 
 static int subprocess_set_foreground(int fd, pid_t group) {
@@ -1224,10 +1191,10 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   int start_pipe[2] = {-1, -1};
   bool gate_open = false;
   if (tty >= 0 && isatty(STDIN_FILENO)) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     pid_t foreground = tcgetpgrp(tty);
     gate_open = foreground == getpgrp() || (subprocess_terminal_owner > 0 && foreground == subprocess_terminal_owner);
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (gate_open && (pipe(start_pipe) != 0 || fcntl(start_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
                     fcntl(start_pipe[1], F_SETFD, FD_CLOEXEC) < 0)) {
@@ -1381,7 +1348,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
       }
     }
     if ((gate_open || terminal_stopped) && !exited) {
-      pthread_mutex_lock(&subprocess_terminal_mutex);
+      terminal_input_lock();
       pid_t foreground = tcgetpgrp(tty);
       if (terminal_stopped && terminal_owned && foreground == pid) {
         terminal_stopped = false;
@@ -1425,7 +1392,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
           terminal_stopped = false;
         }
       }
-      pthread_mutex_unlock(&subprocess_terminal_mutex);
+      terminal_input_unlock();
     }
   }
   if (capture)
@@ -1433,12 +1400,12 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   if (gate_open)
     close(start_pipe[1]);
   if (terminal_owned) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     if (tcgetpgrp(tty) == pid && subprocess_set_foreground(tty, getpgrp()) == 0 && have_terminal_attributes)
       tcsetattr(tty, TCSANOW, &terminal_attributes);
     if (subprocess_terminal_owner == pid)
       subprocess_terminal_owner = -1;
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (tty >= 0)
     close(tty);
