@@ -126,6 +126,8 @@ elseif(APPLE)
     lib/posix/thread.c
     lib/posix/string.c
     lib/posix/filesystem.c
+    lib/posix/clipboard.c
+    lib/posix/keepawake.c
     lib/posix/terminal.c
     lib/posix/agent.c
     lib/posix/socket.c
@@ -151,6 +153,8 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/thread.c
     lib/posix/string.c
     lib/posix/filesystem.c
+    lib/posix/clipboard.c
+    lib/posix/keepawake.c
     lib/posix/terminal.c
     lib/posix/agent.c
     lib/posix/socket.c
