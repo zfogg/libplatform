@@ -103,6 +103,9 @@ void keyboard_destroy(void) {
 
 static keyboard_key_t console_key(KEY_EVENT_RECORD key) {
   keyboard_key_t special = KEY_NONE;
+  if ((key.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) &&
+      (key.wVirtualKeyCode == 'C' || key.wVirtualKeyCode == 'c'))
+    return 3;
   if (key.wVirtualKeyCode == VK_ESCAPE && (key.dwControlKeyState & SHIFT_PRESSED))
     special = KEY_SHIFT_ESCAPE;
   else if (key.wVirtualKeyCode == VK_RETURN && (key.dwControlKeyState & SHIFT_PRESSED))
