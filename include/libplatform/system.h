@@ -30,6 +30,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <time.h>
+#include <libplatform/compiler.h>
 #ifdef _WIN32
 #include <libplatform/windows/system.h>
 #else
@@ -44,10 +45,6 @@ typedef SSIZE_T ssize_t;
 #endif
 #include <stdint.h>
 #include <libplatform/process.h>
-
-#ifndef PLATFORM_MAX_PATH_LENGTH
-#define PLATFORM_MAX_PATH_LENGTH 32767
-#endif
 
 #ifdef __cplusplus
 extern "C" {
