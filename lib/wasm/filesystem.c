@@ -5,9 +5,8 @@
  */
 
 #include <libplatform/filesystem.h>
-#include <ascii-chat/debug/named.h>
-#include <ascii-chat/log/log.h>
-#include <ascii-chat/asciichat_errno.h>
+#include <libplatform/debug/named.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -36,7 +35,8 @@ FILE *platform_tmpfile(void) {
 int platform_mkdir_recursive(const char *path, int mode) {
   (void)path;
   (void)mode;
-  return ERROR_PLATFORM_INIT; // Not implemented for WASM
+  errno = ENOSYS;
+  return -1;
 }
 
 int platform_find_config_file(const char *filename, config_file_list_t *list_out) {
@@ -46,7 +46,7 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
     list_out->count = 0;
     list_out->capacity = 0;
   }
-  return ASCIICHAT_OK; // No config files in WASM
+  return 0; // No config files in WASM
 }
 
 void config_file_list_destroy(config_file_list_t *list) {
@@ -105,9 +105,10 @@ char *platform_get_data_dir(void) {
 int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
   (void)install_prefix;
   if (!list_out) {
-    return SET_ERRNO(ERROR_INVALID_PARAM, "list_out cannot be NULL");
+    errno = EINVAL;
+    return -1;
   }
   list_out->candidates = NULL;
   list_out->count = 0;
-  return ASCIICHAT_OK;
+  return 0;
 }
