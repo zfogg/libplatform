@@ -6,13 +6,9 @@
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <libplatform/font.h>
 
-#ifndef LIBPLATFORM_STANDALONE
-#include <ascii-chat/log/log.h>
-#else
 #define log_debug(...) ((void)0)
 #define log_info(...) ((void)0)
 #define log_warn(...) ((void)0)
-#endif
 #ifndef USE_MUSL
 #include <fontconfig/fontconfig.h>
 #endif
@@ -21,14 +17,10 @@
 #include <sys/stat.h>
 #include <stddef.h>
 
-#ifdef LIBPLATFORM_STANDALONE
 #define ASCIICHAT_OK 0
 #define ERROR_INVALID_PARAM 1
 #define ERROR_NOT_FOUND 2
 #define SET_ERRNO(...) (-1)
-#else
-#include <ascii-chat/asciichat_errno.h>
-#endif
 
 // Fallback font name for fontconfig when a requested font is not found.
 // DejaVu Sans Mono ships with the vast majority of distros.

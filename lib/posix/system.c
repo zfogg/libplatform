@@ -89,14 +89,6 @@ static inline asciichat_error_t hostname_to_ascii(const char *source, char *dest
   memcpy(destination, source, strlen(source) + 1);
   return ASCIICHAT_OK;
 }
-typedef struct {
-  int retained;
-  void *scope;
-} libplatform_otel_scope_t;
-#define ASCII_OTEL_SCOPE(name) libplatform_otel_scope_t otel_scope = {0, NULL}
-#define DNS_RESOLVE 0
-#define gotel_attr_string(...) ((void)0)
-#define gotel_error(...) ((void)0)
 #endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -810,15 +802,7 @@ asciichat_error_t platform_resolve_hostname_to_ipv4(const char *hostname, char *
   hints.ai_flags = 0;
   hints.ai_protocol = 0;
 
-  int ret;
-  {
-    ASCII_OTEL_SCOPE(DNS_RESOLVE);
-    if (otel_scope.retained)
-      gotel_attr_string(&otel_scope.scope, "dns.question.name", hostname);
-    ret = getaddrinfo(hostname, NULL, &hints, &result);
-    if (ret && otel_scope.retained)
-      gotel_error(&otel_scope.scope, "dns.error", "DNS lookup failed");
-  }
+  int ret = getaddrinfo(hostname, NULL, &hints, &result);
   if (ret != 0) {
     return SET_ERRNO_SYS(ERROR_NETWORK, "Failed to resolve hostname: %s", hostname);
   }
