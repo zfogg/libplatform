@@ -10,12 +10,61 @@
 
 #ifndef _WIN32
 
+#ifndef ASCIICHAT_OK
+#define ASCIICHAT_OK 0
+#define SET_ERRNO(...) (-1)
+#define SET_ERRNO_SYS(...) (-1)
+typedef int asciichat_error_t;
+#define BUFFER_SIZE_SMALL 1024
+#define HOSTNAME_BUFFER_SIZE 256
+#define SAFE_MALLOC(size, type) ((type)malloc(size))
+#define SAFE_FREE(ptr) free(ptr)
+#define SAFE_STRERROR(err) strerror(err)
+#define log_debug(...) ((void)0)
+#define log_dev(...) ((void)0)
+#define log_warn(...) ((void)0)
+#define log_error(...) ((void)0)
+#endif
+
+#ifndef SAFE_MALLOC
+#define SAFE_MALLOC(size, type) ((type)malloc(size))
+#endif
+#ifndef SAFE_FREE
+#define SAFE_FREE(ptr) free(ptr)
+#endif
+#ifndef SAFE_STRERROR
+#define SAFE_STRERROR(err) strerror(err)
+#endif
+#ifndef SAFE_STRNCPY
+#define SAFE_STRNCPY(dst, src, size) (strncpy((dst), (src), (size)), (dst)[(size)-1] = '\0')
+#endif
+#ifndef NS_PER_SEC_INT
+#define NS_PER_SEC_INT 1000000000LL
+#endif
+#ifndef time_timespec_to_ns
+#define time_timespec_to_ns(ts) ((uint64_t)(ts)->tv_sec * (uint64_t)NS_PER_SEC_INT + (uint64_t)(ts)->tv_nsec)
+#endif
+#ifndef time_ns_to_us
+#define time_ns_to_us(ns) ((uint64_t)(ns) / 1000ULL)
+#endif
+#ifndef platform_cleanup_binary_path_cache
+#define platform_cleanup_binary_path_cache() ((void)0)
+#endif
+#ifndef socket_init
+#define socket_init() 0
+#endif
+#ifndef log_debug
+#define log_debug(...) ((void)0)
+#define log_dev(...) ((void)0)
+#define log_warn(...) ((void)0)
+#define log_error(...) ((void)0)
+#endif
+
 #include <libplatform/system.h>
-#include <libplatform/socket.h>
-#include <libplatform/filesystem.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
+#include <libplatform/debug/backtrace.h>
 #include "util/string.h"
 #include <libplatform/time.h>
 #include "util/path.h"
@@ -31,11 +80,6 @@
 #include <stdio.h>
 #include <signal.h>
 #include <errno.h>
-
-static int platform_failure(int error_code) {
-  errno = error_code;
-  return -1;
-}
 #include <sys/wait.h>
 #include <termios.h>
 // execinfo.h provides backtrace functions - available in glibc
@@ -58,15 +102,14 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <mach-o/dyld.h>
 #endif
 
-static pthread_mutex_t subprocess_terminal_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pid_t subprocess_terminal_owner = -1;
+int platform_open(const char *name, const char *pathname, int flags, ...);
 
 /**
  * @brief Get username from environment variables
  * @return Username string or "unknown" if not found
  */
 const char *get_username_env(void) {
-  static char username[256];
+  static char username[BUFFER_SIZE_SMALL];
   const char *user = platform_getenv("USER");
   if (!user) {
     user = platform_getenv("USERNAME");
@@ -84,20 +127,20 @@ const char *get_username_env(void) {
  * @return 0 on success, error code on failure
  * @note POSIX platforms don't need special initialization
  */
-int platform_init(void) {
+asciichat_error_t platform_init(void) {
   // Initialize symbol cache for backtrace resolution
-  if (symbol_cache_init() != 0) {
-    return platform_failure(EINVAL);
+  if (symbol_cache_init() != ASCIICHAT_OK) {
+    return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Symbol cache initialization failed");
   }
 
   // Initialize Winsock (required before getaddrinfo and socket operations)
-  if (socket_init() != 0) {
-    return platform_failure(EINVAL);
+  if (socket_init() != ASCIICHAT_OK) {
+    return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Network operation failed");
   }
 
   // Install crash handlers for automatic backtrace on crashes
   platform_install_crash_handler();
-  return 0;
+  return ASCIICHAT_OK;
 }
 
 /**
@@ -112,6 +155,7 @@ void platform_destroy(void) {
   symbol_cache_print_stats();
 
   // Clean up symbol cache
+  log_debug("Platform cleanup: calling symbol_cache_destroy()");
   symbol_cache_destroy();
 }
 
@@ -147,7 +191,7 @@ uint64_t platform_get_monotonic_time_us(void) {
   if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
     return 0; // Fallback on error (shouldn't happen)
   }
-  return ((uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec) / 1000ULL;
+  return time_ns_to_us(time_timespec_to_ns(&ts));
 }
 
 /**
@@ -167,8 +211,8 @@ void platform_sleep_us(unsigned int usec) {
  */
 void platform_sleep_ns(uint64_t ns) {
   struct timespec ts;
-  ts.tv_sec = (time_t)(ns / 1000000000ULL);
-  ts.tv_nsec = (long)(ns % 1000000000ULL);
+  ts.tv_sec = (time_t)(ns / NS_PER_SEC_INT);
+  ts.tv_nsec = (long)(ns % NS_PER_SEC_INT);
   nanosleep(&ts, NULL);
 }
 
@@ -178,28 +222,28 @@ void platform_sleep_ns(uint64_t ns) {
  * @param result Pointer to struct tm to receive result
  * @return 0 on success, non-zero on error
  */
-int platform_localtime(const time_t *timer, struct tm *result) {
+asciichat_error_t platform_localtime(const time_t *timer, struct tm *result) {
   if (!timer || !result) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for localtime");
   }
   struct tm *tm_result = localtime_r(timer, result);
   if (!tm_result) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Failed to convert time to local time");
   }
-  return 0;
+  return ASCIICHAT_OK;
 }
 
-int platform_gtime(const time_t *timer, struct tm *result) {
+asciichat_error_t platform_gtime(const time_t *timer, struct tm *result) {
   if (!timer || !result) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for gmtime");
   }
 
   struct tm *tm_result = gmtime_r(timer, result);
   if (!tm_result) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Failed to convert time to UTC");
   }
 
-  return 0;
+  return ASCIICHAT_OK;
 }
 
 /**
@@ -241,7 +285,7 @@ static console_ctrl_handler_t g_console_ctrl_handler = NULL;
  */
 static void posix_console_ctrl_signal_handler(int sig) {
   if (!g_console_ctrl_handler) {
-    platform_failure(EINVAL);
+    SET_ERRNO(ERROR_INVALID_STATE, "No console control handler registered");
     return;
   }
 
@@ -307,8 +351,6 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
  * Returns NULL if the environment variable contains invalid UTF-8 sequences,
  * helping prevent corruption from malformed environment data.
  */
-
-
 /**
  * @brief Set environment variable
  * @param name Environment variable name
@@ -342,6 +384,7 @@ void platform_raise_fd_limit(unsigned int limit) {
 
   rl.rlim_cur = target;
   if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
+    log_warn("Failed to raise fd limit to %llu: %s", (unsigned long long)target, strerror(errno));
   }
 #endif
 }
@@ -376,7 +419,7 @@ void *platform_aligned_alloc(size_t alignment, size_t size) {
  */
 void platform_aligned_free(void *ptr) {
   // Regular free works for aligned memory on POSIX
-  free(ptr);
+  SAFE_FREE(ptr);
 }
 
 /**
@@ -391,7 +434,7 @@ void platform_memory_barrier(void) {
 // ============================================================================
 
 // Thread-local storage for error strings (non-static for shared library compatibility)
-__thread char error_buffer[256];
+__thread char error_buffer[BUFFER_SIZE_SMALL];
 
 /**
  * @brief Get thread-safe error string
@@ -448,8 +491,6 @@ void platform_set_last_error(int error) {
  * @param ... Mode (if O_CREAT is specified)
  * @return File descriptor on success, -1 on failure
  */
-
-
 /**
  * @brief Open file descriptor with platform-safe mode
  * @param name Debug name for the stream
@@ -465,6 +506,7 @@ FILE *platform_fdopen(const char *name, int fd, const char *mode) {
   FILE *stream = fdopen(fd, mode);
   if (stream && fd >= 0) {
     NAMED_REGISTER_FD(fd, name);
+    log_dev("Wrapped file descriptor %d with stream for %s", fd, name);
   }
   return stream;
 }
@@ -489,6 +531,7 @@ ssize_t platform_read(int fd, void *buf, size_t count) {
  */
 ssize_t platform_write(int fd, const void *buf, size_t count) {
   if (!buf || count == 0) {
+    log_warn("Invalid parameters: fd=%d, buf=%p, count=%zu", fd, buf, count);
   }
   return write(fd, buf, count);
 }
@@ -519,6 +562,7 @@ FILE *platform_fopen(const char *name, const char *filename, const char *mode) {
     int fd = fileno(stream);
     if (fd >= 0) {
       NAMED_REGISTER_FD(fd, name);
+      log_dev("Opened file stream with file descriptor %d for %s", fd, name);
     }
   }
   return stream;
@@ -574,10 +618,28 @@ static const char *get_signal_name(int sig) {
 static void crash_handler(int sig, siginfo_t *info, void *context) {
   (void)context; // Suppress unused parameter warning
 
+  const char *signal_name = get_signal_name(sig);
   if (info) {
-    (void)info;
+#ifndef NDEBUG
+    // Only capture backtraces in Debug builds
+    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p", sig, signal_name,
+              info->si_code, info->si_addr);
+    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
+    backtrace_log_frames(4, 0, 1);
+#else
+    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p\nBacktrace disabled in "
+              "Release builds",
+              sig, signal_name, info->si_code, info->si_addr);
+#endif
   } else {
-    (void)info;
+#ifndef NDEBUG
+    // Only capture backtraces in Debug builds
+    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)", sig, signal_name);
+    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
+    backtrace_log_frames(4, 0, 1);
+#else
+    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nBacktrace disabled in Release builds", sig, signal_name);
+#endif
   }
 
   // Restore default handler and re-raise signal
@@ -592,7 +654,19 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
 /**
  * @brief Install crash handlers for common crash signals (thread-safe)
  */
+void platform_install_crash_handler(void) {
+  struct sigaction sa;
+  sa.sa_sigaction = crash_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_SIGINFO | SA_RESTART;
 
+  // Install handlers for all crash signals
+  sigaction(SIGSEGV, &sa, NULL); // Segmentation fault
+  sigaction(SIGABRT, &sa, NULL); // Abort
+  sigaction(SIGFPE, &sa, NULL);  // Floating point exception
+  sigaction(SIGILL, &sa, NULL);  // Illegal instruction
+  sigaction(SIGBUS, &sa, NULL);  // Bus error
+}
 
 // Safe string functions are defined in platform/posix/string.c
 
@@ -600,49 +674,49 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
 // Safe Memory Functions
 // ============================================================================
 
-int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
+asciichat_error_t platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
   // Validate parameters
   if (!dest || !src) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointers for memcpy");
   }
 
   if (count > dest_size) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Buffer overflow protection: count=%zu > dest_size=%zu", count, dest_size);
   }
 
   // Use standard memcpy with bounds checking already done
   memcpy(dest, src, count);
-  return 0;
+  return ASCIICHAT_OK;
 }
 
-int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
+asciichat_error_t platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
   // Validate parameters
   if (!dest) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointer for memset");
   }
 
   if (count > dest_size) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Buffer overflow protection: count=%zu > dest_size=%zu", count, dest_size);
   }
 
   // Use standard memset with bounds checking already done
   memset(dest, ch, count);
-  return 0;
+  return ASCIICHAT_OK;
 }
 
-int platform_memmove(void *dest, size_t dest_size, const void *src, size_t count) {
+asciichat_error_t platform_memmove(void *dest, size_t dest_size, const void *src, size_t count) {
   // Validate parameters
   if (!dest || !src) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointers for memmove");
   }
 
   if (count > dest_size) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Buffer overflow protection: count=%zu > dest_size=%zu", count, dest_size);
   }
 
   // Use standard memmove with bounds checking already done
   memmove(dest, src, count);
-  return 0; // Success
+  return ASCIICHAT_OK; // Success
 }
 
 /**
@@ -656,23 +730,24 @@ int platform_memmove(void *dest, size_t dest_size, const void *src, size_t count
  * @param src Source string
  * @return 0 on success, non-zero on error
  */
-int platform_strcpy(char *dest, size_t dest_size, const char *src) {
+asciichat_error_t platform_strcpy(char *dest, size_t dest_size, const char *src) {
   if (!dest || !src) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointers for strcpy");
   }
   if (dest_size == 0) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Destination buffer size is zero");
   }
 
   size_t src_len = strlen(src);
   if (src_len >= dest_size) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Source string too long for destination buffer: %zu >= %zu", src_len,
+                     dest_size);
   }
 
   // Use strncpy with bounds checking and ensure null termination
   strncpy(dest, src, dest_size - 1);
   dest[dest_size - 1] = '\0'; // Ensure null termination
-  return 0;        // Success
+  return ASCIICHAT_OK;        // Success
 }
 
 /**
@@ -686,18 +761,10 @@ int platform_strcpy(char *dest, size_t dest_size, const char *src) {
  * @param ipv4_out_size Size of the output buffer
  * @return 0 on success, -1 on failure
  */
-int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size_t ipv4_out_size) {
+asciichat_error_t platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size_t ipv4_out_size) {
   if (!hostname || !ipv4_out || ipv4_out_size == 0) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for hostname resolution");
   }
-
-  char ascii_hostname[1024];
-  if (strlen(hostname) >= sizeof(ascii_hostname)) {
-    return platform_failure(EINVAL);
-  }
-  strncpy(ascii_hostname, hostname, sizeof(ascii_hostname) - 1);
-  ascii_hostname[sizeof(ascii_hostname) - 1] = '\0';
-  hostname = ascii_hostname;
 
   struct addrinfo hints, *result = NULL;
   memset(&hints, 0, sizeof(hints));
@@ -708,23 +775,23 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
 
   int ret = getaddrinfo(hostname, NULL, &hints, &result);
   if (ret != 0) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO_SYS(ERROR_NETWORK, "Failed to resolve hostname: %s", hostname);
   }
 
   if (!result) {
     // Note: Don't call freeaddrinfo(NULL) - it's undefined behavior
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_NETWORK, "No address found for hostname: %s", hostname);
   }
 
   // Extract IPv4 address from first result
-  int format_result = format_ip_address(result->ai_family, result->ai_addr, ipv4_out, ipv4_out_size);
+  asciichat_error_t format_result = format_ip_address(result->ai_family, result->ai_addr, ipv4_out, ipv4_out_size);
   freeaddrinfo(result);
 
-  if (format_result != 0) {
+  if (format_result != ASCIICHAT_OK) {
     return format_result;
   }
 
-  return 0;
+  return ASCIICHAT_OK;
 }
 
 /**
@@ -737,9 +804,9 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
  * @param pem_size_out Pointer to receive size of PEM data
  * @return 0 on success, -1 on failure
  */
-int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
+asciichat_error_t platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
   if (!pem_data_out || !pem_size_out) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for CA cert loading");
   }
 
   // Common CA certificate bundle paths (ordered by likelihood)
@@ -779,10 +846,10 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
     }
 
     // Allocate buffer for PEM data
-    char *pem_data = malloc(file_size + 1);
+    char *pem_data = SAFE_MALLOC(file_size + 1, char *);
     if (!pem_data) {
       fclose(f);
-      return platform_failure(EINVAL);
+      return SET_ERRNO(ERROR_MEMORY, "Failed to allocate memory for CA certificates");
     }
 
     // Read entire file
@@ -790,8 +857,8 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
     fclose(f);
 
     if (bytes_read != (size_t)file_size) {
-      free(pem_data);
-      return platform_failure(EINVAL);
+      SAFE_FREE(pem_data);
+      return SET_ERRNO(ERROR_CRYPTO, "Failed to read complete CA certificate file");
     }
 
     // Null-terminate (PEM is text format)
@@ -803,11 +870,12 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
     // Success!
     *pem_data_out = pem_data;
     *pem_size_out = bytes_read;
-    return 0;
+    log_debug("Loaded CA certificates from: %s (%zu bytes)", ca_paths[i], bytes_read);
+    return ASCIICHAT_OK;
   }
 
   // No CA bundle found
-  return platform_failure(EINVAL);
+  return SET_ERRNO(ERROR_CRYPTO, "No CA certificate bundle found in standard locations");
 }
 
 /**
@@ -821,7 +889,7 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
  */
 bool platform_get_temp_dir(char *temp_dir, size_t path_size) {
   if (temp_dir == NULL || path_size == 0) {
-    platform_failure(EINVAL);
+    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: temp_dir=%s, path_size=%zu", temp_dir, path_size);
     return false;
   }
 
@@ -840,13 +908,13 @@ bool platform_get_temp_dir(char *temp_dir, size_t path_size) {
   }
 
   // Copy the path
-  strncpy(temp_dir, tmp, path_size);
+  SAFE_STRNCPY(temp_dir, tmp, path_size);
   return true;
 }
 
 bool platform_get_cwd(char *cwd, size_t path_size) {
   if (!cwd || path_size == 0) {
-    platform_failure(EINVAL);
+    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: cwd=%s, path_size=%zu", cwd, path_size);
     return false;
   }
 
@@ -859,7 +927,7 @@ bool platform_get_cwd(char *cwd, size_t path_size) {
 
 int platform_access(const char *path, int mode) {
   if (!path) {
-    platform_failure(EINVAL);
+    SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters: path=%s", path);
     return -1;
   }
 
@@ -1019,51 +1087,49 @@ void platform_force_exit(int exit_code) {
  * @brief Register multiple signal handlers at once (POSIX)
  * @param handlers Array of signal handler descriptors
  * @param count Number of handlers
- * @return 0 on success, error code on failure
+ * @return ASCIICHAT_OK on success, error code on failure
  *
  * POSIX implementation registers each signal using platform_signal().
  * Windows implementation handles this differently via console control handlers.
  */
-int platform_register_signal_handlers(const platform_signal_handler_t *handlers, int count) {
+asciichat_error_t platform_register_signal_handlers(const platform_signal_handler_t *handlers, int count) {
   if (!handlers || count <= 0) {
-    return platform_failure(EINVAL);
+    return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid handlers or count");
   }
 
   for (int i = 0; i < count; i++) {
     signal_handler_t old_handler = platform_signal(handlers[i].sig, handlers[i].handler);
     if (old_handler == SIG_ERR) {
+      log_warn("Failed to register signal handler for signal %d", handlers[i].sig);
       // Continue registering others instead of failing completely
     }
   }
 
-  return 0;
+  return ASCIICHAT_OK;
 }
 
 /**
  * Request coarse timer precision (POSIX no-op)
  */
-int platform_request_timer_precision(int precision) {
+asciichat_error_t platform_request_timer_precision(int precision) {
   (void)precision; // Unused on POSIX
   // POSIX systems don't have a timer precision API like Windows
-  return 0;
+  return ASCIICHAT_OK;
 }
 
 /**
  * Restore default timer precision (POSIX no-op)
  */
-int platform_restore_timer_resolution(void) {
+asciichat_error_t platform_restore_timer_resolution(void) {
   // POSIX systems don't have a timer precision API like Windows
-  return 0;
+  return ASCIICHAT_OK;
 }
 
 /**
  * Execute a subprocess using fork+exec (POSIX implementation)
  */
-
-
-
-
-
+// Serialize foreground ownership checks and changes across concurrent loaders.
+static pid_t subprocess_terminal_owner = -1;
 
 static int subprocess_set_foreground(int fd, pid_t group) {
   sigset_t block, previous;
@@ -1102,6 +1168,7 @@ bool terminal_release_subprocess_gate(int fd) {
 int platform_execute_subprocess(const char *executable, const char **argv, char *output_buffer, size_t output_size,
                                 bool (*cancel)(void *), void *data) {
   if (!executable || !argv || !argv[0]) {
+    log_error("Invalid subprocess parameters");
     return -1;
   }
   bool capture = output_buffer && output_size > 0;
@@ -1120,10 +1187,10 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   int start_pipe[2] = {-1, -1};
   bool gate_open = false;
   if (tty >= 0 && isatty(STDIN_FILENO)) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     pid_t foreground = tcgetpgrp(tty);
     gate_open = foreground == getpgrp() || (subprocess_terminal_owner > 0 && foreground == subprocess_terminal_owner);
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (gate_open && (pipe(start_pipe) != 0 || fcntl(start_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
                     fcntl(start_pipe[1], F_SETFD, FD_CLOEXEC) < 0)) {
@@ -1150,6 +1217,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
     }
     if (tty >= 0)
       close(tty);
+    log_error("Failed to fork process: %s", SAFE_STRERROR(errno));
     return -1;
   }
   if (pid == 0) {
@@ -1276,7 +1344,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
       }
     }
     if ((gate_open || terminal_stopped) && !exited) {
-      pthread_mutex_lock(&subprocess_terminal_mutex);
+      terminal_input_lock();
       pid_t foreground = tcgetpgrp(tty);
       if (terminal_stopped && terminal_owned && foreground == pid) {
         terminal_stopped = false;
@@ -1320,7 +1388,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
           terminal_stopped = false;
         }
       }
-      pthread_mutex_unlock(&subprocess_terminal_mutex);
+      terminal_input_unlock();
     }
   }
   if (capture)
@@ -1328,12 +1396,12 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   if (gate_open)
     close(start_pipe[1]);
   if (terminal_owned) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     if (tcgetpgrp(tty) == pid && subprocess_set_foreground(tty, getpgrp()) == 0 && have_terminal_attributes)
       tcsetattr(tty, TCSANOW, &terminal_attributes);
     if (subprocess_terminal_owner == pid)
       subprocess_terminal_owner = -1;
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (tty >= 0)
     close(tty);
@@ -1348,5 +1416,3 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   return !cancelled && !capture_failed && !wait_failed && WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 #endif // !_WIN32
-
-

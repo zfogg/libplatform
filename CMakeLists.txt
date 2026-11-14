@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 
+# A parent project may already have configured libplatform from a shared source
+# tree.  CMake targets are global, so a second FetchContent evaluation must be
+# a no-op instead of attempting to recreate the library targets.
+if(TARGET libplatform OR TARGET libplatform-objects OR TARGET libplatform::libplatform)
+  return()
+endif()
+
 # libplatform is tested with LLVM/Clang.  Keep the compiler selectable by a
 # toolchain or an explicit -D override, but make Clang the default for a
 # normal standalone configure.
@@ -16,6 +23,11 @@ set(LIBPLATFORM_UTF8PROC_TARGET "" CACHE STRING
 set(LIBPLATFORM_UTF8PROC_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/utf8proc" CACHE PATH
   "utf8proc source directory used when LIBPLATFORM_UTF8PROC_TARGET is not supplied")
 include(GNUInstallDirs)
+
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(LIBPLATFORM_FONTCONFIG REQUIRED IMPORTED_TARGET fontconfig)
+endif()
 
 if(NOT LIBPLATFORM_UTF8PROC_TARGET)
   if(TARGET utf8proc::utf8proc)
@@ -53,9 +65,16 @@ else()
   add_library(libplatform STATIC $<TARGET_OBJECTS:libplatform-objects>)
 endif()
 add_library(libplatform::libplatform ALIAS libplatform)
+if(TARGET PkgConfig::LIBPLATFORM_FONTCONFIG)
+  target_link_libraries(libplatform PUBLIC PkgConfig::LIBPLATFORM_FONTCONFIG)
+endif()
 target_compile_definitions(libplatform-objects PRIVATE LIBPLATFORM_STANDALONE=1)
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c
+  # Shared rwlock diagnostics are called by each platform-specific lock
+  # implementation. Keep the hooks in the platform library so shared builds
+  # do not leave unresolved debug symbols at link time.
+  lib/rwlock.c
   lib/filesystem_common.c
   lib/application.c
   lib/app_callbacks.c
@@ -75,7 +94,6 @@ target_sources(libplatform-objects PRIVATE
   lib/named.c
   lib/cpu.c
   lib/font.c
-  lib/backtrace.c
 )
 target_sources(libplatform-objects PRIVATE
   lib/util/path.c
@@ -99,6 +117,7 @@ if(WIN32)
     lib/keyboard.c
     lib/windows/thread.c
     lib/windows/backtrace.c
+    lib/backtrace.c
     lib/windows/string.c
     lib/windows/filesystem.c
     lib/windows/terminal.c
@@ -126,7 +145,10 @@ elseif(APPLE)
   target_sources(libplatform-objects PRIVATE
     lib/posix/thread.c
     lib/posix/string.c
+    lib/posix/system.c
     lib/posix/filesystem.c
+    lib/posix/clipboard.c
+    lib/posix/keepawake.c
     lib/posix/terminal.c
     lib/posix/agent.c
     lib/posix/socket.c
@@ -140,7 +162,6 @@ elseif(APPLE)
     lib/posix/system.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
-    lib/posix/signal.c
     lib/posix/question.c
     lib/posix/wakeup.c
     lib/macos/system.c
@@ -152,6 +173,8 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/thread.c
     lib/posix/string.c
     lib/posix/filesystem.c
+    lib/posix/clipboard.c
+    lib/posix/keepawake.c
     lib/posix/terminal.c
     lib/posix/agent.c
     lib/posix/socket.c
@@ -165,9 +188,9 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/system.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
-    lib/posix/signal.c
     lib/posix/question.c
     lib/posix/wakeup.c
+    lib/posix/system.c
     lib/linux/system.c
     lib/linux/systemd.c
     lib/linux/font.c

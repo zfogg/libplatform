@@ -17,6 +17,7 @@
 // POSIX: netinet/tcp.h (need to include explicitly)
 #ifndef _WIN32
 #include <netinet/tcp.h>
+#include <sys/time.h>
 #endif
 
 // ============================================================================

@@ -172,7 +172,7 @@ void rwlock_on_unlock(rwlock_t *rwlock);
  */
 #ifndef NDEBUG
 void rwlock_log_state(const rwlock_t *rwlock, const char *file, int line, const char *func);
-#define LOG_RWLOCK_STATE(rwlock) rwlock_log_state((rwlock), __FILE__, __LINE__, __func__)
+#define LOG_RWLOCK_STATE(rwlock) rwlock_log_state(rwlock, __FILE__, __LINE__, __func__)
 #else
 #define LOG_RWLOCK_STATE(rwlock) ((void)0)
 #endif
