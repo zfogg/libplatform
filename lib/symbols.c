@@ -78,31 +78,6 @@ static bool ascii_case_equal(const char *left, const char *right) {
   return *left == '\0' && *right == '\0';
 }
 
-bool symbol_module_is_project(const char *module_name) {
-  if (!module_name || !*module_name) {
-    return false;
-  }
-
-  const char *basename = module_name;
-  for (const char *cursor = module_name; *cursor; cursor++) {
-    if (*cursor == '/' || *cursor == '\\') {
-      basename = cursor + 1;
-    }
-  }
-
-  static const char *const project_modules[] = {
-      "ascii-chat", "ascii-chat.exe", "asciichat.dll", "libasciichat.a", "libasciichat.so", "libasciichat.dll", "libasciichat.dylib",
-  };
-  for (size_t i = 0; i < sizeof(project_modules) / sizeof(project_modules[0]); i++) {
-    if (ascii_case_equal(basename, project_modules[i])) {
-      return true;
-    }
-  }
-
-  // Installed Unix libraries may carry an ABI or full version in the name.
-  return strncmp(basename, "libasciichat.", strlen("libasciichat.")) == 0 && (strstr(basename, ".so") != NULL || strstr(basename, ".dylib") != NULL);
-}
-
 bool symbol_module_matches(const char *module_name, const char *const *module_names, size_t module_count) {
   if (!module_name || !*module_name || !module_names) {
     return false;
@@ -125,10 +100,12 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
 }
 
 static bool source_path_is_absolute(const char *path) {
-  return path && ((isalpha((unsigned char)path[0]) && path[1] == ':' && (path[2] == '/' || path[2] == '\\')) || path[0] == '/' || path[0] == '\\');
+  return path && ((isalpha((unsigned char)path[0]) && path[1] == ':' && (path[2] == '/' || path[2] == '\\')) ||
+                  path[0] == '/' || path[0] == '\\');
 }
 
-int symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size, bool *external, const char *const *owned_dirs) {
+int symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size,
+                              bool *external, const char *const *owned_dirs) {
   if (!output || output_size == 0 || !external) {
     return EINVAL;
   }
@@ -149,14 +126,17 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
   if (owned_dirs) {
     for (size_t i = 0; owned_dirs[i]; i++) {
       size_t prefix_length = strlen(owned_dirs[i]);
-      if (prefix_length > owned_prefix_length && strncmp(path, owned_dirs[i], prefix_length) == 0 && (path[prefix_length] == '/' || path[prefix_length] == '\\')) {
+      if (prefix_length > owned_prefix_length && strncmp(path, owned_dirs[i], prefix_length) == 0 &&
+          (path[prefix_length] == '/' || path[prefix_length] == '\\')) {
         owned_prefix = owned_dirs[i];
         owned_prefix_length = prefix_length;
       }
     }
   }
-  *external = project_relative == path || (owned_prefix && owned_dirs && owned_prefix != owned_dirs[0] && source_path_is_absolute(path));
-  const char *display_path = owned_prefix ? path + owned_prefix_length + 1 : (*external ? path_last_components(path, 5) : project_relative);
+  *external = project_relative == path ||
+              (owned_prefix && owned_dirs && owned_prefix != owned_dirs[0] && source_path_is_absolute(path));
+  const char *display_path =
+      owned_prefix ? path + owned_prefix_length + 1 : (*external ? path_last_components(path, 5) : project_relative);
   bool truncated = *external && display_path != path && !owned_prefix;
   size_t prefix_size = truncated ? 4 : 0; // Ellipsis plus the omitted path separator.
   size_t required_size = prefix_size + strlen(display_path) + 1;
@@ -280,7 +260,8 @@ static bool symbolizer_path_is_executable(const char *path) {
     return false;
   }
 
-  HANDLE handle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  HANDLE handle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL, NULL);
   if (handle == INVALID_HANDLE_VALUE) {
     return false;
   }
@@ -316,7 +297,8 @@ static const char *get_llvm_symbolizer_command(void) {
 
     if (env_path && env_path[0] != '\0') {
       if (symbolizer_path_is_executable(env_path)) {
-        available = platform_strncpy(g_llvm_symbolizer_cmd, sizeof(g_llvm_symbolizer_cmd), env_path, sizeof(g_llvm_symbolizer_cmd) - 1) == 0;
+        available = platform_strncpy(g_llvm_symbolizer_cmd, sizeof(g_llvm_symbolizer_cmd), env_path,
+                                     sizeof(g_llvm_symbolizer_cmd) - 1) == 0;
         (void)0;
       } else {
         (void)0;
@@ -369,7 +351,8 @@ static const char *get_addr2line_command(void) {
 
     if (env_path && env_path[0] != '\0') {
       if (symbolizer_path_is_executable(env_path)) {
-        available = platform_strncpy(g_addr2line_cmd, sizeof(g_addr2line_cmd), env_path, sizeof(g_addr2line_cmd) - 1) == 0;
+        available =
+            platform_strncpy(g_addr2line_cmd, sizeof(g_addr2line_cmd), env_path, sizeof(g_addr2line_cmd) - 1) == 0;
         (void)0;
       } else {
         (void)0;
@@ -598,7 +581,8 @@ void symbol_cache_print_stats(void) {
  * @param addr Original address (for fallback display)
  * @return Formatted symbol string (caller must free), or NULL on error
  */
-static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *module_name, const char *const *owned_dirs) {
+static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *module_name,
+                                          const char *const *owned_dirs) {
   char func_name[PLATFORM_SYMBOLS_FUNC_NAME_BUFFER_SIZE] = "??";
   char file_location[PLATFORM_SYMBOLS_FILE_LOCATION_BUFFER_SIZE] = "??:0";
   char blank_line[SYMBOL_SEPARATOR_BUFFER_SIZE];
@@ -640,7 +624,8 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
 
   // Format symbol
   bool has_func = (strcmp(func_name, "??") != 0 && strlen(func_name) > 0);
-  bool has_file = (strcmp(file_location, "??:0") != 0 && strcmp(file_location, "??:?") != 0 && strcmp(file_location, "??") != 0);
+  bool has_file =
+      (strcmp(file_location, "??:0") != 0 && strcmp(file_location, "??:?") != 0 && strcmp(file_location, "??") != 0);
 
   // Remove () from function name if present (llvm-symbolizer includes them)
   char clean_func[PLATFORM_SYMBOLS_CLEAN_FUNC_BUFFER_SIZE];
@@ -653,11 +638,13 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
   if (!has_func && !has_file) {
     snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%p", addr);
   } else if (has_func && has_file) {
-    snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s() (%s)%s", clean_func, rel_path, external ? " (external code)" : "");
+    snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s() (%s)%s", clean_func, rel_path,
+             external ? " (external code)" : "");
   } else if (has_func) {
     snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s()", clean_func);
   } else {
-    snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s (unknown function)%s", rel_path, external ? " (external code)" : "");
+    snprintf(result, SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s (unknown function)%s", rel_path,
+             external ? " (external code)" : "");
   }
 
   return result;
@@ -735,7 +722,8 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size, const cha
 
     if (group_idx < 0 && num_groups < 8) {
       group_idx = num_groups++;
-      platform_strncpy(groups[group_idx].binary_path, sizeof(groups[group_idx].binary_path), match.path, sizeof(groups[group_idx].binary_path) - 1);
+      platform_strncpy(groups[group_idx].binary_path, sizeof(groups[group_idx].binary_path), match.path,
+                       sizeof(groups[group_idx].binary_path) - 1);
       groups[group_idx].relative_addresses = match.relative_address;
       groups[group_idx].count = 0;
     }
@@ -772,8 +760,9 @@ static char **run_llvm_symbolizer_batch(void *const *buffer, int size, const cha
     // Error reporting must not wait for remote debug-data downloads.
     // Build command with all addresses for this binary
     char cmd[PLATFORM_SYMBOLS_CMD_BUFFER_SIZE];
-    int offset = snprintf(cmd, sizeof(cmd), "%s --demangle --no-debuginfod --output-style=LLVM --relativenames %s-e %s ", symbolizer_cmd, groups[g].relative_addresses ? "--relative-address " : "",
-                          escaped_binary_path);
+    int offset =
+        snprintf(cmd, sizeof(cmd), "%s --demangle --no-debuginfod --output-style=LLVM --relativenames %s-e %s ",
+                 symbolizer_cmd, groups[g].relative_addresses ? "--relative-address " : "", escaped_binary_path);
 
     for (int j = 0; j < groups[g].count && offset < (int)sizeof(cmd) - 32; j++) {
       int n = snprintf(cmd + offset, sizeof(cmd) - (size_t)offset, "0x%lx ", (unsigned long)groups[g].addresses[j]);
@@ -970,16 +959,19 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
     } else if (has_func && has_file) {
       // Best case - both function and file:line known
       if (strstr(rel_path, ":") != NULL) {
-        snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s in %s()%s", rel_path, func_name, external ? " (external code)" : "");
+        snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s in %s()%s", rel_path, func_name,
+                 external ? " (external code)" : "");
       } else {
-        snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s() at %s%s", func_name, rel_path, external ? " (external code)" : "");
+        snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s() at %s%s", func_name, rel_path,
+                 external ? " (external code)" : "");
       }
     } else if (has_func) {
       // Function known but file unknown (common for library functions)
       snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s() at %p", func_name, buffer[i]);
     } else {
       // File known but function unknown (rare)
-      snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s (unknown function)%s", rel_path, external ? " (external code)" : "");
+      snprintf(result[i], SYMBOL_DESCRIPTION_BUFFER_SIZE, "%s (unknown function)%s", rel_path,
+               external ? " (external code)" : "");
     }
   }
 

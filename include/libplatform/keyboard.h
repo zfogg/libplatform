@@ -355,5 +355,8 @@ uint64_t keyboard_stream_terminal_reply_ns(void);
 bool keyboard_stream_query_background(int (*read_byte)(void), bool (*send_query)(void), uint8_t *r, uint8_t *g,
                                       uint8_t *b);
 
+/** Mark an asynchronously requested OSC 11 reply as pending. */
+void keyboard_stream_query_started(void);
+
 /** Most recently decoded OSC 11 reply, without reading or waiting for input. */
 bool keyboard_stream_background(uint8_t *r, uint8_t *g, uint8_t *b);

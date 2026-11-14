@@ -71,6 +71,12 @@ typedef int asciichat_error_t;
 #include "util/ip.h"
 #include "util/utf8.h"
 #include <libplatform/symbols.h>
+#include <ascii-chat/common.h>
+#include <ascii-chat/log/log.h>
+#include <ascii-chat/otel.h>
+#include <ascii-chat/os/socket.h>
+#include <ascii-chat/util/time.h>
+#include <ascii-chat/util/url.h>
 #include <unistd.h>
 #include <poll.h>
 #include <fcntl.h>
@@ -146,6 +152,26 @@ int platform_open(const char *name, const char *pathname, int flags, ...) {
   return fd;
 }
 
+/* POSIX fallbacks for APIs whose platform-specific implementations are not
+ * required by the static CLI build. */
+int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
+  (void)install_prefix;
+  if (list_out) {
+    list_out->candidates = NULL;
+    list_out->count = 0;
+  }
+  return list_out ? 0 : -1;
+}
+
+int platform_enable_keepawake(void) { return 0; }
+
+void platform_disable_keepawake(void) {}
+
+int platform_clipboard_read(char *output, size_t capacity) {
+  if (output && capacity > 0) output[0] = '\0';
+  return -1;
+}
+
 /**
  * @brief Get username from environment variables
  * @return Username string or "unknown" if not found
@@ -169,7 +195,7 @@ const char *get_username_env(void) {
  * @return 0 on success, error code on failure
  * @note POSIX platforms don't need special initialization
  */
-asciichat_error_t platform_init(void) {
+int platform_init(void) {
   // Initialize symbol cache for backtrace resolution
   if (symbol_cache_init() != ASCIICHAT_OK) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Symbol cache initialization failed");
@@ -264,7 +290,7 @@ void platform_sleep_ns(uint64_t ns) {
  * @param result Pointer to struct tm to receive result
  * @return 0 on success, non-zero on error
  */
-asciichat_error_t platform_localtime(const time_t *timer, struct tm *result) {
+int platform_localtime(const time_t *timer, struct tm *result) {
   if (!timer || !result) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for localtime");
   }
@@ -275,7 +301,7 @@ asciichat_error_t platform_localtime(const time_t *timer, struct tm *result) {
   return ASCIICHAT_OK;
 }
 
-asciichat_error_t platform_gtime(const time_t *timer, struct tm *result) {
+int platform_gtime(const time_t *timer, struct tm *result) {
   if (!timer || !result) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for gmtime");
   }
@@ -715,7 +741,7 @@ void platform_install_crash_handler(void) {
 // Safe Memory Functions
 // ============================================================================
 
-asciichat_error_t platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
+int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
   // Validate parameters
   if (!dest || !src) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointers for memcpy");
@@ -730,7 +756,7 @@ asciichat_error_t platform_memcpy(void *dest, size_t dest_size, const void *src,
   return ASCIICHAT_OK;
 }
 
-asciichat_error_t platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
+int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
   // Validate parameters
   if (!dest) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointer for memset");
@@ -745,7 +771,7 @@ asciichat_error_t platform_memset(void *dest, size_t dest_size, int ch, size_t c
   return ASCIICHAT_OK;
 }
 
-asciichat_error_t platform_memmove(void *dest, size_t dest_size, const void *src, size_t count) {
+int platform_memmove(void *dest, size_t dest_size, const void *src, size_t count) {
   // Validate parameters
   if (!dest || !src) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointers for memmove");
@@ -771,7 +797,7 @@ asciichat_error_t platform_memmove(void *dest, size_t dest_size, const void *src
  * @param src Source string
  * @return 0 on success, non-zero on error
  */
-asciichat_error_t platform_strcpy(char *dest, size_t dest_size, const char *src) {
+int platform_strcpy(char *dest, size_t dest_size, const char *src) {
   if (!dest || !src) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid pointers for strcpy");
   }
@@ -801,7 +827,7 @@ asciichat_error_t platform_strcpy(char *dest, size_t dest_size, const char *src)
  * @param ipv4_out_size Size of the output buffer
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size_t ipv4_out_size) {
+int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size_t ipv4_out_size) {
   if (!hostname || !ipv4_out || ipv4_out_size == 0) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for hostname resolution");
   }
@@ -844,7 +870,7 @@ asciichat_error_t platform_resolve_hostname_to_ipv4(const char *hostname, char *
  * @param pem_size_out Pointer to receive size of PEM data
  * @return 0 on success, -1 on failure
  */
-asciichat_error_t platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
+int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
   if (!pem_data_out || !pem_size_out) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for CA cert loading");
   }
@@ -1132,7 +1158,7 @@ void platform_force_exit(int exit_code) {
  * POSIX implementation registers each signal using platform_signal().
  * Windows implementation handles this differently via console control handlers.
  */
-asciichat_error_t platform_register_signal_handlers(const platform_signal_handler_t *handlers, int count) {
+int platform_register_signal_handlers(const platform_signal_handler_t *handlers, int count) {
   if (!handlers || count <= 0) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid handlers or count");
   }
@@ -1151,7 +1177,7 @@ asciichat_error_t platform_register_signal_handlers(const platform_signal_handle
 /**
  * Request coarse timer precision (POSIX no-op)
  */
-asciichat_error_t platform_request_timer_precision(int precision) {
+int platform_request_timer_precision(int precision) {
   (void)precision; // Unused on POSIX
   // POSIX systems don't have a timer precision API like Windows
   return ASCIICHAT_OK;
@@ -1160,7 +1186,7 @@ asciichat_error_t platform_request_timer_precision(int precision) {
 /**
  * Restore default timer precision (POSIX no-op)
  */
-asciichat_error_t platform_restore_timer_resolution(void) {
+int platform_restore_timer_resolution(void) {
   // POSIX systems don't have a timer precision API like Windows
   return ASCIICHAT_OK;
 }

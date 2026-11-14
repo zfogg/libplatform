@@ -429,10 +429,11 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
   const platform_application_config_t *app_config = platform_application_config();
   const char *config_directory = app_config->config_directory;
 
-  // Priority 0: %APPDATA%\<config-directory> (user config)
-  char *config_dir = platform_get_config_dir();
-  if (config_dir) {
-    int ret = snprintf(full_path, sizeof(full_path), "%s%s", config_dir, filename);
+  // Priority 0: %APPDATA%\<configured application directory> (user config).
+  // Config discovery must honor the application identity registered by the app.
+  char appdata[MAX_PATH];
+  if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appdata))) {
+    int ret = snprintf(full_path, sizeof(full_path), "%s\\%s\\%s", appdata, config_directory, filename);
     if (ret >= 0 && (size_t)ret < sizeof(full_path)) {
       if (platform_is_regular_file(full_path)) {
         config_file_result_t *result = &list_out->files[list_out->count];
@@ -446,8 +447,6 @@ int platform_find_config_file(const char *filename, config_file_list_t *list_out
       }
     }
   }
-
-  free(config_dir);
 
   // Priority 1: %LOCALAPPDATA%\<config-directory>
   char localappdata[MAX_PATH];

@@ -26,6 +26,11 @@ void platform_directory_list_destroy(platform_directory_list_t *list) {
   }
 }
 
+keyboard_line_edit_result_t keyboard_read_line_interactive(keyboard_line_edit_opts_t *opts) {
+  (void)opts;
+  return LINE_EDIT_NO_INPUT;
+}
+
 // Backtrace stubs (not supported in WASM)
 int platform_backtrace(void **buffer, int size) {
   (void)buffer;
