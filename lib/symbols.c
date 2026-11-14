@@ -104,27 +104,42 @@ static bool symbol_name_matches(const char *module_name, const char *configured_
     return false;
   if (ascii_case_equal(module_name, configured_name))
     return true;
-  if (!library_name)
+  if (!library_name) {
+    const char *extension = ".exe";
+    size_t configured_length = strlen(configured_name);
+    size_t extension_length = strlen(extension);
+    if (strlen(module_name) == configured_length + extension_length &&
+        ascii_case_equal(module_name + configured_length, extension)) {
+      for (size_t i = 0; i < configured_length; ++i) {
+        if (tolower((unsigned char)module_name[i]) != tolower((unsigned char)configured_name[i]))
+          return false;
+      }
+      return true;
+    }
     return false;
+  }
 
   const char *module_without_lib = strncmp(module_name, "lib", 3) == 0 ? module_name + 3 : module_name;
   const char *configured_without_lib = strncmp(configured_name, "lib", 3) == 0 ? configured_name + 3 : configured_name;
   if (ascii_case_equal(module_without_lib, configured_without_lib))
     return true;
 
+  const char *extensions[] = {".dll", ".lib", ".dylib", ".so"};
   size_t configured_length = strlen(configured_without_lib);
-  if (strlen(module_without_lib) > configured_length &&
-      (module_without_lib[configured_length] == '.' || module_without_lib[configured_length] == '_' ||
-       module_without_lib[configured_length] == '-')) {
-    bool prefix_matches = true;
-    for (size_t i = 0; i < configured_length; ++i) {
-      if (tolower((unsigned char)module_without_lib[i]) != tolower((unsigned char)configured_without_lib[i])) {
-        prefix_matches = false;
-        break;
+  for (size_t i = 0; i < sizeof(extensions) / sizeof(extensions[0]); ++i) {
+    size_t extension_length = strlen(extensions[i]);
+    if (strlen(module_without_lib) == configured_length + extension_length &&
+        ascii_case_equal(module_without_lib + configured_length, extensions[i])) {
+      bool prefix_matches = true;
+      for (size_t j = 0; j < configured_length; ++j) {
+        if (tolower((unsigned char)module_without_lib[j]) != tolower((unsigned char)configured_without_lib[j])) {
+          prefix_matches = false;
+          break;
+        }
       }
+      if (prefix_matches)
+        return true;
     }
-    if (prefix_matches)
-      return true;
   }
   return false;
 }
@@ -162,6 +177,8 @@ int symbol_format_source_path(const char *module_name, const char *executable_na
   }
 
   const char *path = source_path ? source_path : "unknown";
+  executable_name = executable_name ? executable_name : g_project_executable_name;
+  library_name = library_name ? library_name : g_project_library_name;
   bool project_module = symbol_module_is_project(module_name, executable_name, library_name);
   if (!owned_dirs) {
     *external = source_path_is_absolute(path) && !project_module;
