@@ -82,7 +82,6 @@ int platform_open(const char *name, const char *pathname, int flags, ...) {
 
   if (fd >= 0) {
     NAMED_REGISTER_FD(fd, name);
-    log_dev("Opened file descriptor %d for %s at path %s", fd, name, pathname);
   }
 
   return fd;
