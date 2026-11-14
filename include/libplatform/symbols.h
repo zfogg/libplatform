@@ -94,8 +94,9 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
  * @param library_name Library basename, or NULL to skip library matching.
  * @return true when the module matches either configured name.
  *
- * Library matching accepts both `libname` and `name` forms, including Windows
- * DLL variants.
+ * Library matching accepts both `libname` and `name` forms and recognizes the
+ * `.dll`, `.lib`, `.dylib`, and `.so` suffixes. Executable matching also
+ * recognizes `.exe`.
  */
 bool symbol_module_is_project(const char *module_name, const char *executable_name, const char *library_name);
 
