@@ -88,6 +88,18 @@
 bool symbol_module_matches(const char *module_name, const char *const *module_names, size_t module_count);
 
 /**
+ * @brief Determine whether a module is the configured executable or library.
+ * @param module_name Module basename or path.
+ * @param executable_name Executable basename, or NULL to skip executable matching.
+ * @param library_name Library basename, or NULL to skip library matching.
+ * @return true when the module matches either configured name.
+ *
+ * Library matching accepts both `libname` and `name` forms, including Windows
+ * DLL variants.
+ */
+bool symbol_module_is_project(const char *module_name, const char *executable_name, const char *library_name);
+
+/**
  * @brief Format a source path for a symbolized frame
  * @param module_name Module basename or path
  * @param source_path Source path reported by debug information
@@ -99,8 +111,9 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
  * Project sources use repository-relative paths. External sources retain at
  * most four parent directories and the filename.
  */
-int symbol_format_source_path(const char *module_name, const char *source_path, char *output,
-                              size_t output_size, bool *external, const char *const *owned_dirs);
+int symbol_format_source_path(const char *module_name, const char *executable_name, const char *library_name,
+                              const char *source_path, char *output, size_t output_size, bool *external,
+                              const char *const *owned_dirs);
 
 /* ============================================================================
  * Symbol Cache Lifecycle
