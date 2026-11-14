@@ -1,4 +1,5 @@
-#pragma once
+#ifndef LIBPLATFORM_UTIL_STRING_H
+#define LIBPLATFORM_UTIL_STRING_H
 
 #include <stddef.h>
 #include <stdarg.h>
@@ -39,3 +40,5 @@ void platform_color_set_enabled(bool enabled);
 void platform_color_set_truecolor_supported(bool supported);
 void platform_color_set_code(platform_color_t color, const char *ansi_code);
 const char *platform_colored_string(bool enabled, platform_color_t color, const char *text);
+
+#endif /* LIBPLATFORM_UTIL_STRING_H */
