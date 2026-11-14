@@ -58,6 +58,9 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <mach-o/dyld.h>
 #endif
 
+static pthread_mutex_t subprocess_terminal_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pid_t subprocess_terminal_owner = -1;
+
 /**
  * @brief Get username from environment variables
  * @return Username string or "unknown" if not found
@@ -304,14 +307,7 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
  * Returns NULL if the environment variable contains invalid UTF-8 sequences,
  * helping prevent corruption from malformed environment data.
  */
-const char *platform_getenv(const char *name) {
-  const char *value = getenv(name);
-  if (value && !utf8_is_valid(value)) {
-    // Invalid UTF-8 detected - log warning and return NULL
-    return NULL;
-  }
-  return value;
-}
+
 
 /**
  * @brief Set environment variable
@@ -452,29 +448,7 @@ void platform_set_last_error(int error) {
  * @param ... Mode (if O_CREAT is specified)
  * @return File descriptor on success, -1 on failure
  */
-int platform_open(const char *name, const char *pathname, int flags, ...) {
-  if (!name) {
-    return -1;
-  }
 
-  int fd = -1;
-  int mode = 0;
-  if (flags & O_CREAT) {
-    va_list args;
-    va_start(args, flags);
-    mode = va_arg(args, int);
-    va_end(args);
-    fd = open(pathname, flags, mode);
-  } else {
-    fd = open(pathname, flags);
-  }
-
-  if (fd >= 0) {
-    NAMED_REGISTER_FD(fd, name);
-  }
-
-  return fd;
-}
 
 /**
  * @brief Open file descriptor with platform-safe mode
@@ -618,19 +592,7 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
 /**
  * @brief Install crash handlers for common crash signals (thread-safe)
  */
-void platform_install_crash_handler(void) {
-  struct sigaction sa;
-  sa.sa_sigaction = crash_handler;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = SA_SIGINFO | SA_RESTART;
 
-  // Install handlers for all crash signals
-  sigaction(SIGSEGV, &sa, NULL); // Segmentation fault
-  sigaction(SIGABRT, &sa, NULL); // Abort
-  sigaction(SIGFPE, &sa, NULL);  // Floating point exception
-  sigaction(SIGILL, &sa, NULL);  // Illegal instruction
-  sigaction(SIGBUS, &sa, NULL);  // Bus error
-}
 
 // Safe string functions are defined in platform/posix/string.c
 
@@ -1097,21 +1059,11 @@ int platform_restore_timer_resolution(void) {
 /**
  * Execute a subprocess using fork+exec (POSIX implementation)
  */
-// Serialize foreground ownership checks and changes across concurrent loaders.
-static pthread_mutex_t subprocess_terminal_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pid_t subprocess_terminal_owner = -1;
 
-void terminal_input_lock(void) {
-  pthread_mutex_lock(&subprocess_terminal_mutex);
-}
 
-bool terminal_input_trylock(void) {
-  return pthread_mutex_trylock(&subprocess_terminal_mutex) == 0;
-}
 
-void terminal_input_unlock(void) {
-  pthread_mutex_unlock(&subprocess_terminal_mutex);
-}
+
+
 
 static int subprocess_set_foreground(int fd, pid_t group) {
   sigset_t block, previous;
@@ -1396,4 +1348,5 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   return !cancelled && !capture_failed && !wait_failed && WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 #endif // !_WIN32
+
 
