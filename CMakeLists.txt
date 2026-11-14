@@ -170,6 +170,7 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/linux/system.c
     lib/linux/systemd.c
     lib/linux/font.c
+    lib/linux/clipboard.c
   )
 elseif(EMSCRIPTEN)
   # The browser replacements below intentionally supersede generic helpers

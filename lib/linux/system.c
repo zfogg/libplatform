@@ -14,6 +14,22 @@
 #include <link.h>
 #include <string.h>
 
+int platform_enable_keepawake(void) {
+  return 0;
+}
+
+void platform_disable_keepawake(void) {}
+
+int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
+  (void)install_prefix;
+  if (!list_out) {
+    return -1;
+  }
+  list_out->candidates = NULL;
+  list_out->count = 0;
+  return 0;
+}
+
 typedef struct {
   uintptr_t address;
   platform_binary_match_t *match;
