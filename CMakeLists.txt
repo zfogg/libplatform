@@ -56,6 +56,10 @@ add_library(libplatform::libplatform ALIAS libplatform)
 target_compile_definitions(libplatform-objects PRIVATE LIBPLATFORM_STANDALONE=1)
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c
+  # Shared rwlock diagnostics are called by each platform-specific lock
+  # implementation. Keep the hooks in the platform library so shared builds
+  # do not leave unresolved debug symbols at link time.
+  lib/rwlock.c
   lib/filesystem_common.c
   lib/application.c
   lib/app_callbacks.c
