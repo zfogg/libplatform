@@ -76,6 +76,7 @@ target_sources(libplatform-objects PRIVATE
   lib/app_callbacks.c
   lib/lifecycle.c
   lib/mutex.c
+  lib/rwlock.c
   lib/cond.c
   lib/system_common.c
   lib/keyboard.c
