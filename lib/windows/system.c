@@ -228,7 +228,12 @@ bool platform_get_cwd(char *cwd, size_t path_size) {
   return cwd && path_size && _getcwd(cwd, (int)path_size) != NULL;
 }
 bool platform_get_temp_dir(char *temp_dir, size_t path_size) {
-  return temp_dir && path_size && GetTempPathA((DWORD)path_size, temp_dir) != 0;
+  if (!temp_dir || !path_size)
+    return false;
+  /* GetTempPathA documents a maximum return length of MAX_PATH + 1. */
+  DWORD capacity = (DWORD)(path_size < MAX_PATH + 1 ? path_size : MAX_PATH + 1);
+  DWORD length = GetTempPathA(capacity, temp_dir);
+  return length != 0 && length < capacity;
 }
 int platform_execute_subprocess(const char *executable, const char **argv, char *output_buffer, size_t output_size,
                                 bool (*cancel)(void *), void *data) {
