@@ -372,7 +372,6 @@ void named_unregister(uintptr_t key) {
   rwlock_wrlock(&g_named_registry.entries_lock);
   named_entry_t *entry = NULL;
   HASH_FIND(hh, g_named_registry.entries, &key, sizeof(uintptr_t), entry);
-  bool changed = entry != NULL;
   // A primitive may be registered again with a parent-qualified name. Retire
   // every entry before its owner releases the object.
   while (entry) {
@@ -389,8 +388,7 @@ void named_unregister(uintptr_t key) {
     free(entry);
     HASH_FIND(hh, g_named_registry.entries, &key, sizeof(uintptr_t), entry);
   }
-  if (changed)
-    rwlock_wrunlock(&g_named_registry.entries_lock);
+  rwlock_wrunlock(&g_named_registry.entries_lock);
 }
 
 const char *named_update_name(uintptr_t key, const char *new_base_name) {
