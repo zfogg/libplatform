@@ -228,6 +228,7 @@ elseif(EMSCRIPTEN)
     lib/wasm/time.c
     lib/wasm/stubs/actions.c
     lib/wasm/stubs/crypto.c
+    lib/wasm/stubs/initializers.c
     lib/wasm/stubs/log.c
     lib/wasm/stubs/manpage.c
     lib/wasm/stubs/mode_defaults.c
