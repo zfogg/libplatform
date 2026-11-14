@@ -11,6 +11,8 @@
 #ifndef _WIN32
 
 #include <libplatform/system.h>
+#include <libplatform/socket.h>
+#include <libplatform/filesystem.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
@@ -142,7 +144,7 @@ uint64_t platform_get_monotonic_time_us(void) {
   if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
     return 0; // Fallback on error (shouldn't happen)
   }
-  return time_ns_to_us(((uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec));
+  return ((uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec) / 1000ULL;
 }
 
 /**
