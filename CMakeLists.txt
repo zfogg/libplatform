@@ -134,6 +134,7 @@ elseif(APPLE)
     lib/posix/agent.c
     lib/posix/socket.c
     lib/posix/process.c
+    lib/posix/system.c
     lib/posix/rwlock.c
     lib/posix/mutex.c
     lib/posix/cond.c
@@ -159,6 +160,7 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/agent.c
     lib/posix/socket.c
     lib/posix/process.c
+    lib/posix/system.c
     lib/posix/rwlock.c
     lib/posix/mutex.c
     lib/posix/cond.c
