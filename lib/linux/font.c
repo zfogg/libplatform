@@ -6,9 +6,6 @@
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <libplatform/font.h>
 
-#define log_debug(...) ((void)0)
-#define log_info(...) ((void)0)
-#define log_warn(...) ((void)0)
 #ifndef USE_MUSL
 #include <fontconfig/fontconfig.h>
 #endif
@@ -57,7 +54,6 @@ static int resolve_via_fontconfig(const char *name, char *out, size_t sz) {
     return SET_ERRNO(ERROR_NOT_FOUND, "fontconfig matched but no file");
   }
   snprintf(out, sz, "%s", (const char *)file);
-  log_debug("'%s' → %s", name, out);
   FcPatternDestroy(match);
   return ASCIICHAT_OK;
 }
@@ -95,9 +91,6 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
       *out_font_data_size = matrix_size;
     snprintf(out, out_size, "matrix");
     *out_is_path = false;
-    log_info("USING MATRIX FONT - g_font_matrix_resurrected=%p (size=%zu), g_font_default=%p "
-             "(size=%zu)",
-             (void *)matrix_data, matrix_size, (void *)default_data, default_size);
     return ASCIICHAT_OK;
   }
 
@@ -108,9 +101,6 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
       *out_font_data_size = default_size;
     snprintf(out, out_size, "default");
     *out_is_path = false;
-    log_info("USING DEFAULT FONT - g_font_default=%p (size=%zu), g_font_matrix_resurrected=%p "
-             "(size=%zu)",
-             (void *)default_data, default_size, (void *)matrix_data, matrix_size);
     return ASCIICHAT_OK;
   }
 
@@ -118,13 +108,11 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
   *out_is_path = true;
   int err = resolve_via_fontconfig(eff, out, out_size);
   if (err != ASCIICHAT_OK && strcmp(eff, k_fallback) != 0) {
-    log_warn("'%s' not found, trying '%s'", eff, k_fallback);
     err = resolve_via_fontconfig(k_fallback, out, out_size);
   }
 
   // Fallback chain: system fonts → bundled default font
   if (err != ASCIICHAT_OK) {
-    log_warn("system font resolution failed, using bundled default font");
     if (out_font_data)
       *out_font_data = default_data;
     if (out_font_data_size)
@@ -137,7 +125,6 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
   return err;
 #else
   // musl static builds: fontconfig not available, use bundled default font
-  log_debug("using bundled default font (musl build, no fontconfig)");
   if (out_font_data)
     *out_font_data = default_data;
   if (out_font_data_size)

@@ -47,49 +47,6 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <netdb.h>
-
-#ifndef ASCIICHAT_OK
-// The standalone libplatform target does not include ascii-chat's errno
-// layer. Keep the POSIX system implementation self-contained for consumers
-// that link libplatform directly.
-typedef int asciichat_error_t;
-#define ASCIICHAT_OK 0
-#define ERROR_CRYPTO 1
-#define ERROR_INVALID_PARAM 2
-#define ERROR_INVALID_STATE 3
-#define ERROR_MEMORY 4
-#define ERROR_NETWORK 5
-#define ERROR_PLATFORM_INIT 6
-#define SET_ERRNO(...) (-1)
-#define SET_ERRNO_SYS(...) (-1)
-#define SAFE_MALLOC(type, count) ((type *)malloc(sizeof(type) * (count)))
-#define SAFE_STRNCPY(dest, src, size) strncpy((dest), (src), (size))
-#define SAFE_STRERROR(error) strerror(error)
-#endif
-
-#ifdef LIBPLATFORM_STANDALONE
-// Standalone libplatform does not depend on ascii-chat's logging, telemetry,
-// or errno layers. Keep the POSIX system implementation usable by consumers
-// that build libplatform as an independent target.
-#define BUFFER_SIZE_SMALL 256
-#define HOSTNAME_BUFFER_SIZE 1024
-#define NS_PER_SEC_INT 1000000000ULL
-#define LOG_ERROR 0
-#define log_warn(...) ((void)0)
-#define log_dev(...) ((void)0)
-#define log_error(...) ((void)0)
-#define SAFE_FREE(value) free(value)
-#define backtrace_log_frames(...) ((void)0)
-static inline uint64_t time_timespec_to_ns(const struct timespec *ts) {
-  return (uint64_t)ts->tv_sec * NS_PER_SEC_INT + (uint64_t)ts->tv_nsec;
-}
-static inline asciichat_error_t hostname_to_ascii(const char *source, char *destination, size_t capacity) {
-  if (!source || !destination || capacity == 0 || strlen(source) >= capacity)
-    return ERROR_INVALID_PARAM;
-  memcpy(destination, source, strlen(source) + 1);
-  return ASCIICHAT_OK;
-}
-#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -145,7 +102,6 @@ void platform_destroy(void) {
   symbol_cache_print_stats();
 
   // Clean up symbol cache
-  log_debug("Platform cleanup: calling symbol_cache_destroy()");
   symbol_cache_destroy();
 }
 
@@ -345,7 +301,6 @@ const char *platform_getenv(const char *name) {
   const char *value = getenv(name);
   if (value && !utf8_is_valid(value)) {
     // Invalid UTF-8 detected - log warning and return NULL
-    log_warn("Environment variable '%s' contains invalid UTF-8, ignoring", name);
     return NULL;
   }
   return value;
@@ -384,7 +339,6 @@ void platform_raise_fd_limit(unsigned int limit) {
 
   rl.rlim_cur = target;
   if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
-    log_warn("Failed to raise fd limit to %llu: %s", (unsigned long long)target, strerror(errno));
   }
 #endif
 }
@@ -419,7 +373,7 @@ void *platform_aligned_alloc(size_t alignment, size_t size) {
  */
 void platform_aligned_free(void *ptr) {
   // Regular free works for aligned memory on POSIX
-  SAFE_FREE(ptr);
+  free(ptr);
 }
 
 /**
@@ -510,7 +464,6 @@ int platform_open(const char *name, const char *pathname, int flags, ...) {
 
   if (fd >= 0) {
     NAMED_REGISTER_FD(fd, name);
-    log_dev("Opened file descriptor %d for %s at path %s", fd, name, pathname);
   }
 
   return fd;
@@ -531,7 +484,6 @@ FILE *platform_fdopen(const char *name, int fd, const char *mode) {
   FILE *stream = fdopen(fd, mode);
   if (stream && fd >= 0) {
     NAMED_REGISTER_FD(fd, name);
-    log_dev("Wrapped file descriptor %d with stream for %s", fd, name);
   }
   return stream;
 }
@@ -556,7 +508,6 @@ ssize_t platform_read(int fd, void *buf, size_t count) {
  */
 ssize_t platform_write(int fd, const void *buf, size_t count) {
   if (!buf || count == 0) {
-    log_warn("Invalid parameters: fd=%d, buf=%p, count=%zu", fd, buf, count);
   }
   return write(fd, buf, count);
 }
@@ -587,7 +538,6 @@ FILE *platform_fopen(const char *name, const char *filename, const char *mode) {
     int fd = fileno(stream);
     if (fd >= 0) {
       NAMED_REGISTER_FD(fd, name);
-      log_dev("Opened file stream with file descriptor %d for %s", fd, name);
     }
   }
   return stream;
@@ -643,26 +593,10 @@ static const char *get_signal_name(int sig) {
 static void crash_handler(int sig, siginfo_t *info, void *context) {
   (void)context; // Suppress unused parameter warning
 
-  const char *signal_name = get_signal_name(sig);
   if (info) {
-#ifndef NDEBUG
-    // Only capture backtraces in Debug builds
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p", sig, signal_name,
-              info->si_code, info->si_addr);
-    backtrace_log_frames(LOG_ERROR, 0, 1);
-#else
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p\nBacktrace disabled in "
-              "Release builds",
-              sig, signal_name, info->si_code, info->si_addr);
-#endif
+    (void)info;
   } else {
-#ifndef NDEBUG
-    // Only capture backtraces in Debug builds
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)", sig, signal_name);
-    backtrace_log_frames(LOG_ERROR, 0, 1);
-#else
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nBacktrace disabled in Release builds", sig, signal_name);
-#endif
+    (void)info;
   }
 
   // Restore default handler and re-raise signal
@@ -875,7 +809,7 @@ asciichat_error_t platform_load_system_ca_certs(char **pem_data_out, size_t *pem
     }
 
     // Allocate buffer for PEM data
-    char *pem_data = SAFE_MALLOC(file_size + 1, char *);
+    char *pem_data = malloc(file_size + 1);
     if (!pem_data) {
       fclose(f);
       return SET_ERRNO(ERROR_MEMORY, "Failed to allocate memory for CA certificates");
@@ -886,7 +820,7 @@ asciichat_error_t platform_load_system_ca_certs(char **pem_data_out, size_t *pem
     fclose(f);
 
     if (bytes_read != (size_t)file_size) {
-      SAFE_FREE(pem_data);
+      free(pem_data);
       return SET_ERRNO(ERROR_CRYPTO, "Failed to read complete CA certificate file");
     }
 
@@ -899,7 +833,6 @@ asciichat_error_t platform_load_system_ca_certs(char **pem_data_out, size_t *pem
     // Success!
     *pem_data_out = pem_data;
     *pem_size_out = bytes_read;
-    log_debug("Loaded CA certificates from: %s (%zu bytes)", ca_paths[i], bytes_read);
     return ASCIICHAT_OK;
   }
 
@@ -937,7 +870,7 @@ bool platform_get_temp_dir(char *temp_dir, size_t path_size) {
   }
 
   // Copy the path
-  SAFE_STRNCPY(temp_dir, tmp, path_size);
+  strncpy(temp_dir, tmp, path_size);
   return true;
 }
 
@@ -1129,7 +1062,6 @@ asciichat_error_t platform_register_signal_handlers(const platform_signal_handle
   for (int i = 0; i < count; i++) {
     signal_handler_t old_handler = platform_signal(handlers[i].sig, handlers[i].handler);
     if (old_handler == SIG_ERR) {
-      log_warn("Failed to register signal handler for signal %d", handlers[i].sig);
       // Continue registering others instead of failing completely
     }
   }
@@ -1210,7 +1142,6 @@ bool terminal_release_subprocess_gate(int fd) {
 int platform_execute_subprocess(const char *executable, const char **argv, char *output_buffer, size_t output_size,
                                 bool (*cancel)(void *), void *data) {
   if (!executable || !argv || !argv[0]) {
-    log_error("Invalid subprocess parameters");
     return -1;
   }
   bool capture = output_buffer && output_size > 0;
@@ -1259,7 +1190,6 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
     }
     if (tty >= 0)
       close(tty);
-    log_error("Failed to fork process: %s", SAFE_STRERROR(errno));
     return -1;
   }
   if (pid == 0) {
