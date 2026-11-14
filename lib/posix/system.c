@@ -10,56 +10,6 @@
 
 #ifndef _WIN32
 
-#ifndef ASCIICHAT_OK
-#define ASCIICHAT_OK 0
-#define SET_ERRNO(...) (-1)
-#define SET_ERRNO_SYS(...) (-1)
-typedef int asciichat_error_t;
-#define BUFFER_SIZE_SMALL 1024
-#define HOSTNAME_BUFFER_SIZE 256
-#define SAFE_MALLOC(size, type) ((type)malloc(size))
-#define SAFE_FREE(ptr) free(ptr)
-#define SAFE_STRERROR(err) strerror(err)
-#define log_debug(...) ((void)0)
-#define log_dev(...) ((void)0)
-#define log_warn(...) ((void)0)
-#define log_error(...) ((void)0)
-#endif
-
-#ifndef SAFE_MALLOC
-#define SAFE_MALLOC(size, type) ((type)malloc(size))
-#endif
-#ifndef SAFE_FREE
-#define SAFE_FREE(ptr) free(ptr)
-#endif
-#ifndef SAFE_STRERROR
-#define SAFE_STRERROR(err) strerror(err)
-#endif
-#ifndef SAFE_STRNCPY
-#define SAFE_STRNCPY(dst, src, size) (strncpy((dst), (src), (size)), (dst)[(size) - 1] = '\0')
-#endif
-#ifndef NS_PER_SEC_INT
-#define NS_PER_SEC_INT 1000000000LL
-#endif
-#ifndef time_timespec_to_ns
-#define time_timespec_to_ns(ts) ((uint64_t)(ts)->tv_sec * (uint64_t)NS_PER_SEC_INT + (uint64_t)(ts)->tv_nsec)
-#endif
-#ifndef time_ns_to_us
-#define time_ns_to_us(ns) ((uint64_t)(ns) / 1000ULL)
-#endif
-#ifndef platform_cleanup_binary_path_cache
-#define platform_cleanup_binary_path_cache() ((void)0)
-#endif
-#ifndef socket_init
-#define socket_init() 0
-#endif
-#ifndef log_debug
-#define log_debug(...) ((void)0)
-#define log_dev(...) ((void)0)
-#define log_warn(...) ((void)0)
-#define log_error(...) ((void)0)
-#endif
-
 #include <libplatform/system.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
