@@ -63,8 +63,40 @@ typedef int asciichat_error_t;
 #define SET_ERRNO(...) (-1)
 #define SET_ERRNO_SYS(...) (-1)
 #define SAFE_MALLOC(type, count) ((type *)malloc(sizeof(type) * (count)))
-#define SAFE_STRNCPY(dest, size, src) strncpy((dest), (src), (size))
+#define SAFE_STRNCPY(dest, src, size) strncpy((dest), (src), (size))
 #define SAFE_STRERROR(error) strerror(error)
+#endif
+
+#ifdef LIBPLATFORM_STANDALONE
+// Standalone libplatform does not depend on ascii-chat's logging, telemetry,
+// or errno layers. Keep the POSIX system implementation usable by consumers
+// that build libplatform as an independent target.
+#define BUFFER_SIZE_SMALL 256
+#define HOSTNAME_BUFFER_SIZE 1024
+#define NS_PER_SEC_INT 1000000000ULL
+#define LOG_ERROR 0
+#define log_warn(...) ((void)0)
+#define log_dev(...) ((void)0)
+#define log_error(...) ((void)0)
+#define SAFE_FREE(value) free(value)
+#define backtrace_log_frames(...) ((void)0)
+static inline uint64_t time_timespec_to_ns(const struct timespec *ts) {
+  return (uint64_t)ts->tv_sec * NS_PER_SEC_INT + (uint64_t)ts->tv_nsec;
+}
+static inline asciichat_error_t hostname_to_ascii(const char *source, char *destination, size_t capacity) {
+  if (!source || !destination || capacity == 0 || strlen(source) >= capacity)
+    return ERROR_INVALID_PARAM;
+  memcpy(destination, source, strlen(source) + 1);
+  return ASCIICHAT_OK;
+}
+typedef struct {
+  int retained;
+  void *scope;
+} libplatform_otel_scope_t;
+#define ASCII_OTEL_SCOPE(name) libplatform_otel_scope_t otel_scope = {0, NULL}
+#define DNS_RESOLVE 0
+#define gotel_attr_string(...) ((void)0)
+#define gotel_error(...) ((void)0)
 #endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
