@@ -74,7 +74,7 @@ typedef int asciichat_error_t;
 #include <ascii-chat/common.h>
 #include <ascii-chat/log/log.h>
 #include <ascii-chat/otel.h>
-#include <ascii-chat/os/socket.h>
+#include <libplatform/socket.h>
 #include <ascii-chat/util/time.h>
 #include <ascii-chat/util/url.h>
 #include <unistd.h>
