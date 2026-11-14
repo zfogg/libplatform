@@ -62,6 +62,7 @@ target_sources(libplatform-objects PRIVATE
   lib/lifecycle.c
   lib/mutex.c
   lib/cond.c
+  lib/rwlock.c
   lib/system_common.c
   lib/keyboard.c
   lib/terminal.c
