@@ -81,12 +81,14 @@ target_sources(libplatform-objects PRIVATE
   lib/lifecycle.c
   lib/mutex.c
   lib/cond.c
+  lib/rwlock.c
   lib/system_common.c
   lib/keyboard.c
   lib/terminal.c
   lib/socket.c
   lib/socket_io.c
   lib/question.c
+  lib/frame_flush.c
   lib/process.c
   lib/time.c
   lib/atomic.c
@@ -139,6 +141,7 @@ if(WIN32)
     lib/windows/clipboard.c
     lib/windows/font.c
     lib/windows/question.c
+    lib/windows/frame_flush.c
   )
 elseif(APPLE)
   target_sources(libplatform-objects PRIVATE
@@ -158,10 +161,11 @@ elseif(APPLE)
     lib/posix/errno.c
     lib/posix/memory.c
     lib/posix/mmap.c
-    lib/posix/backtrace.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/question.c
+    lib/posix/backtrace.c
+    lib/posix/frame_flush.c
     lib/posix/wakeup.c
     lib/macos/system.c
     lib/macos/font.c
@@ -172,8 +176,6 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/thread.c
     lib/posix/string.c
     lib/posix/filesystem.c
-    lib/posix/clipboard.c
-    lib/posix/keepawake.c
     lib/posix/terminal.c
     lib/posix/agent.c
     lib/posix/socket.c
@@ -184,15 +186,17 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/errno.c
     lib/posix/memory.c
     lib/posix/mmap.c
-    lib/posix/backtrace.c
+    lib/posix/system.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/question.c
+    lib/posix/backtrace.c
+    lib/posix/frame_flush.c
     lib/posix/wakeup.c
-    lib/posix/system.c
     lib/linux/system.c
     lib/linux/systemd.c
     lib/linux/font.c
+    lib/linux/clipboard.c
   )
 elseif(EMSCRIPTEN)
   # The browser replacements below intentionally supersede generic helpers
@@ -254,9 +258,17 @@ target_compile_features(libplatform PUBLIC c_std_11)
 target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
-  target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
+  if(NOT MSVC)
+    target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
+  endif()
 endif()
-set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS OFF)
+if(MSVC)
+  set(_libplatform_windows_exports TRUE)
+else()
+  set(_libplatform_windows_exports OFF)
+endif()
+set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform
+  WINDOWS_EXPORT_ALL_SYMBOLS ${_libplatform_windows_exports})
 if(WIN32 AND LIBPLATFORM_BUILD_SHARED)
   find_program(LIBPLATFORM_NM llvm-nm REQUIRED)
   set(_libplatform_objects "${CMAKE_CURRENT_BINARY_DIR}/libplatform-objects-$<CONFIG>.txt")

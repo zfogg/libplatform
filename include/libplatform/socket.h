@@ -275,6 +275,7 @@ typedef int socklen_t;
 typedef unsigned long nfds_t;
 #else
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h> // For TCP_NODELAY and other TCP options
 #include <arpa/inet.h>
