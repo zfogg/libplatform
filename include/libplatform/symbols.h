@@ -100,6 +100,15 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
 bool symbol_module_is_project(const char *module_name, const char *executable_name, const char *library_name);
 
 /**
+ * @brief Configure the executable and library names used by symbol formatting.
+ * @param executable_name Executable basename, or NULL to disable executable matching.
+ * @param library_name Library basename, or NULL to disable library matching.
+ *
+ * The strings are borrowed and must remain valid until the next call.
+ */
+void symbol_cache_set_project_modules(const char *executable_name, const char *library_name);
+
+/**
  * @brief Format a source path for a symbolized frame
  * @param module_name Module basename or path
  * @param source_path Source path reported by debug information
