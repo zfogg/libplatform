@@ -161,6 +161,7 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/errno.c
     lib/posix/memory.c
     lib/posix/mmap.c
+    lib/posix/system.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/signal.c
