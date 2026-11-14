@@ -88,6 +88,7 @@ target_sources(libplatform-objects PRIVATE
   lib/socket.c
   lib/socket_io.c
   lib/question.c
+  lib/frame_flush.c
   lib/process.c
   lib/time.c
   lib/atomic.c
@@ -140,6 +141,7 @@ if(WIN32)
     lib/windows/clipboard.c
     lib/windows/font.c
     lib/windows/question.c
+    lib/windows/frame_flush.c
   )
 elseif(APPLE)
   target_sources(libplatform-objects PRIVATE
@@ -163,6 +165,7 @@ elseif(APPLE)
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/question.c
+    lib/posix/frame_flush.c
     lib/posix/wakeup.c
     lib/macos/system.c
     lib/macos/font.c
