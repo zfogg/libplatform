@@ -10,8 +10,10 @@
 #include <libplatform/font.h>
 
 #include <libplatform/filesystem.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 static bool is_absolute_path(const char *s) {
   return s && s[0] == '/';
@@ -21,8 +23,8 @@ static bool file_exists(const char *p) {
   return stat(p, &st) == 0;
 }
 
-asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
-                                        const uint8_t **out_font_data, size_t *out_font_data_size) {
+int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
+                          const uint8_t **out_font_data, size_t *out_font_data_size) {
   // If no font is specified, use the bundled default font (DejaVu Sans Mono) for render-file output.
   // This ensures render-file always has a suitable fallback font available.
   const char *eff = (spec && spec[0]) ? spec : "default";
@@ -39,10 +41,10 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   if (is_absolute_path(eff) || strchr(eff, '/') ||
       (strcmp(eff, "default") != 0 && strcmp(eff, "matrix") != 0 && file_exists(eff))) {
     if (strlen(eff) >= out_size)
-      return SET_ERRNO(ERROR_INVALID_PARAM, "render-font: path exceeds output capacity");
+      return -1;
     snprintf(out, out_size, "%s", eff);
     *out_is_path = true;
-    return file_exists(out) ? ASCIICHAT_OK : SET_ERRNO(ERROR_NOT_FOUND, "render-font: not found: %s", out);
+    return file_exists(out) ? 0 : -1;
   }
 
   // Check for bundled font names ("matrix" or "default")
@@ -59,14 +61,13 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
       if (fd >= 0) {
         write(fd, *out_font_data, *out_font_data_size);
         close(fd);
-        log_debug("wrote bundled matrix font to %s", tmp_path);
       }
     }
     if (tmp_path[0] != '\0') {
       snprintf(out, out_size, "%s", tmp_path);
       *out_is_path = true;
     }
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (strcmp(eff, "default") == 0) {
@@ -82,14 +83,13 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
       if (fd >= 0) {
         write(fd, *out_font_data, *out_font_data_size);
         close(fd);
-        log_debug("wrote bundled default font to %s", tmp_path_default);
       }
     }
     if (tmp_path_default[0] != '\0') {
       snprintf(out, out_size, "%s", tmp_path_default);
       *out_is_path = true;
     }
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // Pass other specifications through unchanged; this does not resolve family names.
@@ -97,7 +97,6 @@ asciichat_error_t platform_font_resolve(const char *spec, char *out, size_t out_
   snprintf(out, out_size, "%s", eff);
   *out_is_path = false;
 
-  log_debug("passing unresolved font specification '%s' to the FreeType renderer", eff);
-  return ASCIICHAT_OK;
+  return 0;
 }
 #endif // __APPLE__
