@@ -46,7 +46,21 @@ typedef SSIZE_T ssize_t;
 #include <libplatform/process.h>
 
 #ifndef PLATFORM_MAX_PATH_LENGTH
+#if defined(_WIN32)
 #define PLATFORM_MAX_PATH_LENGTH 32767
+#elif defined(__APPLE__)
+#include <sys/syslimits.h>
+#define PLATFORM_MAX_PATH_LENGTH PATH_MAX
+#elif defined(__linux__)
+#include <limits.h>
+#ifdef PATH_MAX
+#define PLATFORM_MAX_PATH_LENGTH PATH_MAX
+#else
+#define PLATFORM_MAX_PATH_LENGTH 4096
+#endif
+#else
+#define PLATFORM_MAX_PATH_LENGTH 4096
+#endif
 #endif
 
 #ifdef __cplusplus
