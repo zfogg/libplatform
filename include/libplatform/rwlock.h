@@ -122,7 +122,11 @@ int rwlock_destroy(rwlock_t *lock);
  *
  * @ingroup platform
  */
+#ifndef NDEBUG
+void rwlock_on_rdlock(rwlock_t *rwlock);
+#else
 #define rwlock_on_rdlock(rwlock) ((void)0)
+#endif
 
 /**
  * @brief Hook called when a write lock is successfully acquired
@@ -133,7 +137,11 @@ int rwlock_destroy(rwlock_t *lock);
  *
  * @ingroup platform
  */
+#ifndef NDEBUG
+void rwlock_on_wrlock(rwlock_t *rwlock);
+#else
 #define rwlock_on_wrlock(rwlock) ((void)0)
+#endif
 
 /**
  * @brief Hook called when an rwlock is unlocked (read or write)
@@ -144,7 +152,11 @@ int rwlock_destroy(rwlock_t *lock);
  *
  * @ingroup platform
  */
+#ifndef NDEBUG
+void rwlock_on_unlock(rwlock_t *rwlock);
+#else
 #define rwlock_on_unlock(rwlock) ((void)0)
+#endif
 
 /**
  * @brief Format and log the current state of a read-write lock
@@ -158,7 +170,12 @@ int rwlock_destroy(rwlock_t *lock);
  *
  * @ingroup platform
  */
+#ifndef NDEBUG
+void rwlock_log_state(const rwlock_t *rwlock, const char *file, int line, const char *func);
+#define LOG_RWLOCK_STATE(rwlock) rwlock_log_state((rwlock), __FILE__, __LINE__, __func__)
+#else
 #define LOG_RWLOCK_STATE(rwlock) ((void)0)
+#endif
 
 /**
  * @brief Initialize a read-write lock (implementation function)
