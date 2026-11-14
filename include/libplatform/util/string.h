@@ -24,6 +24,9 @@ size_t platform_strlcpy(char *dst, const char *src, size_t size);
 int platform_strncpy(char *dst, size_t dst_size, const char *src, size_t count);
 char *platform_strtok_r(char *str, const char *delim, char **saveptr);
 
+bool validate_shell_safe(const char *str, const char *allowed_chars);
+bool escape_path_for_shell(const char *path, char *out_buffer, size_t out_buffer_size);
+
 typedef enum platform_color {
   PLATFORM_COLOR_GREY,
   PLATFORM_COLOR_FATAL,
