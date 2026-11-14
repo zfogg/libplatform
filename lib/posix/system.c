@@ -48,7 +48,7 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <sys/resource.h>
 #include <netdb.h>
 
-#ifdef LIBPLATFORM_STANDALONE
+#ifndef ASCIICHAT_OK
 // The standalone libplatform target does not include ascii-chat's errno
 // layer. Keep the POSIX system implementation self-contained for consumers
 // that link libplatform directly.
