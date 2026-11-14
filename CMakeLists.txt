@@ -164,6 +164,7 @@ elseif(APPLE)
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/question.c
+    lib/posix/backtrace.c
     lib/posix/frame_flush.c
     lib/posix/wakeup.c
     lib/macos/system.c
@@ -189,6 +190,7 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/question.c
+    lib/posix/backtrace.c
     lib/posix/wakeup.c
     lib/linux/system.c
     lib/linux/systemd.c
