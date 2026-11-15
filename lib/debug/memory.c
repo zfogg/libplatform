@@ -77,6 +77,7 @@
 #define LOG_COLOR_ERROR PLATFORM_COLOR_ERROR
 #define LOG_COLOR_WARN PLATFORM_COLOR_WARN
 #define LOG_COLOR_DEV PLATFORM_COLOR_DEV
+typedef platform_color_t log_color_t;
 static bool g_memory_report_colors;
 static const char *colored_string(platform_color_t color, const char *text) {
   return platform_colored_string(g_memory_report_colors, color, text);

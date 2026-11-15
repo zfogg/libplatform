@@ -43,11 +43,6 @@ typedef enum platform_color {
   PLATFORM_COLOR_COUNT
 } platform_color_t;
 
-/**
- * @brief Compatibility name used by platform debug-report code.
- */
-typedef platform_color_t log_color_t;
-
 void platform_color_set_enabled(bool enabled);
 void platform_color_set_truecolor_supported(bool supported);
 void platform_color_set_code(platform_color_t color, const char *ansi_code);
