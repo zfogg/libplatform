@@ -244,6 +244,14 @@ elseif(EMSCRIPTEN)
     lib/wasm/stubs/ffmpeg_decoder.c
   )
 endif()
+
+# Keep the POSIX backtrace implementation explicitly attached to the object
+# target.  Some parent projects reuse the target during a second configure;
+# registering it after platform source selection prevents that reuse path from
+# dropping the implementation while retaining the public declarations.
+if(UNIX AND NOT EMSCRIPTEN)
+  target_sources(libplatform-objects PRIVATE lib/posix/backtrace.c)
+endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform-objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 target_include_directories(libplatform-objects PRIVATE ${LIBPLATFORM_UTF8PROC_SOURCE_DIR})
