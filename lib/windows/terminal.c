@@ -480,6 +480,12 @@ int terminal_move_cursor_relative(int offset) {
  * @note Enable ANSI escape sequences on Windows 10+
  */
 void terminal_enable_ansi(void) {
+  // VT frames are already serialized with explicit control sequences and
+  // line endings. Prevent the CRT from translating LF to CRLF on ConPTY
+  // output; terminal emulators do not all consume the translated stream the
+  // same way when a large frame is written in chunks.
+  (void)_setmode(_fileno(stdout), _O_BINARY);
+  (void)_setmode(_fileno(stderr), _O_BINARY);
   // Enable ANSI escape sequences on Windows 10+
   HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
   if (hOut != INVALID_HANDLE_VALUE) {
@@ -519,7 +525,13 @@ int terminal_set_buffering(bool line_buffered) {
 int terminal_flush(int fd) {
   HANDLE output = (HANDLE)_get_osfhandle(fd);
   DWORD mode;
-  if (output == INVALID_HANDLE_VALUE || !GetConsoleMode(output, &mode))
+  if (output == INVALID_HANDLE_VALUE)
+    return -1;
+  // ConPTY and terminal emulators expose stdout as a pipe rather than a
+  // console handle. Writes to the synchronous CRT/ConPTY path are already
+  // ordered; FlushFileBuffers here can block behind a terminal parser that is
+  // still consuming a large frame.
+  if (!GetConsoleMode(output, &mode))
     return 0;
   // A synchronous console query is ordered after preceding output writes.
   // fflush(stdout) cannot drain writes made through a retained descriptor.

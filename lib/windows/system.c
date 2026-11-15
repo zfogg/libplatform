@@ -166,6 +166,10 @@ ssize_t platform_read(int fd, void *buf, size_t count) {
   return _read(fd, buf, (unsigned int)count);
 }
 ssize_t platform_write(int fd, const void *buf, size_t count) {
+  // ConPTY output is a byte stream containing VT sequences. Ensure retained
+  // descriptors used by the presentation thread do not apply CRT CRLF
+  // translation before writing to Alacritty.
+  (void)_setmode(fd, _O_BINARY);
   return _write(fd, buf, (unsigned int)count);
 }
 FILE *platform_tmpfile(void) {

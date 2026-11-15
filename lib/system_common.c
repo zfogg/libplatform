@@ -65,7 +65,7 @@ size_t platform_write_all(int fd, const void *buffer, size_t count) {
   size_t written = 0;
   while (written < count) {
 #ifdef _WIN32
-    int result = _write(fd, bytes + written, (unsigned int)(count - written));
+    ssize_t result = platform_write(fd, bytes + written, count - written);
 #else
     ssize_t result = write(fd, bytes + written, count - written);
 #endif
