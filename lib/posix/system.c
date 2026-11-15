@@ -39,19 +39,37 @@
 #include <sys/wait.h>
 #include <termios.h>
 
-#ifndef ASCIICHAT_OK
-#define ASCIICHAT_OK 0
+#ifndef SET_ERRNO
 #define SET_ERRNO(...) (-1)
+#endif
+#ifndef SET_ERRNO_SYS
 #define SET_ERRNO_SYS(...) (-1)
-typedef int asciichat_error_t;
+#endif
+#ifndef BUFFER_SIZE_SMALL
 #define BUFFER_SIZE_SMALL 1024
+#endif
+#ifndef HOSTNAME_BUFFER_SIZE
 #define HOSTNAME_BUFFER_SIZE 256
+#endif
+#ifndef SAFE_MALLOC
 #define SAFE_MALLOC(size, type) ((type)malloc(size))
+#endif
+#ifndef SAFE_FREE
 #define SAFE_FREE(ptr) free(ptr)
+#endif
+#ifndef SAFE_STRERROR
 #define SAFE_STRERROR(err) strerror(err)
+#endif
+#ifndef log_debug
 #define log_debug(...) ((void)0)
+#endif
+#ifndef log_dev
 #define log_dev(...) ((void)0)
+#endif
+#ifndef log_warn
 #define log_warn(...) ((void)0)
+#endif
+#ifndef log_error
 #define log_error(...) ((void)0)
 #endif
 
