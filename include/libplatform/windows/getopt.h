@@ -1,5 +1,7 @@
 #pragma once
 
+#include <libplatform/api.h>
+
 #ifdef _WIN32
 
 /**
@@ -83,16 +85,16 @@ extern "C" {
  */
 
 /** @brief Pointer to argument of current option (for options requiring arguments) */
-extern char *optarg;
+extern LIBPLATFORM_API char *optarg;
 
 /** @brief Index of next argument to process */
-extern int optind;
+extern LIBPLATFORM_API int optind;
 
 /** @brief Error flag (non-zero to print errors, zero to suppress) */
-extern int opterr;
+extern LIBPLATFORM_API int opterr;
 
 /** @brief Current option character being processed */
-extern int optopt;
+extern LIBPLATFORM_API int optopt;
 
 /** @} */
 
