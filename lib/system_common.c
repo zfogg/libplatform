@@ -28,10 +28,11 @@ int platform_fileno(FILE *stream) {
 
 int platform_dup2(int source_fd, int target_fd) {
 #ifdef _WIN32
-  return _dup2(source_fd, target_fd);
+  int result = _dup2(source_fd, target_fd);
 #else
-  return dup2(source_fd, target_fd);
+  int result = dup2(source_fd, target_fd);
 #endif
+  return result < 0 ? -1 : 0;
 }
 
 int safe_vsnprintf(char *buffer, size_t buffer_size, const char *format, va_list ap) {
