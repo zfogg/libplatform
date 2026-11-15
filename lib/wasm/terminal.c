@@ -10,7 +10,6 @@
 #include <libplatform/terminal.h>
 #include <ascii-chat/asciichat_errno.h>
 #include <ascii-chat/common/limits.h>
-#include <ascii-chat/options/options.h>
 #include <ascii-chat/terminal/fd/reader.h>
 #include <ascii-chat/tui/controller.h>
 #include <stdbool.h>

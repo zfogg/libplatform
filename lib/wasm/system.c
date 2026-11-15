@@ -20,7 +20,6 @@
 #include <ascii-chat/util/time.h>
 #include <ascii-chat/util/utf8.h>
 #include <libplatform/symbols.h>
-#include <ascii-chat/options/options.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
