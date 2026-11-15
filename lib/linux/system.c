@@ -14,12 +14,6 @@
 #include <link.h>
 #include <string.h>
 
-int platform_enable_keepawake(void) {
-  return 0;
-}
-
-void platform_disable_keepawake(void) {}
-
 int platform_get_data_dir_candidates(const char *install_prefix, platform_directory_list_t *list_out) {
   (void)install_prefix;
   if (!list_out) {

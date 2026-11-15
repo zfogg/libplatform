@@ -126,11 +126,6 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <mach-o/dyld.h>
 #endif
 
-int platform_clipboard_read(char *output, size_t capacity) {
-  if (output && capacity > 0) output[0] = '\0';
-  return -1;
-}
-
 int platform_open(const char *name, const char *pathname, int flags, ...);
 
 /**
