@@ -10,10 +10,61 @@
 
 #ifndef _WIN32
 
+#ifndef ASCIICHAT_OK
+#define ASCIICHAT_OK 0
+#define SET_ERRNO(...) (-1)
+#define SET_ERRNO_SYS(...) (-1)
+typedef int asciichat_error_t;
+#define BUFFER_SIZE_SMALL 1024
+#define HOSTNAME_BUFFER_SIZE 256
+#define SAFE_MALLOC(size, type) ((type)malloc(size))
+#define SAFE_FREE(ptr) free(ptr)
+#define SAFE_STRERROR(err) strerror(err)
+#define log_debug(...) ((void)0)
+#define log_dev(...) ((void)0)
+#define log_warn(...) ((void)0)
+#define log_error(...) ((void)0)
+#endif
+
+#ifndef SAFE_MALLOC
+#define SAFE_MALLOC(size, type) ((type)malloc(size))
+#endif
+#ifndef SAFE_FREE
+#define SAFE_FREE(ptr) free(ptr)
+#endif
+#ifndef SAFE_STRERROR
+#define SAFE_STRERROR(err) strerror(err)
+#endif
+#ifndef SAFE_STRNCPY
+#define SAFE_STRNCPY(dst, src, size) (strncpy((dst), (src), (size)), (dst)[(size)-1] = '\0')
+#endif
+#ifndef NS_PER_SEC_INT
+#define NS_PER_SEC_INT 1000000000LL
+#endif
+#ifndef time_timespec_to_ns
+#define time_timespec_to_ns(ts) ((uint64_t)(ts)->tv_sec * (uint64_t)NS_PER_SEC_INT + (uint64_t)(ts)->tv_nsec)
+#endif
+#ifndef time_ns_to_us
+#define time_ns_to_us(ns) ((uint64_t)(ns) / 1000ULL)
+#endif
+#ifndef platform_cleanup_binary_path_cache
+#define platform_cleanup_binary_path_cache() ((void)0)
+#endif
+#ifndef socket_init
+#define socket_init() 0
+#endif
+#ifndef log_debug
+#define log_debug(...) ((void)0)
+#define log_dev(...) ((void)0)
+#define log_warn(...) ((void)0)
+#define log_error(...) ((void)0)
+#endif
+
 #include <libplatform/system.h>
 #include <libplatform/terminal.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/backtrace.h>
+#include <libplatform/debug/backtrace.h>
 #include "util/string.h"
 #include <libplatform/time.h>
 #include "util/path.h"
@@ -76,6 +127,8 @@ int platform_clipboard_read(char *output, size_t capacity) {
   if (output && capacity > 0) output[0] = '\0';
   return -1;
 }
+
+int platform_open(const char *name, const char *pathname, int flags, ...);
 
 /**
  * @brief Get username from environment variables
@@ -324,16 +377,6 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
  * Returns NULL if the environment variable contains invalid UTF-8 sequences,
  * helping prevent corruption from malformed environment data.
  */
-const char *platform_getenv(const char *name) {
-  const char *value = getenv(name);
-  if (value && !utf8_is_valid(value)) {
-    // Invalid UTF-8 detected - log warning and return NULL
-    log_warn("Environment variable '%s' contains invalid UTF-8, ignoring", name);
-    return NULL;
-  }
-  return value;
-}
-
 /**
  * @brief Set environment variable
  * @param name Environment variable name
@@ -474,31 +517,6 @@ void platform_set_last_error(int error) {
  * @param ... Mode (if O_CREAT is specified)
  * @return File descriptor on success, -1 on failure
  */
-int platform_open(const char *name, const char *pathname, int flags, ...) {
-  if (!name) {
-    return -1;
-  }
-
-  int fd = -1;
-  int mode = 0;
-  if (flags & O_CREAT) {
-    va_list args;
-    va_start(args, flags);
-    mode = va_arg(args, int);
-    va_end(args);
-    fd = open(pathname, flags, mode);
-  } else {
-    fd = open(pathname, flags);
-  }
-
-  if (fd >= 0) {
-    NAMED_REGISTER_FD(fd, name);
-    log_dev("Opened file descriptor %d for %s at path %s", fd, name, pathname);
-  }
-
-  return fd;
-}
-
 /**
  * @brief Open file descriptor with platform-safe mode
  * @param name Debug name for the stream
@@ -632,7 +650,8 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
     // Only capture backtraces in Debug builds
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p", sig, signal_name,
               info->si_code, info->si_addr);
-    backtrace_log_frames(LOG_ERROR, 0, 1);
+    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
+    backtrace_log_frames(4, 0, 1);
 #else
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p\nBacktrace disabled in "
               "Release builds",
@@ -642,7 +661,8 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
 #ifndef NDEBUG
     // Only capture backtraces in Debug builds
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)", sig, signal_name);
-    backtrace_log_frames(LOG_ERROR, 0, 1);
+    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
+    backtrace_log_frames(4, 0, 1);
 #else
     log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nBacktrace disabled in Release builds", sig, signal_name);
 #endif
@@ -772,12 +792,6 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for hostname resolution");
   }
 
-  char ascii_hostname[HOSTNAME_BUFFER_SIZE];
-  asciichat_error_t normalized = hostname_to_ascii(hostname, ascii_hostname, sizeof(ascii_hostname));
-  if (normalized != ASCIICHAT_OK)
-    return normalized;
-  hostname = ascii_hostname;
-
   struct addrinfo hints, *result = NULL;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_INET;       // IPv4 only
@@ -785,15 +799,7 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
   hints.ai_flags = 0;
   hints.ai_protocol = 0;
 
-  int ret;
-  {
-    ASCII_OTEL_SCOPE(DNS_RESOLVE);
-    if (otel_scope.retained)
-      gotel_attr_string(&otel_scope.scope, "dns.question.name", hostname);
-    ret = getaddrinfo(hostname, NULL, &hints, &result);
-    if (ret && otel_scope.retained)
-      gotel_error(&otel_scope.scope, "dns.error", "DNS lookup failed");
-  }
+  int ret = getaddrinfo(hostname, NULL, &hints, &result);
   if (ret != 0) {
     return SET_ERRNO_SYS(ERROR_NETWORK, "Failed to resolve hostname: %s", hostname);
   }
@@ -1149,20 +1155,7 @@ int platform_restore_timer_resolution(void) {
  * Execute a subprocess using fork+exec (POSIX implementation)
  */
 // Serialize foreground ownership checks and changes across concurrent loaders.
-static pthread_mutex_t subprocess_terminal_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pid_t subprocess_terminal_owner = -1;
-
-void terminal_input_lock(void) {
-  pthread_mutex_lock(&subprocess_terminal_mutex);
-}
-
-bool terminal_input_trylock(void) {
-  return pthread_mutex_trylock(&subprocess_terminal_mutex) == 0;
-}
-
-void terminal_input_unlock(void) {
-  pthread_mutex_unlock(&subprocess_terminal_mutex);
-}
 
 static int subprocess_set_foreground(int fd, pid_t group) {
   sigset_t block, previous;
@@ -1220,10 +1213,10 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   int start_pipe[2] = {-1, -1};
   bool gate_open = false;
   if (tty >= 0 && isatty(STDIN_FILENO)) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     pid_t foreground = tcgetpgrp(tty);
     gate_open = foreground == getpgrp() || (subprocess_terminal_owner > 0 && foreground == subprocess_terminal_owner);
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (gate_open && (pipe(start_pipe) != 0 || fcntl(start_pipe[0], F_SETFD, FD_CLOEXEC) < 0 ||
                     fcntl(start_pipe[1], F_SETFD, FD_CLOEXEC) < 0)) {
@@ -1377,7 +1370,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
       }
     }
     if ((gate_open || terminal_stopped) && !exited) {
-      pthread_mutex_lock(&subprocess_terminal_mutex);
+      terminal_input_lock();
       pid_t foreground = tcgetpgrp(tty);
       if (terminal_stopped && terminal_owned && foreground == pid) {
         terminal_stopped = false;
@@ -1421,7 +1414,7 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
           terminal_stopped = false;
         }
       }
-      pthread_mutex_unlock(&subprocess_terminal_mutex);
+      terminal_input_unlock();
     }
   }
   if (capture)
@@ -1429,12 +1422,12 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
   if (gate_open)
     close(start_pipe[1]);
   if (terminal_owned) {
-    pthread_mutex_lock(&subprocess_terminal_mutex);
+    terminal_input_lock();
     if (tcgetpgrp(tty) == pid && subprocess_set_foreground(tty, getpgrp()) == 0 && have_terminal_attributes)
       tcsetattr(tty, TCSANOW, &terminal_attributes);
     if (subprocess_terminal_owner == pid)
       subprocess_terminal_owner = -1;
-    pthread_mutex_unlock(&subprocess_terminal_mutex);
+    terminal_input_unlock();
   }
   if (tty >= 0)
     close(tty);

@@ -1,9 +1,14 @@
-#pragma once
+#ifndef LIBPLATFORM_UTIL_STRING_H
+#define LIBPLATFORM_UTIL_STRING_H
 
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _WIN32
 #include <BaseTsd.h>
@@ -23,6 +28,9 @@ size_t platform_strlcpy(char *dst, const char *src, size_t size);
 int platform_strncpy(char *dst, size_t dst_size, const char *src, size_t count);
 char *platform_strtok_r(char *str, const char *delim, char **saveptr);
 
+bool validate_shell_safe(const char *str, const char *allowed_chars);
+bool escape_path_for_shell(const char *path, char *out_buffer, size_t out_buffer_size);
+
 typedef enum platform_color {
   PLATFORM_COLOR_GREY,
   PLATFORM_COLOR_FATAL,
@@ -39,3 +47,8 @@ void platform_color_set_enabled(bool enabled);
 void platform_color_set_truecolor_supported(bool supported);
 void platform_color_set_code(platform_color_t color, const char *ansi_code);
 const char *platform_colored_string(bool enabled, platform_color_t color, const char *text);
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* LIBPLATFORM_UTIL_STRING_H */

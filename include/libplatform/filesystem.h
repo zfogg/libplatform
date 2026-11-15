@@ -163,39 +163,6 @@ extern "C" {
 #endif
 
 /**
- * @brief Maximum path length supported by the operating system
- *
- * Platform-specific values:
- * - Windows: 32767 characters (extended-length path with \\?\ prefix)
- * - Linux: 4096 bytes (PATH_MAX from limits.h)
- * - macOS: 1024 bytes (PATH_MAX from sys/syslimits.h)
- *
- * @note Windows legacy MAX_PATH (260) is too restrictive for modern use.
- *       We use the extended-length limit instead.
- *
- * @ingroup platform
- */
-#ifndef PLATFORM_MAX_PATH_LENGTH
-#ifdef _WIN32
-#define PLATFORM_MAX_PATH_LENGTH 32767
-#elif defined(__linux__)
-#ifndef PATH_MAX
-#define PLATFORM_MAX_PATH_LENGTH 4096
-#else
-#define PLATFORM_MAX_PATH_LENGTH PATH_MAX
-#endif
-#elif defined(__APPLE__)
-#ifndef PATH_MAX
-#define PLATFORM_MAX_PATH_LENGTH 1024
-#else
-#define PLATFORM_MAX_PATH_LENGTH PATH_MAX
-#endif
-#else
-#define PLATFORM_MAX_PATH_LENGTH 4096
-#endif
-#endif
-
-/**
  * @brief Maximum environment variable value length
  *
  * Windows theoretically supports 32767 chars per env var value.

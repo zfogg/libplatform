@@ -16,7 +16,7 @@
 #include <ascii-chat/common/buffer_sizes.h>
 #include <ascii-chat/asciichat_errno.h>
 #include <ascii-chat/util/ip.h>
-#include "util/string.h"
+#include <libplatform/util/string.h>
 #include <ascii-chat/util/time.h>
 #include <ascii-chat/util/utf8.h>
 #include <libplatform/symbols.h>

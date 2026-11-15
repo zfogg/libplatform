@@ -6,13 +6,6 @@
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <libplatform/font.h>
 
-#ifndef LIBPLATFORM_STANDALONE
-#include <ascii-chat/log/log.h>
-#else
-#define log_debug(...) ((void)0)
-#define log_info(...) ((void)0)
-#define log_warn(...) ((void)0)
-#endif
 #ifndef USE_MUSL
 #include <fontconfig/fontconfig.h>
 #endif
@@ -21,14 +14,6 @@
 #include <sys/stat.h>
 #include <stddef.h>
 
-#ifdef LIBPLATFORM_STANDALONE
-#define ASCIICHAT_OK 0
-#define ERROR_INVALID_PARAM 1
-#define ERROR_NOT_FOUND 2
-#define SET_ERRNO(...) (-1)
-#else
-#include <ascii-chat/asciichat_errno.h>
-#endif
 
 // Fallback font name for fontconfig when a requested font is not found.
 // DejaVu Sans Mono ships with the vast majority of distros.
@@ -47,7 +32,7 @@ static int resolve_via_fontconfig(const char *name, char *out, size_t sz) {
   FcConfig *fc = FcInitLoadConfigAndFonts();
   FcPattern *pat = FcNameParse((const FcChar8 *)name);
   if (!pat)
-    return SET_ERRNO(ERROR_INVALID_PARAM, "bad name '%s'", name);
+    return (-1);
 
   FcConfigSubstitute(fc, pat, FcMatchPattern);
   FcDefaultSubstitute(pat);
@@ -57,20 +42,18 @@ static int resolve_via_fontconfig(const char *name, char *out, size_t sz) {
   FcPatternDestroy(pat);
 
   if (!match || result != FcResultMatch)
-    return SET_ERRNO(ERROR_NOT_FOUND, "no font matching '%s'", name);
+    return (-1);
 
   FcChar8 *file = NULL;
   if (FcPatternGetString(match, FC_FILE, 0, &file) != FcResultMatch || !file) {
     FcPatternDestroy(match);
-    return SET_ERRNO(ERROR_NOT_FOUND, "fontconfig matched but no file");
+    return (-1);
   }
   snprintf(out, sz, "%s", (const char *)file);
-  log_debug("'%s' → %s", name, out);
   FcPatternDestroy(match);
-  return ASCIICHAT_OK;
+  return 0;
 }
 #endif
-
 int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *out_is_path,
                           const uint8_t **out_font_data, size_t *out_font_data_size) {
   // If no font is specified, use the bundled default font (DejaVu Sans Mono) for render-file output.
@@ -89,10 +72,10 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
   if (is_absolute_path(eff) || strchr(eff, '/') ||
       (strcmp(eff, "default") != 0 && strcmp(eff, "matrix") != 0 && file_exists(eff))) {
     if (strlen(eff) >= out_size)
-      return SET_ERRNO(ERROR_INVALID_PARAM, "render-font: path exceeds output capacity");
+      return (-1);
     snprintf(out, out_size, "%s", eff);
     *out_is_path = true;
-    return file_exists(out) ? ASCIICHAT_OK : SET_ERRNO(ERROR_NOT_FOUND, "render-font: not found: %s", out);
+    return file_exists(out) ? 0 : (-1);
   }
 
   // Check for bundled font names ("matrix" or "default")
@@ -103,10 +86,7 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
       *out_font_data_size = matrix_size;
     snprintf(out, out_size, "matrix");
     *out_is_path = false;
-    log_info("USING MATRIX FONT - g_font_matrix_resurrected=%p (size=%zu), g_font_default=%p "
-             "(size=%zu)",
-             (void *)matrix_data, matrix_size, (void *)default_data, default_size);
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (strcmp(eff, "default") == 0) {
@@ -116,43 +96,38 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
       *out_font_data_size = default_size;
     snprintf(out, out_size, "default");
     *out_is_path = false;
-    log_info("USING DEFAULT FONT - g_font_default=%p (size=%zu), g_font_matrix_resurrected=%p "
-             "(size=%zu)",
-             (void *)default_data, default_size, (void *)matrix_data, matrix_size);
-    return ASCIICHAT_OK;
+    return 0;
   }
 
 #ifndef USE_MUSL
   *out_is_path = true;
   int err = resolve_via_fontconfig(eff, out, out_size);
-  if (err != ASCIICHAT_OK && strcmp(eff, k_fallback) != 0) {
-    log_warn("'%s' not found, trying '%s'", eff, k_fallback);
+  if (err != 0 && strcmp(eff, k_fallback) != 0) {
     err = resolve_via_fontconfig(k_fallback, out, out_size);
   }
 
   // Fallback chain: system fonts → bundled default font
-  if (err != ASCIICHAT_OK) {
-    log_warn("system font resolution failed, using bundled default font");
+  if (err != 0) {
     if (out_font_data)
       *out_font_data = default_data;
     if (out_font_data_size)
       *out_font_data_size = default_size;
     out[0] = '\0';
     *out_is_path = false;
-    err = ASCIICHAT_OK;
+    err = 0;
   }
 
   return err;
 #else
   // musl static builds: fontconfig not available, use bundled default font
-  log_debug("using bundled default font (musl build, no fontconfig)");
   if (out_font_data)
     *out_font_data = default_data;
   if (out_font_data_size)
     *out_font_data_size = default_size;
   out[0] = '\0';
   *out_is_path = false;
-  return ASCIICHAT_OK;
+  return 0;
 #endif
 }
 #endif
+

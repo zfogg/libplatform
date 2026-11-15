@@ -6,9 +6,18 @@
 #include <ascii-chat/debug/backtrace.h>
 #include <stdarg.h>
 
+bool backtrace_filter_error_internal(const char *frame) {
+  (void)frame;
+  return false;
+}
+
 void backtrace_t_free(backtrace_t *bt) {
   (void)bt;
   // No-op - no resources to free in WASM
+}
+
+void backtrace_print_simple(int skip_frames) {
+  (void)skip_frames;
 }
 
 void backtrace_print(int level, const char *label, const backtrace_t *bt, int skip_frames, int max_frames,

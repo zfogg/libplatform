@@ -104,8 +104,8 @@ static bool source_path_is_absolute(const char *path) {
                   path[0] == '/' || path[0] == '\\');
 }
 
-int symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size,
-                              bool *external, const char *const *owned_dirs) {
+static int platform_symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size,
+                                              bool *external, const char *const *owned_dirs) {
   if (!output || output_size == 0 || !external) {
     return EINVAL;
   }
@@ -612,7 +612,7 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
 
   char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
   bool external = false;
-  if (symbol_format_source_path(module_name, file_location, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
+  if (platform_symbol_format_source_path(module_name, file_location, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
     platform_strncpy(rel_path, sizeof(rel_path), "unknown", sizeof(rel_path) - 1);
   }
 
@@ -942,7 +942,7 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
     exe_name = exe_name ? exe_name + 1 : exe_path;
     char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
     bool external = false;
-    if (symbol_format_source_path(exe_name, file_line, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
+  if (platform_symbol_format_source_path(exe_name, file_line, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
       platform_strncpy(rel_path, sizeof(rel_path), "unknown", sizeof(rel_path) - 1);
     }
 

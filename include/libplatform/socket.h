@@ -275,14 +275,20 @@ typedef int socklen_t;
 typedef unsigned long nfds_t;
 #else
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h> // For TCP_NODELAY and other TCP options
 #include <arpa/inet.h>
 #include <poll.h>
+
 /** @brief Socket handle type (POSIX: int) */
 typedef int socket_t;
 /** @brief Invalid socket value (POSIX: -1) */
 #define INVALID_SOCKET_VALUE (-1)
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 // ============================================================================
@@ -1228,3 +1234,7 @@ int platform_socket_set_timeout(socket_t sock, uint64_t timeout_ns);
  */
 int platform_socket_connect_timeout(socket_t sock, const struct sockaddr *addr, socklen_t addr_len,
                                     uint64_t timeout_ns);
+
+#ifdef __cplusplus
+}
+#endif
