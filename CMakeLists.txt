@@ -245,7 +245,6 @@ elseif(EMSCRIPTEN)
     lib/wasm/stubs/crypto.c
     lib/wasm/stubs/log.c
     lib/wasm/stubs/manpage.c
-    lib/wasm/stubs/mode_defaults.c
     lib/wasm/stubs/network.c
     lib/wasm/stubs/stats.c
     lib/wasm/stubs/util.c
