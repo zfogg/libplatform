@@ -1,6 +1,7 @@
 #ifdef _WIN32
 
 #include <libplatform/system.h>
+#include <libplatform/time.h>
 #include <libplatform/filesystem.h>
 #include <libplatform/socket.h>
 #include <libplatform/terminal.h>
@@ -136,10 +137,7 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
   return SetConsoleCtrlHandler(platform_console_ctrl_handler, FALSE) != 0;
 }
 uint64_t platform_get_monotonic_time_us(void) {
-  LARGE_INTEGER now, frequency;
-  QueryPerformanceCounter(&now);
-  QueryPerformanceFrequency(&frequency);
-  return (uint64_t)((now.QuadPart * 1000000ULL) / frequency.QuadPart);
+  return time_get_ns() / 1000ULL;
 }
 void platform_sleep_ms(unsigned int ms) {
   Sleep(ms);

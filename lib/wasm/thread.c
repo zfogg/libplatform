@@ -12,6 +12,8 @@
 #include <stdint.h>
 #include <errno.h>
 
+
+
 // Emscripten provides pthread.h but mutexes don't work correctly with pthreads in WASM
 // The JS side is single-threaded, so we can safely make mutexes no-ops
 // This avoids deadlocks from pthread_mutex_t not being properly initialized in WASM
