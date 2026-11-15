@@ -232,24 +232,10 @@ elseif(EMSCRIPTEN)
   unset(_wasm_replaced_source)
   target_sources(libplatform-objects PRIVATE
     lib/symbols.c
-    lib/wasm/backtrace.c
-    lib/wasm/filesystem.c
-    lib/wasm/init.c
     lib/wasm/lifecycle.c
-    lib/wasm/string.c
-    lib/wasm/system.c
-    lib/wasm/terminal.c
     lib/wasm/thread.c
     lib/wasm/time.c
-    lib/wasm/stubs/actions.c
-    lib/wasm/stubs/crypto.c
-    lib/wasm/stubs/log.c
     lib/wasm/stubs/manpage.c
-    lib/wasm/stubs/network.c
-    lib/wasm/stubs/stats.c
-    lib/wasm/stubs/util.c
-    lib/wasm/stubs/video.c
-    lib/wasm/stubs/ffmpeg_decoder.c
   )
 endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
