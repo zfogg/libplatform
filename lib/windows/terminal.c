@@ -480,6 +480,12 @@ int terminal_move_cursor_relative(int offset) {
  * @note Enable ANSI escape sequences on Windows 10+
  */
 void terminal_enable_ansi(void) {
+  // The application writes UTF-8 through the C stdio streams.  Keep the
+  // console code page in sync before any Unicode help or UI text is emitted;
+  // otherwise Windows decodes UTF-8 bytes using the legacy OEM code page.
+  (void)SetConsoleOutputCP(CP_UTF8);
+  (void)SetConsoleCP(CP_UTF8);
+
   // Enable ANSI escape sequences on Windows 10+
   HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
   if (hOut != INVALID_HANDLE_VALUE) {

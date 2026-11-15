@@ -25,6 +25,11 @@
 
 // SPDX-License-Identifier: MIT
 #include <stdbool.h>
+#include <stddef.h>
+
+#ifndef DEBUG_MEMORY
+typedef void (*debug_memory_report_writer_fn)(const char *text, size_t length, void *user_data);
+#endif
 
 #ifdef DEBUG_MEMORY
 
@@ -40,6 +45,19 @@
 
 #include <libplatform/debug/memory.h>
 #include <libplatform/atomic.h>
+#include "../util/path.h"
+
+static debug_memory_report_writer_fn g_report_writer;
+static void *g_report_writer_data;
+static const char *const *g_owned_source_dirs;
+
+static const char *memory_relative_path(const char *file) {
+  return extract_project_relative_path(file, g_owned_source_dirs);
+}
+
+void debug_memory_set_owned_source_dirs(const char *const *owned_dirs) {
+  g_owned_source_dirs = owned_dirs;
+}
 #include <libplatform/debug/backtrace.h>
 #include <libplatform/debug/named.h>
 #include <libplatform/debug/sync.h>
@@ -287,7 +305,7 @@ static bool should_ignore_allocation(const char *file, int line, uint64_t tid, s
  */
 static alloc_site_t *get_or_create_site(const char *file, int line) {
   uint64_t tid = thread_current_id();
-  const char *relative_file = extract_project_relative_path(file, NULL);
+    const char *relative_file = memory_relative_path(file);
 
   char key[BUFFER_SIZE_SMALL + 32];
   safe_snprintf(key, sizeof(key), "%s:%d:%lu", relative_file, line, tid);
@@ -333,7 +351,7 @@ static alloc_site_t *get_or_create_site(const char *file, int line) {
  * Look up an allocation site by file, line, and thread ID (called while holding g_mem.mutex)
  */
 static alloc_site_t *lookup_site(const char *file, int line, uint64_t tid) {
-  const char *relative_file = extract_project_relative_path(file, NULL);
+  const char *relative_file = memory_relative_path(file);
   char key[BUFFER_SIZE_SMALL + 32];
   safe_snprintf(key, sizeof(key), "%s:%d:%lu", relative_file, line, tid);
 
@@ -448,7 +466,7 @@ void *debug_malloc(size_t size, const char *file, int line) {
       block->ptr = ptr;
       block->size = size;
       block->is_aligned = false;
-      const char *normalized_file = extract_project_relative_path(file, NULL);
+      const char *normalized_file = memory_relative_path(file);
       SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
       block->line = line;
       block->tid = thread_current_id();
@@ -517,7 +535,7 @@ void debug_track_aligned(void *ptr, size_t size, const char *file, int line) {
       block->ptr = ptr;
       block->size = size;
       block->is_aligned = true;
-      const char *normalized_file = extract_project_relative_path(file, NULL);
+      const char *normalized_file = memory_relative_path(file);
       SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
       block->line = line;
       block->tid = thread_current_id();
@@ -678,7 +696,7 @@ void *debug_calloc(size_t count, size_t size, const char *file, int line) {
       block->ptr = ptr;
       block->size = total;
       block->is_aligned = false;
-      const char *normalized_file = extract_project_relative_path(file, NULL);
+      const char *normalized_file = memory_relative_path(file);
       SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
       block->line = line;
       block->tid = thread_current_id();
@@ -867,7 +885,7 @@ void *debug_realloc(void *ptr, size_t size, const char *file, int line) {
       memset(&curr->backtrace, 0, sizeof(curr->backtrace));
       backtrace_capture(&curr->backtrace);
       curr->ptr = new_ptr;
-      const char *normalized_file = extract_project_relative_path(file, NULL);
+          const char *normalized_file = memory_relative_path(file);
       SAFE_STRNCPY(curr->file, normalized_file, sizeof(curr->file) - 1);
       curr->file[sizeof(curr->file) - 1] = '\0';
       curr->line = line;
@@ -895,7 +913,7 @@ void *debug_realloc(void *ptr, size_t size, const char *file, int line) {
         block->ptr = new_ptr;
         block->size = size;
         block->is_aligned = false;
-        const char *normalized_file = extract_project_relative_path(file, NULL);
+        const char *normalized_file = memory_relative_path(file);
         SAFE_STRNCPY(block->file, normalized_file, sizeof(block->file) - 1);
         block->line = line;
         block->tid = thread_current_id();
@@ -928,6 +946,11 @@ void *debug_realloc(void *ptr, size_t size, const char *file, int line) {
 
 void debug_memory_set_quiet_mode(bool quiet) {
   g_mem.quiet_mode = quiet;
+}
+
+void debug_memory_set_report_writer(debug_memory_report_writer_fn writer, void *user_data) {
+  g_report_writer = writer;
+  g_report_writer_data = user_data;
 }
 
 void debug_memory_report(bool colors) {
@@ -1122,16 +1145,16 @@ void debug_memory_report(bool colors) {
 
     // Colorize total allocated/freed: green if they match, red if they don't (memory leak)
     // We've already adjusted allocated to exclude suppressions, so now compare directly
-    log_color_t alloc_freed_color = (adjusted_total_allocated == total_freed) ? LOG_COLOR_INFO : LOG_COLOR_ERROR;
+    platform_color_t alloc_freed_color = (adjusted_total_allocated == total_freed) ? LOG_COLOR_INFO : LOG_COLOR_ERROR;
     APPEND_MEM_LINE_COLORED(label_total, pretty_total, alloc_freed_color);
     APPEND_MEM_LINE_COLORED(label_freed, pretty_freed, alloc_freed_color);
 
     // Colorize current usage: green if 0 (no leaks), red if any unfreed memory (leak detected)
-    log_color_t current_color = (adjusted_current_usage == 0) ? LOG_COLOR_INFO : LOG_COLOR_ERROR;
+    platform_color_t current_color = (adjusted_current_usage == 0) ? LOG_COLOR_INFO : LOG_COLOR_ERROR;
     APPEND_MEM_LINE_COLORED(label_current, pretty_current, current_color);
 
     // Colorize peak usage: green if 0-50 MB, yellow if 50-80 MB, red if above 80 MB
-    log_color_t peak_color = LOG_COLOR_INFO; // Default green
+    platform_color_t peak_color = LOG_COLOR_INFO; // Default green
     if (peak_usage >= (80 * 1024 * 1024)) {
       peak_color = LOG_COLOR_ERROR; // Red if >= 80 MB
     } else if (peak_usage >= (50 * 1024 * 1024)) {
@@ -1142,7 +1165,7 @@ void debug_memory_report(bool colors) {
     // unfreed_count already calculated earlier for suppression warning filtering
 
     // Colorize malloc/calloc/free calls: green if unfreed == 0, red if unfreed != 0
-    log_color_t calls_color = (unfreed_count == 0) ? LOG_COLOR_INFO : LOG_COLOR_ERROR;
+    platform_color_t calls_color = (unfreed_count == 0) ? LOG_COLOR_INFO : LOG_COLOR_ERROR;
     char malloc_str[DEBUG_MEMORY_MALLOC_BUFFER_SIZE];
     safe_snprintf(malloc_str, sizeof(malloc_str), "%zu", malloc_calls);
     APPEND_MEM_LINE_COLORED(label_malloc, malloc_str, calls_color);
@@ -1162,7 +1185,7 @@ void debug_memory_report(bool colors) {
       char suppressions_str[DEBUG_MEMORY_SUPPRESSIONS_BUFFER_SIZE];
       safe_snprintf(suppressions_str, sizeof(suppressions_str), "%zu (%s)", suppressed_count, pretty_suppressed);
 
-      log_color_t suppressions_color = LOG_COLOR_INFO; // Green by default (working properly)
+      platform_color_t suppressions_color = LOG_COLOR_INFO; // Green by default (working properly)
       if (suppressed_bytes >= (1024 * 1024) || suppressed_count >= 100) {
         suppressions_color = LOG_COLOR_ERROR; // Red if >= 1MB or >= 100 allocations
       }
@@ -1224,7 +1247,7 @@ void debug_memory_report(bool colors) {
 
           // Keys end in :line:tid; earlier colons can belong to Windows drive letters.
           // Shorten before copying so an absolute root cannot consume the file buffer.
-          const char *relative_key = extract_project_relative_path(site->key, NULL);
+          const char *relative_key = memory_relative_path(site->key);
           char file[sizeof(site->key)] = {0};
           int line = 0;
           uint64_t tid = 0;
@@ -1266,7 +1289,7 @@ void debug_memory_report(bool colors) {
           safe_snprintf(count_str, sizeof(count_str), "%zu", site->live_count);
 
           // Determine color based on byte size (1 MB and over=red, KB=yellow, B=light blue)
-          log_color_t size_color = LOG_COLOR_DEBUG;
+          platform_color_t size_color = LOG_COLOR_DEBUG;
           if (strstr(pretty_bytes, "MB") || strstr(pretty_bytes, "GB") || strstr(pretty_bytes, "TB") ||
               strstr(pretty_bytes, "PB") || strstr(pretty_bytes, "EB")) {
             size_color = LOG_COLOR_ERROR;
@@ -1336,6 +1359,10 @@ void debug_memory_report(bool colors) {
     // undefined behavior (modifying hash table during iteration = infinite loop/hang).
     // Since we're exiting anyway, skip this cleanup - the OS will reclaim memory.
 
+    if (g_report_writer)
+      g_report_writer(report_buffer, report_len, g_report_writer_data);
+    else
+      (void)fwrite(report_buffer, 1, report_len, stderr);
     free(report_buffer);
 #undef REPORT_BUFFER_SIZE
 #undef APPEND_REPORT
@@ -1363,6 +1390,15 @@ void debug_sync_symbolize_allocations(void) {
 
 void debug_memory_ensure_init(void) {
   // No-op in release builds
+}
+
+void debug_memory_set_report_writer(debug_memory_report_writer_fn writer, void *user_data) {
+  (void)writer;
+  (void)user_data;
+}
+
+void debug_memory_set_owned_source_dirs(const char *const *owned_dirs) {
+  (void)owned_dirs;
 }
 
 void debug_memory_set_quiet_mode(bool quiet) {

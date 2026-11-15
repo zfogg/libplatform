@@ -6,10 +6,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifdef _WIN32
 #include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
@@ -48,7 +44,4 @@ void platform_color_set_truecolor_supported(bool supported);
 void platform_color_set_code(platform_color_t color, const char *ansi_code);
 const char *platform_colored_string(bool enabled, platform_color_t color, const char *text);
 
-#ifdef __cplusplus
-}
-#endif
 #endif /* LIBPLATFORM_UTIL_STRING_H */

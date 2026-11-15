@@ -24,6 +24,16 @@
 
 #include <stdio.h>
 
+#ifdef rwlock_on_rdlock
+#undef rwlock_on_rdlock
+#endif
+#ifdef rwlock_on_wrlock
+#undef rwlock_on_wrlock
+#endif
+#ifdef rwlock_on_unlock
+#undef rwlock_on_unlock
+#endif
+
 #ifndef NDEBUG
 
 /**

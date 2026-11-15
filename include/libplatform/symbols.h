@@ -92,6 +92,28 @@ extern "C" {
 bool symbol_module_matches(const char *module_name, const char *const *module_names, size_t module_count);
 
 /**
+ * @brief Determine whether a module is the configured executable or library.
+ * @param module_name Module basename or path.
+ * @param executable_name Executable basename, or NULL to skip executable matching.
+ * @param library_names NULL-terminated library basenames, or NULL to skip library matching.
+ * @return true when the module matches either configured name.
+ *
+ * Library matching accepts both `libname` and `name` forms and recognizes the
+ * `.dll`, `.lib`, `.dylib`, and `.so` suffixes. Executable matching also
+ * recognizes `.exe`.
+ */
+bool symbol_module_is_project(const char *module_name, const char *executable_name, const char *const *library_names);
+
+/**
+ * @brief Configure the executable and library names used by symbol formatting.
+ * @param executable_name Executable basename, or NULL to disable executable matching.
+ * @param library_names NULL-terminated library basenames, or NULL to disable library matching.
+ *
+ * The strings are borrowed and must remain valid until the next call.
+ */
+void symbol_cache_set_project_modules(const char *executable_name, const char *const *library_names);
+
+/**
  * @brief Format a source path for a symbolized frame
  * @param module_name Module basename or path
  * @param source_path Source path reported by debug information
@@ -103,8 +125,9 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
  * Project sources use repository-relative paths. External sources retain at
  * most four parent directories and the filename.
  */
-int symbol_format_source_path(const char *module_name, const char *source_path, char *output,
-                              size_t output_size, bool *external, const char *const *owned_dirs);
+int symbol_format_source_path(const char *module_name, const char *executable_name, const char *const *library_names,
+                              const char *source_path, char *output, size_t output_size, bool *external,
+                              const char *const *owned_dirs);
 
 /* ============================================================================
  * Symbol Cache Lifecycle

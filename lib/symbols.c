@@ -99,20 +99,97 @@ bool symbol_module_matches(const char *module_name, const char *const *module_na
   return false;
 }
 
+static bool symbol_name_matches(const char *module_name, const char *configured_name, bool library_name) {
+  if (!configured_name || !*configured_name)
+    return false;
+  if (ascii_case_equal(module_name, configured_name))
+    return true;
+  if (!library_name) {
+    const char *extension = ".exe";
+    size_t configured_length = strlen(configured_name);
+    size_t extension_length = strlen(extension);
+    if (strlen(module_name) == configured_length + extension_length &&
+        ascii_case_equal(module_name + configured_length, extension)) {
+      for (size_t i = 0; i < configured_length; ++i) {
+        if (tolower((unsigned char)module_name[i]) != tolower((unsigned char)configured_name[i]))
+          return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  const char *module_without_lib = strncmp(module_name, "lib", 3) == 0 ? module_name + 3 : module_name;
+  const char *configured_without_lib = strncmp(configured_name, "lib", 3) == 0 ? configured_name + 3 : configured_name;
+  if (ascii_case_equal(module_without_lib, configured_without_lib))
+    return true;
+
+  const char *extensions[] = {".dll", ".lib", ".dylib", ".so"};
+  size_t configured_length = strlen(configured_without_lib);
+  for (size_t i = 0; i < sizeof(extensions) / sizeof(extensions[0]); ++i) {
+    size_t extension_length = strlen(extensions[i]);
+    if (strlen(module_without_lib) == configured_length + extension_length &&
+        ascii_case_equal(module_without_lib + configured_length, extensions[i])) {
+      bool prefix_matches = true;
+      for (size_t j = 0; j < configured_length; ++j) {
+        if (tolower((unsigned char)module_without_lib[j]) != tolower((unsigned char)configured_without_lib[j])) {
+          prefix_matches = false;
+          break;
+        }
+      }
+      if (prefix_matches)
+        return true;
+    }
+  }
+  return false;
+}
+
+bool symbol_module_is_project(const char *module_name, const char *executable_name, const char *const *library_names) {
+  if (!module_name || !*module_name)
+    return false;
+
+  const char *basename = module_name;
+  for (const char *cursor = module_name; *cursor; cursor++) {
+    if (*cursor == '/' || *cursor == '\\')
+      basename = cursor + 1;
+  }
+  if (symbol_name_matches(basename, executable_name, false))
+    return true;
+  if (library_names) {
+    for (size_t i = 0; library_names[i]; ++i) {
+      if (symbol_name_matches(basename, library_names[i], true))
+        return true;
+    }
+  }
+  return false;
+}
+
 static bool source_path_is_absolute(const char *path) {
   return path && ((isalpha((unsigned char)path[0]) && path[1] == ':' && (path[2] == '/' || path[2] == '\\')) ||
                   path[0] == '/' || path[0] == '\\');
 }
 
-static int platform_symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size,
-                                              bool *external, const char *const *owned_dirs) {
+static const char *g_project_executable_name;
+static const char *const *g_project_library_names;
+
+void symbol_cache_set_project_modules(const char *executable_name, const char *const *library_names) {
+  g_project_executable_name = executable_name;
+  g_project_library_names = library_names;
+}
+
+int symbol_format_source_path(const char *module_name, const char *executable_name, const char *const *library_names,
+                              const char *source_path, char *output, size_t output_size, bool *external,
+                              const char *const *owned_dirs) {
   if (!output || output_size == 0 || !external) {
     return EINVAL;
   }
 
   const char *path = source_path ? source_path : "unknown";
+  executable_name = executable_name ? executable_name : g_project_executable_name;
+  library_names = library_names ? library_names : g_project_library_names;
+  bool project_module = symbol_module_is_project(module_name, executable_name, library_names);
   if (!owned_dirs) {
-    *external = source_path_is_absolute(path);
+    *external = source_path_is_absolute(path) && !project_module;
     size_t required_size = strlen(path) + 1;
     if (required_size > output_size) {
       return EOVERFLOW;
@@ -134,6 +211,7 @@ static int platform_symbol_format_source_path(const char *module_name, const cha
     }
   }
   *external = project_relative == path ||
+              (!project_module && source_path_is_absolute(path)) ||
               (owned_prefix && owned_dirs && owned_prefix != owned_dirs[0] && source_path_is_absolute(path));
   const char *display_path =
       owned_prefix ? path + owned_prefix_length + 1 : (*external ? path_last_components(path, 5) : project_relative);
@@ -612,7 +690,8 @@ static char *parse_llvm_symbolizer_result(FILE *fp, void *addr, const char *modu
 
   char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
   bool external = false;
-  if (platform_symbol_format_source_path(module_name, file_location, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
+  if (symbol_format_source_path(module_name, g_project_executable_name, g_project_library_names, file_location, rel_path,
+                                sizeof(rel_path), &external, owned_dirs) != 0) {
     platform_strncpy(rel_path, sizeof(rel_path), "unknown", sizeof(rel_path) - 1);
   }
 
@@ -942,7 +1021,8 @@ static char **run_addr2line_batch(void *const *buffer, int size, const char *con
     exe_name = exe_name ? exe_name + 1 : exe_path;
     char rel_path[PLATFORM_SYMBOLS_REL_PATH_BUFFER_SIZE];
     bool external = false;
-  if (platform_symbol_format_source_path(exe_name, file_line, rel_path, sizeof(rel_path), &external, owned_dirs) != 0) {
+    if (symbol_format_source_path(exe_name, g_project_executable_name, g_project_library_names, file_line, rel_path,
+                                  sizeof(rel_path), &external, owned_dirs) != 0) {
       platform_strncpy(rel_path, sizeof(rel_path), "unknown", sizeof(rel_path) - 1);
     }
 

@@ -48,6 +48,9 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+
+typedef void (*debug_memory_report_writer_fn)(const char *text, size_t length, void *user_data);
 #include <stdlib.h>
 
 #ifdef __cplusplus
@@ -108,6 +111,19 @@ void debug_memory_set_quiet_mode(bool quiet);
  *   - lib/ui/window.c:89 - 124 KiB
  * @endcode
  */
+/**
+ * @brief Installs the sink used for generated memory reports.
+ * @param writer Callback receiving the complete report, or NULL to use stderr.
+ * @param user_data Opaque callback data.
+ */
+void debug_memory_set_report_writer(debug_memory_report_writer_fn writer, void *user_data);
+
+/**
+ * @brief Configures source roots used when recording allocation locations.
+ * @param owned_dirs NULL-terminated application-owned source directories.
+ */
+void debug_memory_set_owned_source_dirs(const char *const *owned_dirs);
+
 void debug_memory_report(bool colors);
 
 /**

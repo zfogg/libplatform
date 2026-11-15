@@ -193,7 +193,7 @@ char **platform_backtrace_symbols(void *const *buffer, int size, const char *con
       if (line_result) {
         char source_path[PLATFORM_WINDOWS_BACKTRACE_SOURCE_PATH_BUFFER_SIZE];
         bool external = false;
-        if (symbol_format_source_path(resolved_module, line_info.FileName, source_path, sizeof(source_path),
+        if (symbol_format_source_path(resolved_module, NULL, NULL, line_info.FileName, source_path, sizeof(source_path),
                                       &external, owned_dirs) != 0) {
           strncpy(source_path, "unknown", sizeof(source_path));
         }

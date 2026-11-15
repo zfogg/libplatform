@@ -10,16 +10,6 @@
 #include <libplatform/font.h>
 
 #include <libplatform/filesystem.h>
-#ifndef LIBPLATFORM_STANDALONE
-#include <ascii-chat/asciichat_errno.h>
-#include <ascii-chat/log/log.h>
-#else
-#define ASCIICHAT_OK 0
-#define ERROR_INVALID_PARAM 1
-#define ERROR_NOT_FOUND 2
-#define SET_ERRNO(...) (-1)
-#define log_debug(...) ((void)0)
-#endif
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -51,10 +41,10 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
   if (is_absolute_path(eff) || strchr(eff, '/') ||
       (strcmp(eff, "default") != 0 && strcmp(eff, "matrix") != 0 && file_exists(eff))) {
     if (strlen(eff) >= out_size)
-      return SET_ERRNO(ERROR_INVALID_PARAM, "render-font: path exceeds output capacity");
+      return -1;
     snprintf(out, out_size, "%s", eff);
     *out_is_path = true;
-    return file_exists(out) ? ASCIICHAT_OK : SET_ERRNO(ERROR_NOT_FOUND, "render-font: not found: %s", out);
+    return file_exists(out) ? 0 : -1;
   }
 
   // Check for bundled font names ("matrix" or "default")
@@ -71,14 +61,13 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
       if (fd >= 0) {
         write(fd, *out_font_data, *out_font_data_size);
         close(fd);
-        log_debug("wrote bundled matrix font to %s", tmp_path);
       }
     }
     if (tmp_path[0] != '\0') {
       snprintf(out, out_size, "%s", tmp_path);
       *out_is_path = true;
     }
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   if (strcmp(eff, "default") == 0) {
@@ -94,14 +83,13 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
       if (fd >= 0) {
         write(fd, *out_font_data, *out_font_data_size);
         close(fd);
-        log_debug("wrote bundled default font to %s", tmp_path_default);
       }
     }
     if (tmp_path_default[0] != '\0') {
       snprintf(out, out_size, "%s", tmp_path_default);
       *out_is_path = true;
     }
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // Pass other specifications through unchanged; this does not resolve family names.
@@ -109,7 +97,6 @@ int platform_font_resolve(const char *spec, char *out, size_t out_size, bool *ou
   snprintf(out, out_size, "%s", eff);
   *out_is_path = false;
 
-  log_debug("passing unresolved font specification '%s' to the FreeType renderer", eff);
-  return ASCIICHAT_OK;
+  return 0;
 }
 #endif // __APPLE__

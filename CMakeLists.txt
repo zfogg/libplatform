@@ -69,26 +69,26 @@ if(TARGET PkgConfig::LIBPLATFORM_FONTCONFIG)
   target_link_libraries(libplatform PUBLIC PkgConfig::LIBPLATFORM_FONTCONFIG)
 endif()
 target_compile_definitions(libplatform-objects PRIVATE LIBPLATFORM_STANDALONE=1)
+if(LIBPLATFORM_BUILD_SHARED)
+  target_compile_definitions(libplatform-objects PRIVATE BUILDING_LIBPLATFORM_DLL=1)
+else()
+  target_compile_definitions(libplatform-objects PRIVATE BUILDING_STATIC_LIB=1)
+endif()
 target_sources(libplatform-objects PRIVATE
   lib/symbols.c
-  # Shared rwlock diagnostics are called by each platform-specific lock
-  # implementation. Keep the hooks in the platform library so shared builds
-  # do not leave unresolved debug symbols at link time.
-  lib/rwlock.c
   lib/filesystem_common.c
   lib/application.c
   lib/app_callbacks.c
   lib/lifecycle.c
   lib/mutex.c
-  lib/cond.c
   lib/rwlock.c
+  lib/cond.c
   lib/system_common.c
   lib/keyboard.c
   lib/terminal.c
   lib/socket.c
   lib/socket_io.c
   lib/question.c
-  lib/frame_flush.c
   lib/process.c
   lib/time.c
   lib/atomic.c
@@ -141,7 +141,6 @@ if(WIN32)
     lib/windows/clipboard.c
     lib/windows/font.c
     lib/windows/question.c
-    lib/windows/frame_flush.c
   )
 elseif(APPLE)
   target_sources(libplatform-objects PRIVATE
@@ -161,11 +160,10 @@ elseif(APPLE)
     lib/posix/errno.c
     lib/posix/memory.c
     lib/posix/mmap.c
+    lib/posix/backtrace.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/question.c
-    lib/posix/backtrace.c
-    lib/posix/frame_flush.c
     lib/posix/wakeup.c
     lib/macos/system.c
     lib/macos/font.c
@@ -176,6 +174,8 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/thread.c
     lib/posix/string.c
     lib/posix/filesystem.c
+    lib/posix/clipboard.c
+    lib/posix/keepawake.c
     lib/posix/terminal.c
     lib/posix/agent.c
     lib/posix/socket.c
@@ -186,17 +186,15 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/posix/errno.c
     lib/posix/memory.c
     lib/posix/mmap.c
-    lib/posix/system.c
+    lib/posix/backtrace.c
     lib/posix/pipe.c
     lib/posix/keyboard.c
     lib/posix/question.c
-    lib/posix/backtrace.c
-    lib/posix/frame_flush.c
     lib/posix/wakeup.c
+    lib/posix/system.c
     lib/linux/system.c
     lib/linux/systemd.c
     lib/linux/font.c
-    lib/linux/clipboard.c
   )
 elseif(EMSCRIPTEN)
   # The browser replacements below intentionally supersede generic helpers
@@ -235,6 +233,7 @@ elseif(EMSCRIPTEN)
     lib/wasm/time.c
     lib/wasm/stubs/actions.c
     lib/wasm/stubs/crypto.c
+    lib/wasm/stubs/initializers.c
     lib/wasm/stubs/log.c
     lib/wasm/stubs/manpage.c
     lib/wasm/stubs/mode_defaults.c
@@ -248,9 +247,6 @@ endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform-objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 target_include_directories(libplatform-objects PRIVATE ${LIBPLATFORM_UTF8PROC_SOURCE_DIR})
-if(LIBEXECINFO_INCLUDE_DIRS)
-  target_include_directories(libplatform-objects PRIVATE ${LIBEXECINFO_INCLUDE_DIRS})
-endif()
 target_include_directories(libplatform PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
@@ -261,34 +257,9 @@ target_compile_features(libplatform PUBLIC c_std_11)
 target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
-  if(NOT MSVC)
-    target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
-  endif()
+  target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
 endif()
-if(MSVC)
-  set(_libplatform_windows_exports TRUE)
-else()
-  set(_libplatform_windows_exports OFF)
-endif()
-set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform
-  WINDOWS_EXPORT_ALL_SYMBOLS ${_libplatform_windows_exports})
-if(WIN32 AND LIBPLATFORM_BUILD_SHARED)
-  find_program(LIBPLATFORM_NM llvm-nm REQUIRED)
-  set(_libplatform_objects "${CMAKE_CURRENT_BINARY_DIR}/libplatform-objects-$<CONFIG>.txt")
-  file(GENERATE OUTPUT "${_libplatform_objects}" CONTENT "$<JOIN:$<TARGET_OBJECTS:libplatform-objects>,\n>\n")
-  set(_libplatform_def "${CMAKE_CURRENT_BINARY_DIR}/platform.def")
-  add_custom_command(
-    OUTPUT "${_libplatform_def}"
-    COMMAND ${CMAKE_COMMAND} -DNM_TOOL=${LIBPLATFORM_NM}
-      -DOBJECT_LIST_FILE=${_libplatform_objects} -DOUTPUT_FILE=${_libplatform_def}
-      -DPUBLIC_INCLUDE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/include
-      -DLIBRARY_NAME=platform -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateDefFile.cmake"
-    DEPENDS libplatform-objects "${_libplatform_objects}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateDefFile.cmake"
-    VERBATIM)
-  add_custom_target(libplatform-def DEPENDS "${_libplatform_def}")
-  add_dependencies(libplatform libplatform-def)
-  target_link_options(libplatform PRIVATE "LINKER:/DEF:${_libplatform_def}")
-endif()
+set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 if(WIN32)
   target_link_libraries(libplatform PUBLIC dbghelp)
 elseif(NOT EMSCRIPTEN)
@@ -312,8 +283,4 @@ if(LIBPLATFORM_BUILD_TESTS)
   add_executable(libplatform-test tests/test_backtrace.c)
   target_link_libraries(libplatform-test PRIVATE libplatform)
   add_test(NAME libplatform-test COMMAND libplatform-test)
-  add_executable(libplatform-regression-test tests/test_registry_temp.c)
-  target_link_libraries(libplatform-regression-test PRIVATE libplatform)
-  add_test(NAME libplatform-regression-test COMMAND libplatform-regression-test)
-  set_tests_properties(libplatform-regression-test PROPERTIES TIMEOUT 5)
 endif()
