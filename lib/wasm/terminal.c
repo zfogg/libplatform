@@ -85,27 +85,17 @@ int terminal_cursor_show(void) {
 }
 
 unsigned short int terminal_get_effective_width(int width_option, unsigned short fallback_width) {
-  (void)fallback_width;
   if (width_option > 0) {
     return (unsigned short int)width_option;
   }
-  int width = GET_OPTION(width);
-  if (width > 0) {
-    return (unsigned short int)width;
-  }
-  return OPT_WIDTH_DEFAULT;
+  return fallback_width;
 }
 
 unsigned short int terminal_get_effective_height(int height_option, unsigned short fallback_height) {
-  (void)fallback_height;
   if (height_option > 0) {
     return (unsigned short int)height_option;
   }
-  int height = GET_OPTION(height);
-  if (height > 0) {
-    return (unsigned short int)height;
-  }
-  return OPT_HEIGHT_DEFAULT;
+  return fallback_height;
 }
 
 // Color mode detection - not needed for WASM mirror mode
@@ -161,8 +151,7 @@ int get_terminal_size(unsigned short int *width, unsigned short int *height) {
 
 // Terminal UTF-8 support detection
 bool terminal_should_use_utf8(terminal_utf8_setting_t user_setting) {
-  (void)user_setting;
-  return GET_OPTION(force_utf8) != UTF8_SETTING_FALSE;
+  return user_setting != TERMINAL_UTF8_SETTING_FALSE;
 }
 
 bool terminal_supports_utf8(void) {
@@ -182,10 +171,10 @@ bool terminal_should_color_output(int fd, const terminal_options_t *options) {
 }
 
 terminal_color_mode_t terminal_get_effective_color_mode(const terminal_options_t *options) {
-  (void)options;
-  // Browser output supports color; retain the explicit option or AUTO so the
-  // caller can resolve it using the JavaScript-managed terminal capabilities.
-  return GET_OPTION(color_mode);
+  if (!options || options->color == TERMINAL_COLOR_SETTING_FALSE || options->color_mode == TERM_COLOR_NONE) {
+    return TERM_COLOR_NONE;
+  }
+  return options->color_mode;
 }
 
 // TTY detection stubs
