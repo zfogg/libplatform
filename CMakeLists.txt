@@ -250,7 +250,7 @@ endif()
 # registering it after platform source selection prevents that reuse path from
 # dropping the implementation while retaining the public declarations.
 if(UNIX AND NOT EMSCRIPTEN)
-  target_sources(libplatform-objects PRIVATE lib/posix/backtrace.c)
+  target_sources(libplatform PRIVATE lib/posix/backtrace.c)
 endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform-objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
