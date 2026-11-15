@@ -94,6 +94,10 @@ typedef enum terminal_render_mode {
 #include <stdint.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // ============================================================================
 // Cross-platform CLI Utilities
 // ============================================================================
@@ -1502,4 +1506,8 @@ void terminal_stop_resize_detection(void);
  * @brief No-op stub on POSIX platforms (no resize detection thread)
  */
 void terminal_stop_resize_detection(void);
+#endif
+
+#ifdef __cplusplus
+}
 #endif

@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @file platform/socket.h
  * @brief Cross-platform socket interface for application
@@ -1228,3 +1232,7 @@ int platform_socket_set_timeout(socket_t sock, uint64_t timeout_ns);
  */
 int platform_socket_connect_timeout(socket_t sock, const struct sockaddr *addr, socklen_t addr_len,
                                     uint64_t timeout_ns);
+
+#ifdef __cplusplus
+}
+#endif
