@@ -258,6 +258,14 @@ target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
 if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_compile_definitions(libplatform-objects PRIVATE _GNU_SOURCE)
 endif()
+if(LIBPLATFORM_BUILD_SHARED AND (CMAKE_C_FLAGS MATCHES "(^| )(--coverage|-fprofile-arcs|-ftest-coverage)( |$)"))
+  target_compile_options(libplatform-objects PRIVATE
+    -fno-profile-arcs
+    -fno-test-coverage)
+  target_link_options(libplatform PRIVATE
+    -fno-profile-arcs
+    -fno-test-coverage)
+endif()
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
   target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
