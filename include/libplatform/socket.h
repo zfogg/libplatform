@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @file platform/socket.h
  * @brief Cross-platform socket interface for application

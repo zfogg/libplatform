@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** CPU features usable by this process, including operating system support. */
 enum {
   CPU_FEATURE_SSE2 = 1u << 0,
@@ -13,3 +17,7 @@ enum {
 };
 
 uint32_t platform_cpu_features(void);
+
+#ifdef __cplusplus
+}
+#endif

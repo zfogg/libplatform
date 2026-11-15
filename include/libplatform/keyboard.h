@@ -26,6 +26,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef UTF8_MAX_BYTES
 #define UTF8_MAX_BYTES 4
 #endif
@@ -360,3 +364,7 @@ void keyboard_stream_query_started(void);
 
 /** Most recently decoded OSC 11 reply, without reading or waiting for input. */
 bool keyboard_stream_background(uint8_t *r, uint8_t *g, uint8_t *b);
+
+#ifdef __cplusplus
+}
+#endif

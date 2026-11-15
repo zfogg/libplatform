@@ -2,7 +2,15 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 uint64_t time_get_ns(void);
 uint64_t time_get_realtime_ns(void);
 void time_ns_to_timespec(uint64_t nanoseconds, struct timespec *result);
 int platform_time_pretty(uint64_t nanoseconds, int precision, char *output, size_t capacity);
+
+#ifdef __cplusplus
+}
+#endif

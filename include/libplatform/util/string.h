@@ -2,9 +2,14 @@
 #define LIBPLATFORM_UTIL_STRING_H
 
 #include <stddef.h>
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _WIN32
 #include <BaseTsd.h>
@@ -45,3 +50,7 @@ void platform_color_set_code(platform_color_t color, const char *ansi_code);
 const char *platform_colored_string(bool enabled, platform_color_t color, const char *text);
 
 #endif /* LIBPLATFORM_UTIL_STRING_H */
+
+#ifdef __cplusplus
+}
+#endif
