@@ -10,6 +10,35 @@
 
 #ifndef _WIN32
 
+#include <libplatform/system.h>
+#include <libplatform/terminal.h>
+#include <libplatform/debug/named.h>
+#include <libplatform/backtrace.h>
+#include <libplatform/debug/backtrace.h>
+#include "util/string.h"
+#include <libplatform/time.h>
+#include "util/path.h"
+#include "util/ip.h"
+#include "util/utf8.h"
+#include <libplatform/symbols.h>
+#include <ascii-chat/common.h>
+#include <ascii-chat/log/log.h>
+#include <ascii-chat/otel.h>
+#include <libplatform/socket.h>
+#include <ascii-chat/util/time.h>
+#include <ascii-chat/util/url.h>
+#include <unistd.h>
+#include <poll.h>
+#include <fcntl.h>
+#include <string.h>
+#include <strings.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <signal.h>
+#include <errno.h>
+#include <sys/wait.h>
+#include <termios.h>
+
 #ifndef ASCIICHAT_OK
 #define ASCIICHAT_OK 0
 #define SET_ERRNO(...) (-1)
@@ -59,35 +88,6 @@ typedef int asciichat_error_t;
 #define log_warn(...) ((void)0)
 #define log_error(...) ((void)0)
 #endif
-
-#include <libplatform/system.h>
-#include <libplatform/terminal.h>
-#include <libplatform/debug/named.h>
-#include <libplatform/backtrace.h>
-#include <libplatform/debug/backtrace.h>
-#include "util/string.h"
-#include <libplatform/time.h>
-#include "util/path.h"
-#include "util/ip.h"
-#include "util/utf8.h"
-#include <libplatform/symbols.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/log/log.h>
-#include <ascii-chat/otel.h>
-#include <libplatform/socket.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/util/url.h>
-#include <unistd.h>
-#include <poll.h>
-#include <fcntl.h>
-#include <string.h>
-#include <strings.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <signal.h>
-#include <errno.h>
-#include <sys/wait.h>
-#include <termios.h>
 // execinfo.h provides backtrace functions - available in glibc
 // For musl, libexecinfo provides it but may not be available during compile
 #ifndef USE_MUSL
