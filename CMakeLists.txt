@@ -247,6 +247,9 @@ endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform-objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 target_include_directories(libplatform-objects PRIVATE ${LIBPLATFORM_UTF8PROC_SOURCE_DIR})
+if(LIBEXECINFO_INCLUDE_DIRS)
+  target_include_directories(libplatform-objects PRIVATE ${LIBEXECINFO_INCLUDE_DIRS})
+endif()
 target_include_directories(libplatform PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
