@@ -291,10 +291,6 @@ typedef int socket_t;
 #define INVALID_SOCKET_VALUE (-1)
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // ============================================================================
 // Socket Functions
 // ============================================================================
