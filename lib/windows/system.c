@@ -1,6 +1,7 @@
 #ifdef _WIN32
 
 #include <libplatform/system.h>
+#include <libplatform/time.h>
 #include <libplatform/filesystem.h>
 #include <libplatform/socket.h>
 #include <libplatform/terminal.h>
@@ -136,10 +137,7 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
   return SetConsoleCtrlHandler(platform_console_ctrl_handler, FALSE) != 0;
 }
 uint64_t platform_get_monotonic_time_us(void) {
-  LARGE_INTEGER now, frequency;
-  QueryPerformanceCounter(&now);
-  QueryPerformanceFrequency(&frequency);
-  return (uint64_t)((now.QuadPart * 1000000ULL) / frequency.QuadPart);
+  return time_get_ns() / 1000ULL;
 }
 void platform_sleep_ms(unsigned int ms) {
   Sleep(ms);
@@ -148,6 +146,23 @@ void platform_sleep_us(unsigned int us) {
   Sleep((us + 999U) / 1000U);
 }
 void platform_sleep_ns(uint64_t ns) {
+  if (ns != 0) {
+    // Sleep's millisecond rounding can cross an additional scheduler tick.
+    // Use a relative waitable timer without changing process-wide resolution.
+    HANDLE timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
+    if (!timer && GetLastError() == ERROR_INVALID_PARAMETER)
+      timer = CreateWaitableTimerExW(NULL, NULL, 0, TIMER_MODIFY_STATE | SYNCHRONIZE);
+    if (timer) {
+      LARGE_INTEGER due;
+      due.QuadPart = -(LONGLONG)(ns / 100ULL + (ns % 100ULL != 0));
+      DWORD result = WAIT_FAILED;
+      if (SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE))
+        result = WaitForSingleObject(timer, INFINITE);
+      CloseHandle(timer);
+      if (result == WAIT_OBJECT_0)
+        return;
+    }
+  }
   Sleep((DWORD)((ns + 999999ULL) / 1000000ULL));
 }
 int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
@@ -166,6 +181,10 @@ ssize_t platform_read(int fd, void *buf, size_t count) {
   return _read(fd, buf, (unsigned int)count);
 }
 ssize_t platform_write(int fd, const void *buf, size_t count) {
+  // ConPTY output is a byte stream containing VT sequences. Ensure retained
+  // descriptors used by the presentation thread do not apply CRT CRLF
+  // translation before writing to Alacritty.
+  (void)_setmode(fd, _O_BINARY);
   return _write(fd, buf, (unsigned int)count);
 }
 FILE *platform_tmpfile(void) {
