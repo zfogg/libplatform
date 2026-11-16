@@ -284,7 +284,6 @@ if(LIBPLATFORM_BUILD_SHARED AND (
 endif()
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
-  target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
 endif()
 set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 if(WIN32)
