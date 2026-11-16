@@ -56,7 +56,7 @@ typedef int pid_t;
 extern "C" {
 #endif
 
-#define PLATFORM_PROCESS_NAME_MAX 260
+#define PLATFORM_PROCESS_NAME_MAX 4096
 typedef struct {
   pid_t pid;
   char name[PLATFORM_PROCESS_NAME_MAX];
