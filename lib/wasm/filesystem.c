@@ -5,7 +5,7 @@
  */
 
 #include <libplatform/filesystem.h>
-#include <ascii-chat/os/wasm_console.h>
+#include <ascii-chat/log/wasm.h>
 #include <ascii-chat/debug/named.h>
 #include <ascii-chat/log/log.h>
 #include <ascii-chat/asciichat_errno.h>
