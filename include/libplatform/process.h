@@ -56,6 +56,18 @@ typedef int pid_t;
 extern "C" {
 #endif
 
+#define PLATFORM_PROCESS_NAME_MAX 260
+typedef struct {
+  pid_t pid;
+  char name[PLATFORM_PROCESS_NAME_MAX];
+} platform_process_info_t;
+
+typedef int (*platform_process_list_callback_t)(const platform_process_info_t *process, void *context);
+
+/** Enumerate running processes whose executable name contains @p name_substring. */
+int platform_process_list(const char *name_substring, platform_process_list_callback_t callback, void *context);
+bool platform_process_name_matches(const char *name, const char *needle);
+
 /** Normalize process arguments to UTF-8 where necessary. */
 int process_utf8_arguments(int *argc, char ***argv);
 
