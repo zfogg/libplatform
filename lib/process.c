@@ -7,9 +7,22 @@
 #define PLATFORM_PROCESS_TITLE_SHORT_NAME_BUFFER_SIZE 64
 
 #include <libplatform/process.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+
+bool platform_process_name_matches(const char *name, const char *needle) {
+  if (!name || !needle) return false;
+  if (!*needle) return true;
+  size_t n = strlen(name), m = strlen(needle);
+  for (size_t offset = 0; offset + m <= n; ++offset) {
+    size_t i = 0;
+    while (i < m && tolower((unsigned char)name[offset + i]) == tolower((unsigned char)needle[i])) ++i;
+    if (i == m) return true;
+  }
+  return false;
+}
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <stdint.h>

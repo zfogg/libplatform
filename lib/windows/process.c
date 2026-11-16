@@ -9,6 +9,7 @@
 #include <libplatform/process.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 #include <windows.h>
 #include <shellapi.h>
 #include <psapi.h>
@@ -71,6 +72,27 @@ int platform_process_stats(platform_process_stats_t *out) {
     CloseHandle(snapshot);
   }
   return 0;
+}
+
+int platform_process_list(const char *name_substring, platform_process_list_callback_t callback, void *context) {
+  if (!callback) return -1;
+  HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (snapshot == INVALID_HANDLE_VALUE) return -1;
+  PROCESSENTRY32 entry = {.dwSize = sizeof(entry)};
+  int result = 0;
+  if (Process32First(snapshot, &entry)) {
+    do {
+      if (platform_process_name_matches(entry.szExeFile, name_substring)) {
+        platform_process_info_t info = {.pid = (pid_t)entry.th32ProcessID};
+        strncpy(info.name, entry.szExeFile, sizeof(info.name) - 1);
+        if (callback(&info, context)) break;
+      }
+    } while (Process32Next(snapshot, &entry));
+  } else {
+    result = -1;
+  }
+  CloseHandle(snapshot);
+  return result;
 }
 
 /**

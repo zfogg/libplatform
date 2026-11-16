@@ -167,6 +167,7 @@ elseif(APPLE)
     lib/posix/wakeup.c
     lib/macos/system.c
     lib/macos/font.c
+    lib/macos/process.c
   )
 elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_sources(libplatform-objects PRIVATE
@@ -195,6 +196,7 @@ elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     lib/linux/system.c
     lib/linux/systemd.c
     lib/linux/font.c
+    lib/linux/process.c
   )
 elseif(EMSCRIPTEN)
   # The browser replacements below intentionally supersede generic helpers
