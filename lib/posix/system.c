@@ -21,6 +21,8 @@
 #include "util/ip.h"
 #include "util/utf8.h"
 #include <libplatform/symbols.h>
+#include <sqlite3.h>
+#include <gotel/gotel.h>
 #include <ascii-chat/common.h>
 #include <ascii-chat/log/log.h>
 #include <ascii-chat/otel.h>
