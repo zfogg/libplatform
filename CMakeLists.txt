@@ -262,6 +262,26 @@ target_link_libraries(libplatform-objects PRIVATE "${LIBPLATFORM_UTF8PROC_TARGET
 target_link_libraries(libplatform PRIVATE "${LIBPLATFORM_UTF8PROC_TARGET}")
 target_compile_features(libplatform-objects PUBLIC c_std_11)
 target_compile_features(libplatform PUBLIC c_std_11)
+if(NOT LIBPLATFORM_BUILD_SHARED)
+  target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
+endif()
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+  target_compile_definitions(libplatform-objects PRIVATE _GNU_SOURCE)
+endif()
+if(LIBPLATFORM_BUILD_SHARED AND (
+    CMAKE_C_FLAGS MATCHES "(^| )(--coverage|-fprofile-arcs|-ftest-coverage|-fprofile-instr-generate)( |$)"
+    OR CMAKE_CXX_FLAGS MATCHES "(^| )(--coverage|-fprofile-arcs|-ftest-coverage|-fprofile-instr-generate)( |$)"
+    OR CMAKE_SHARED_LINKER_FLAGS MATCHES "(^| )(--coverage|-fprofile-arcs|-ftest-coverage|-fprofile-instr-generate)( |$)"
+    OR CMAKE_EXE_LINKER_FLAGS MATCHES "(^| )(--coverage|-fprofile-arcs|-ftest-coverage|-fprofile-instr-generate)( |$)"))
+  target_compile_options(libplatform-objects PRIVATE
+          -fno-profile-instr-generate
+    -fno-profile-arcs
+    -fno-test-coverage)
+  target_link_options(libplatform PRIVATE
+          -fno-profile-instr-generate
+    -fno-profile-arcs
+    -fno-test-coverage)
+endif()
 if(WIN32)
   target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
   target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
