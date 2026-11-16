@@ -170,7 +170,7 @@ bool atomic_load_bool(atomic_t *a) {
   if (!a)
     return false;
   bool result = (bool)atomic_load((const _Atomic(uint64_t) *)&a->impl);
-  atomic_on_load(a);
+  atomic_on_load((atomic_t *)(void *)a);
   return result;
 }
 
