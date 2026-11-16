@@ -201,7 +201,7 @@ void backtrace_format_styled(backtrace_text_t *text, const char *label, const ba
       while (*file_start && *file_start == ' ')
         file_start++;
 
-      char *file_colon = strrchr(file_start, ':');
+      const char *file_colon = strrchr(file_start, ':');
       if (file_colon) {
         has_source_path = true;
         int filename_len = file_colon - file_start;
@@ -258,7 +258,7 @@ void backtrace_format_styled(backtrace_text_t *text, const char *label, const ba
           while (*file_start && *file_start == ' ')
             file_start++;
 
-          char *colon_pos = strrchr(file_start, ':');
+          const char *colon_pos = strrchr(file_start, ':');
           if (colon_pos) {
             has_source_path = true;
             int filename_len = colon_pos - file_start;
