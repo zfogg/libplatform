@@ -146,6 +146,23 @@ void platform_sleep_us(unsigned int us) {
   Sleep((us + 999U) / 1000U);
 }
 void platform_sleep_ns(uint64_t ns) {
+  if (ns != 0) {
+    // Sleep's millisecond rounding can cross an additional scheduler tick.
+    // Use a relative waitable timer without changing process-wide resolution.
+    HANDLE timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
+    if (!timer && GetLastError() == ERROR_INVALID_PARAMETER)
+      timer = CreateWaitableTimerExW(NULL, NULL, 0, TIMER_MODIFY_STATE | SYNCHRONIZE);
+    if (timer) {
+      LARGE_INTEGER due;
+      due.QuadPart = -(LONGLONG)(ns / 100ULL + (ns % 100ULL != 0));
+      DWORD result = WAIT_FAILED;
+      if (SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE))
+        result = WaitForSingleObject(timer, INFINITE);
+      CloseHandle(timer);
+      if (result == WAIT_OBJECT_0)
+        return;
+    }
+  }
   Sleep((DWORD)((ns + 999999ULL) / 1000000ULL));
 }
 int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
