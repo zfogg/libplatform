@@ -114,6 +114,7 @@ target_sources(libplatform-objects PRIVATE
   lib/debug/mutex.c
 )
 if(WIN32)
+  target_link_libraries(libplatform PUBLIC ws2_32)
   target_sources(libplatform-objects PRIVATE
     lib/keyboard.c
     lib/windows/thread.c
