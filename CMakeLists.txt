@@ -248,6 +248,9 @@ endif()
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform-objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 target_include_directories(libplatform-objects PRIVATE ${LIBPLATFORM_UTF8PROC_SOURCE_DIR})
+if(DEFINED KERNEL_HEADERS_DIR AND EXISTS "${KERNEL_HEADERS_DIR}")
+  target_include_directories(libplatform-objects PRIVATE "${KERNEL_HEADERS_DIR}")
+endif()
 target_include_directories(libplatform PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
