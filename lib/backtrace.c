@@ -27,7 +27,7 @@ static int manual_backtrace(void **buffer, int size) {
     return 0;
   }
 
-  void **frame = (void **)__builtin_frame_address(0);
+  void **frame = (void **)(uintptr_t)__builtin_frame_address(0);
   int depth = 0;
 
   while (frame && depth < size) {

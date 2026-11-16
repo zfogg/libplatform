@@ -170,7 +170,7 @@ bool atomic_load_bool(atomic_t *a) {
   if (!a)
     return false;
   bool result = (bool)atomic_load((const _Atomic(uint64_t) *)&a->impl);
-  atomic_on_load((atomic_t *)(void *)a);
+  atomic_on_load(a);
   return result;
 }
 
@@ -199,7 +199,7 @@ int atomic_load_int(atomic_t *a) {
   if (!a)
     return 0;
   int result = (int)(int32_t)atomic_load((const _Atomic(uint64_t) *)&a->impl);
-  atomic_on_load(a);
+  atomic_on_load((atomic_t *)(void *)a);
   return result;
 }
 
@@ -246,7 +246,7 @@ uint64_t atomic_load_u64(const atomic_t *a) {
   if (!a)
     return 0;
   uint64_t result = atomic_load((const _Atomic(uint64_t) *)&a->impl);
-  atomic_on_load(a);
+  atomic_on_load((atomic_t *)(void *)a);
   return result;
 }
 
