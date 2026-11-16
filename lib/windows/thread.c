@@ -12,6 +12,21 @@
 #define PLATFORM_WINDOWS_THREAD_STACK_BUFFER_SIZE 16384
 
 #include <windows.h>
+
+/* MinGW GCC does not implement MSVC's SEH syntax. Keep the Windows source
+ * buildable with that toolchain; native SEH remains enabled for MSVC/Clang-cl.
+ * MinGW still receives the normal thread cleanup path, but cannot intercept
+ * hardware exceptions in this wrapper. */
+#if defined(__MINGW32__) && !defined(__clang__)
+#define __try if (1)
+#define __except(condition) else if (0)
+#ifndef GetExceptionInformation
+#define GetExceptionInformation() ((EXCEPTION_POINTERS *)NULL)
+#endif
+#ifndef GetExceptionCode
+#define GetExceptionCode() ((DWORD)0)
+#endif
+#endif
 #include <libplatform/system.h>
 #include "util/string.h"
 #include <libplatform/named.h>
