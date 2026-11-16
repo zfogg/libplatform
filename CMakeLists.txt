@@ -282,9 +282,6 @@ if(LIBPLATFORM_BUILD_SHARED AND (
     -fno-profile-arcs
     -fno-test-coverage)
 endif()
-if(WIN32)
-  target_compile_definitions(libplatform-objects PRIVATE _WINSOCKAPI_)
-endif()
 set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 if(WIN32)
   target_link_libraries(libplatform PUBLIC dbghelp)
