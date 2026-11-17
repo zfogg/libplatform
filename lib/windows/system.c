@@ -1,10 +1,12 @@
 #ifdef _WIN32
 
 #include <libplatform/system.h>
+#include <libplatform/time.h>
 #include <libplatform/filesystem.h>
 #include <libplatform/socket.h>
 #include <libplatform/terminal.h>
 #include <windows.h>
+#include <wincrypt.h>
 #include <psapi.h>
 #include <fcntl.h>
 #include <io.h>
@@ -19,11 +21,13 @@
 #include <direct.h>
 #include <process.h>
 
+#pragma comment(lib, "crypt32.lib")
+
 const char *platform_getenv(const char *name) {
   static _Thread_local char value[32768];
   size_t required = 0;
 
-  if (!name || !name[0] || getenv_s(&required, NULL, 0, name) != 0 || required > sizeof(value)) {
+  if (!name || !name[0] || getenv_s(&required, NULL, 0, name) != 0 || required == 0 || required > sizeof(value)) {
     return NULL;
   }
   return getenv_s(&required, value, sizeof(value), name) == 0 ? value : NULL;
@@ -133,10 +137,7 @@ bool platform_set_console_ctrl_handler(console_ctrl_handler_t handler) {
   return SetConsoleCtrlHandler(platform_console_ctrl_handler, FALSE) != 0;
 }
 uint64_t platform_get_monotonic_time_us(void) {
-  LARGE_INTEGER now, frequency;
-  QueryPerformanceCounter(&now);
-  QueryPerformanceFrequency(&frequency);
-  return (uint64_t)((now.QuadPart * 1000000ULL) / frequency.QuadPart);
+  return time_get_ns() / 1000ULL;
 }
 void platform_sleep_ms(unsigned int ms) {
   Sleep(ms);
@@ -145,6 +146,23 @@ void platform_sleep_us(unsigned int us) {
   Sleep((us + 999U) / 1000U);
 }
 void platform_sleep_ns(uint64_t ns) {
+  if (ns != 0) {
+    // Sleep's millisecond rounding can cross an additional scheduler tick.
+    // Use a relative waitable timer without changing process-wide resolution.
+    HANDLE timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
+    if (!timer && GetLastError() == ERROR_INVALID_PARAMETER)
+      timer = CreateWaitableTimerExW(NULL, NULL, 0, TIMER_MODIFY_STATE | SYNCHRONIZE);
+    if (timer) {
+      LARGE_INTEGER due;
+      due.QuadPart = -(LONGLONG)(ns / 100ULL + (ns % 100ULL != 0));
+      DWORD result = WAIT_FAILED;
+      if (SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE))
+        result = WaitForSingleObject(timer, INFINITE);
+      CloseHandle(timer);
+      if (result == WAIT_OBJECT_0)
+        return;
+    }
+  }
   Sleep((DWORD)((ns + 999999ULL) / 1000000ULL));
 }
 int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count) {
@@ -163,6 +181,10 @@ ssize_t platform_read(int fd, void *buf, size_t count) {
   return _read(fd, buf, (unsigned int)count);
 }
 ssize_t platform_write(int fd, const void *buf, size_t count) {
+  // ConPTY output is a byte stream containing VT sequences. Ensure retained
+  // descriptors used by the presentation thread do not apply CRT CRLF
+  // translation before writing to Alacritty.
+  (void)_setmode(fd, _O_BINARY);
   return _write(fd, buf, (unsigned int)count);
 }
 FILE *platform_tmpfile(void) {
@@ -225,7 +247,12 @@ bool platform_get_cwd(char *cwd, size_t path_size) {
   return cwd && path_size && _getcwd(cwd, (int)path_size) != NULL;
 }
 bool platform_get_temp_dir(char *temp_dir, size_t path_size) {
-  return temp_dir && path_size && GetTempPathA((DWORD)path_size, temp_dir) != 0;
+  if (!temp_dir || !path_size)
+    return false;
+  /* GetTempPathA documents a maximum return length of MAX_PATH + 1. */
+  DWORD capacity = (DWORD)(path_size < MAX_PATH + 1 ? path_size : MAX_PATH + 1);
+  DWORD length = GetTempPathA(capacity, temp_dir);
+  return length != 0 && length < capacity;
 }
 int platform_execute_subprocess(const char *executable, const char **argv, char *output_buffer, size_t output_size,
                                 bool (*cancel)(void *), void *data) {
@@ -239,11 +266,45 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
 }
 
 int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
-  if (pem_data_out)
-    *pem_data_out = NULL;
-  if (pem_size_out)
-    *pem_size_out = 0;
-  return -1;
+  if (!pem_data_out || !pem_size_out)
+    return -1;
+  *pem_data_out = NULL;
+  *pem_size_out = 0;
+
+  HCERTSTORE store = CertOpenSystemStoreA((HCRYPTPROV_LEGACY)0, "ROOT");
+  if (!store)
+    return -1;
+
+  size_t total = 0;
+  PCCERT_CONTEXT cert = NULL;
+  while ((cert = CertEnumCertificatesInStore(store, cert)) != NULL) {
+    DWORD needed = 0;
+    if (!CryptBinaryToStringA(cert->pbCertEncoded, cert->cbCertEncoded, CRYPT_STRING_BASE64HEADER, NULL, &needed))
+      continue;
+    total += (size_t)needed;
+  }
+  if (total == 0) {
+    CertCloseStore(store, 0);
+    return -1;
+  }
+
+  char *pem = malloc(total + 1);
+  if (!pem) {
+    CertCloseStore(store, 0);
+    return -1;
+  }
+  size_t written = 0;
+  cert = NULL;
+  while ((cert = CertEnumCertificatesInStore(store, cert)) != NULL) {
+    DWORD needed = (DWORD)(total - written);
+    if (CryptBinaryToStringA(cert->pbCertEncoded, cert->cbCertEncoded, CRYPT_STRING_BASE64HEADER, pem + written, &needed))
+      written += (size_t)needed;
+  }
+  CertCloseStore(store, 0);
+  pem[written] = '\0';
+  *pem_data_out = pem;
+  *pem_size_out = written;
+  return 0;
 }
 
 int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size_t ipv4_out_size) {

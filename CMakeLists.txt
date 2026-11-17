@@ -245,11 +245,15 @@ elseif(EMSCRIPTEN)
     lib/wasm/stubs/ffmpeg_decoder.c
   )
 endif()
+
 target_include_directories(libplatform-objects PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(libplatform-objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 target_include_directories(libplatform-objects PRIVATE ${LIBPLATFORM_UTF8PROC_SOURCE_DIR})
 if(DEFINED KERNEL_HEADERS_DIR AND EXISTS "${KERNEL_HEADERS_DIR}")
   target_include_directories(libplatform-objects PRIVATE "${KERNEL_HEADERS_DIR}")
+endif()
+if(LIBEXECINFO_INCLUDE_DIRS)
+  target_include_directories(libplatform-objects PRIVATE ${LIBEXECINFO_INCLUDE_DIRS})
 endif()
 target_include_directories(libplatform PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -259,6 +263,9 @@ target_link_libraries(libplatform PRIVATE "${LIBPLATFORM_UTF8PROC_TARGET}")
 target_compile_features(libplatform-objects PUBLIC c_std_11)
 target_compile_features(libplatform PUBLIC c_std_11)
 target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
+if(NOT LIBPLATFORM_BUILD_SHARED)
+  target_compile_definitions(libplatform-objects PRIVATE UTF8PROC_STATIC=1)
+endif()
 if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_compile_definitions(libplatform-objects PRIVATE _GNU_SOURCE)
 endif()
@@ -292,8 +299,11 @@ if(PROJECT_IS_TOP_LEVEL)
   if(TARGET utf8proc)
     install(TARGETS utf8proc EXPORT libplatformTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES "${LIBPLATFORM_UTF8PROC_SOURCE_DIR}/utf8proc.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+<<<<<<< HEAD
   elseif(TARGET utf8proc)
     install(TARGETS utf8proc EXPORT libplatformTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+=======
+>>>>>>> origin/main
   endif()
   install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
   install(EXPORT libplatformTargets NAMESPACE libplatform:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libplatform)

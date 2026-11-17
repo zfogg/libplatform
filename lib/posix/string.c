@@ -13,6 +13,10 @@
 #include <stdarg.h>
 #include <ctype.h>
 
+#if defined(ASCII_CHAT_USE_MIMALLOC)
+#include <mimalloc.h>
+#endif
+
 /* ============================================================================
  * String Formatting
  * ============================================================================
@@ -43,7 +47,11 @@ char *platform_strdup(const char *s) {
   if (!s)
     return NULL;
   size_t len = strlen(s) + 1;
+#if defined(ASCII_CHAT_USE_MIMALLOC)
+  char *dup = mi_malloc(len);
+#else
   char *dup = malloc(len);
+#endif
   if (dup) {
     memcpy(dup, s, len);
   }

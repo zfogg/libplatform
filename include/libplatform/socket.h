@@ -285,6 +285,7 @@ typedef unsigned long nfds_t;
 #include <netinet/tcp.h> // For TCP_NODELAY and other TCP options
 #include <arpa/inet.h>
 #include <poll.h>
+
 /** @brief Socket handle type (POSIX: int) */
 typedef int socket_t;
 /** @brief Invalid socket value (POSIX: -1) */

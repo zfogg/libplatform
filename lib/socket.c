@@ -5,6 +5,10 @@
  * @brief 🌐 Common socket utility functions (cross-platform implementations)
  */
 
+#ifndef _WIN32
+#include <sys/time.h>
+#endif
+
 #include <libplatform/socket.h>
 #include <libplatform/time.h>
 

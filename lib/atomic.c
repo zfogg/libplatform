@@ -242,7 +242,7 @@ bool atomic_cas_int(atomic_t *a, int *expected, int new_value) {
   return success;
 }
 
-uint64_t atomic_load_u64(atomic_t *a) {
+uint64_t atomic_load_u64(const atomic_t *a) {
   if (!a)
     return 0;
   uint64_t result = atomic_load((const _Atomic(uint64_t) *)&a->impl);

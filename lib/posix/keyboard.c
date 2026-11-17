@@ -231,6 +231,8 @@ bool keyboard_request_background(void) {
   if (!terminal_input_trylock())
     return false;
   bool result = isatty(fd) && tcgetpgrp(fd) == getpgrp() && send_background_query();
+  if (result)
+    keyboard_stream_query_started();
   terminal_input_unlock();
   return result;
 }

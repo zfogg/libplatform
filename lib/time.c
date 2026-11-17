@@ -2,7 +2,28 @@
 #include <stdio.h>
 #ifdef _WIN32
 #include <windows.h>
-uint64_t time_get_ns(void) { static LARGE_INTEGER f; static INIT_ONCE o=INIT_ONCE_STATIC_INIT; BOOL p=FALSE; InitOnceBeginInitialize(&o,0,&p,NULL); if(p){QueryPerformanceFrequency(&f); InitOnceComplete(&o,0,NULL);} LARGE_INTEGER c; QueryPerformanceCounter(&c); return (uint64_t)((c.QuadPart*1000000000ULL)/f.QuadPart); }
+uint64_t time_get_ns(void) {
+  static LARGE_INTEGER frequency;
+  static INIT_ONCE once = INIT_ONCE_STATIC_INIT;
+  BOOL pending = FALSE;
+  InitOnceBeginInitialize(&once, 0, &pending, NULL);
+  if (pending) {
+    QueryPerformanceFrequency(&frequency);
+    InitOnceComplete(&once, 0, NULL);
+  }
+  LARGE_INTEGER counter;
+  QueryPerformanceCounter(&counter);
+  uint64_t ticks = (uint64_t)counter.QuadPart;
+  uint64_t hz = (uint64_t)frequency.QuadPart;
+  uint64_t seconds = ticks / hz;
+  uint64_t remainder = ticks % hz;
+  // Split whole seconds before scaling: scaling the entire QPC value wraps
+  // after about 31 minutes with a 10 MHz performance counter.
+  uint64_t fraction = remainder <= UINT64_MAX / 1000000000ULL
+                          ? remainder * 1000000000ULL / hz
+                          : (uint64_t)((long double)remainder * 1000000000.0L / (long double)hz);
+  return seconds * 1000000000ULL + fraction;
+}
 uint64_t time_get_realtime_ns(void) { FILETIME ft; GetSystemTimeAsFileTime(&ft); ULARGE_INTEGER v={.LowPart=ft.dwLowDateTime,.HighPart=ft.dwHighDateTime}; return (uint64_t)(v.QuadPart-116444736000000000ULL)*100ULL; }
 #else
 uint64_t time_get_ns(void) { struct timespec v; clock_gettime(CLOCK_MONOTONIC,&v); return (uint64_t)v.tv_sec*1000000000ULL+(uint64_t)v.tv_nsec; }

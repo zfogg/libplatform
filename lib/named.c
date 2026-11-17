@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <stdatomic.h>
 #define UNTRACKED_MALLOC(size, type) ((type)malloc(size))
 #define UNTRACKED_FREE(ptr) free(ptr)
 #define log_error(...) ((void)0)
@@ -219,10 +220,10 @@ void named_destroy(void) {
  * needed.
  * @brief Lock-free atomic counters for unique naming
  */
-static uint64_t mutex_counter = 0;
-static uint64_t rwlock_counter = 0;
-static uint64_t cond_counter = 0;
-static uint64_t atomic_counter = 0;
+static _Atomic uint64_t mutex_counter = 0;
+static _Atomic uint64_t rwlock_counter = 0;
+static _Atomic uint64_t cond_counter = 0;
+static _Atomic uint64_t atomic_counter = 0;
 static _Atomic uint64_t named_generation = 0;
 
 /**
@@ -290,13 +291,13 @@ const char *named_register(uintptr_t key, const char *base_name, const char *typ
   if (parent_key == 0) {
     uint64_t counter = 0;
     if (strcmp(type, "mutex") == 0) {
-      counter = __sync_fetch_and_add(&mutex_counter, 1);
+      counter = atomic_fetch_add(&mutex_counter, 1);
     } else if (strcmp(type, "rwlock") == 0) {
-      counter = __sync_fetch_and_add(&rwlock_counter, 1);
+      counter = atomic_fetch_add(&rwlock_counter, 1);
     } else if (strcmp(type, "cond") == 0) {
-      counter = __sync_fetch_and_add(&cond_counter, 1);
+      counter = atomic_fetch_add(&cond_counter, 1);
     } else if (strcmp(type, "atomic") == 0) {
-      counter = __sync_fetch_and_add(&atomic_counter, 1);
+      counter = atomic_fetch_add(&atomic_counter, 1);
     }
     snprintf(name_buffer, sizeof(name_buffer), "%s.%" PRIu64, final_base_name, counter);
   } else {
@@ -372,7 +373,6 @@ void named_unregister(uintptr_t key) {
   rwlock_wrlock(&g_named_registry.entries_lock);
   named_entry_t *entry = NULL;
   HASH_FIND(hh, g_named_registry.entries, &key, sizeof(uintptr_t), entry);
-  bool changed = entry != NULL;
   // A primitive may be registered again with a parent-qualified name. Retire
   // every entry before its owner releases the object.
   while (entry) {
@@ -389,8 +389,7 @@ void named_unregister(uintptr_t key) {
     free(entry);
     HASH_FIND(hh, g_named_registry.entries, &key, sizeof(uintptr_t), entry);
   }
-  if (changed)
-    rwlock_wrunlock(&g_named_registry.entries_lock);
+  rwlock_wrunlock(&g_named_registry.entries_lock);
 }
 
 const char *named_update_name(uintptr_t key, const char *new_base_name) {

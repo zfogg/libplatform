@@ -54,10 +54,6 @@ int get_binary_file_address_offsets(const void *addr, platform_binary_match_t *m
           matches[count].symbolizer_address = addr_int - (uintptr_t)slide;
           matches[count].relative_address = false;
 
-#ifndef NDEBUG
-          log_debug("[macOS dyld] addr=%p matches %s (preferred=%lx, slide=%ld)", addr, image_name,
-                    matches[count].symbolizer_address, slide);
-#endif
           count++;
           break;
         }
