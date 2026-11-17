@@ -9,7 +9,7 @@
 #include <libplatform/symbols.h>
 #include "util/string.h"
 #include "util/path.h"
-#ifdef USE_MUSL
+#if defined(USE_MUSL) || (defined(__has_include) && !__has_include(<execinfo.h>))
 /* musl may not ship libexecinfo's header.  Keep the optional symbol weak so
  * the manual frame-pointer fallback remains usable without that dependency. */
 extern int backtrace(void **buffer, int size) __attribute__((weak));
