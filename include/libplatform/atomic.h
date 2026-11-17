@@ -433,7 +433,7 @@ int atomic_exchange_int_impl(atomic_t *a, int new_value);
 // ============================================================================
 
 #ifndef NDEBUG
-void atomic_on_load(atomic_t *a);
+void atomic_on_load(const atomic_t *a);
 void atomic_on_store(atomic_t *a);
 void atomic_on_cas(atomic_t *a, bool success);
 void atomic_on_fetch(atomic_t *a);

@@ -363,11 +363,12 @@ uint64_t atomic_exchange_u64(atomic_t *a, uint64_t new_value) {
 // Forward declare the initialization state from lib/debug/atomic.c
 extern bool debug_atomic_is_initialized(void);
 
-void atomic_on_load(atomic_t *a) {
+void atomic_on_load(const atomic_t *a) {
   if (!a || !debug_atomic_is_initialized())
     return;
-  a->last_load_time_ns = time_get_ns();
-  a->load_count++;
+  atomic_t *mutable_a = (atomic_t *)a;
+  mutable_a->last_load_time_ns = time_get_ns();
+  mutable_a->load_count++;
 }
 
 void atomic_on_store(atomic_t *a) {
