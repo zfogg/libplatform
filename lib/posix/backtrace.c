@@ -9,7 +9,12 @@
 #include <libplatform/symbols.h>
 #include "util/string.h"
 #include "util/path.h"
+#if !defined(USE_MUSL) && (!defined(__has_include) || __has_include(<execinfo.h>))
 #include <execinfo.h>
+#else
+/* musl may not ship libexecinfo's header; use the manual fallback when absent. */
+extern int backtrace(void **buffer, int size) __attribute__((weak));
+#endif
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
