@@ -117,10 +117,6 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <netdb.h>
-#ifndef ASCIICHAT_OK
-#define ASCIICHAT_OK 0
-typedef int asciichat_error_t;
-#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -152,18 +148,18 @@ const char *get_username_env(void) {
  */
 int platform_init(void) {
   // Initialize symbol cache for backtrace resolution
-  if (symbol_cache_init() != ASCIICHAT_OK) {
+  if (symbol_cache_init() != 0) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Symbol cache initialization failed");
   }
 
   // Initialize Winsock (required before getaddrinfo and socket operations)
-  if (socket_init() != ASCIICHAT_OK) {
+  if (socket_init() != 0) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Network operation failed");
   }
 
   // Install crash handlers for automatic backtrace on crashes
   platform_install_crash_handler();
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -253,7 +249,7 @@ int platform_localtime(const time_t *timer, struct tm *result) {
   if (!tm_result) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Failed to convert time to local time");
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 int platform_gtime(const time_t *timer, struct tm *result) {
@@ -266,7 +262,7 @@ int platform_gtime(const time_t *timer, struct tm *result) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Failed to convert time to UTC");
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -709,7 +705,7 @@ int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count)
 
   // Use standard memcpy with bounds checking already done
   memcpy(dest, src, count);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
@@ -724,7 +720,7 @@ int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
 
   // Use standard memset with bounds checking already done
   memset(dest, ch, count);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 int platform_memmove(void *dest, size_t dest_size, const void *src, size_t count) {
@@ -739,7 +735,7 @@ int platform_memmove(void *dest, size_t dest_size, const void *src, size_t count
 
   // Use standard memmove with bounds checking already done
   memmove(dest, src, count);
-  return ASCIICHAT_OK; // Success
+  return 0; // Success
 }
 
 /**
@@ -770,7 +766,7 @@ int platform_strcpy(char *dest, size_t dest_size, const char *src) {
   // Use strncpy with bounds checking and ensure null termination
   strncpy(dest, src, dest_size - 1);
   dest[dest_size - 1] = '\0'; // Ensure null termination
-  return ASCIICHAT_OK;        // Success
+  return 0;        // Success
 }
 
 /**
@@ -807,14 +803,14 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
   }
 
   // Extract IPv4 address from first result
-  asciichat_error_t format_result = format_ip_address(result->ai_family, result->ai_addr, ipv4_out, ipv4_out_size);
+  int format_result = format_ip_address(result->ai_family, result->ai_addr, ipv4_out, ipv4_out_size);
   freeaddrinfo(result);
 
-  if (format_result != ASCIICHAT_OK) {
+  if (format_result != 0) {
     return format_result;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -894,7 +890,7 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
     *pem_data_out = pem_data;
     *pem_size_out = bytes_read;
     log_debug("Loaded CA certificates from: %s (%zu bytes)", ca_paths[i], bytes_read);
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // No CA bundle found
@@ -1110,7 +1106,7 @@ void platform_force_exit(int exit_code) {
  * @brief Register multiple signal handlers at once (POSIX)
  * @param handlers Array of signal handler descriptors
  * @param count Number of handlers
- * @return ASCIICHAT_OK on success, error code on failure
+ * @return 0 on success, error code on failure
  *
  * POSIX implementation registers each signal using platform_signal().
  * Windows implementation handles this differently via console control handlers.
@@ -1128,7 +1124,7 @@ int platform_register_signal_handlers(const platform_signal_handler_t *handlers,
     }
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -1137,7 +1133,7 @@ int platform_register_signal_handlers(const platform_signal_handler_t *handlers,
 int platform_request_timer_precision(int precision) {
   (void)precision; // Unused on POSIX
   // POSIX systems don't have a timer precision API like Windows
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -1145,7 +1141,7 @@ int platform_request_timer_precision(int precision) {
  */
 int platform_restore_timer_resolution(void) {
   // POSIX systems don't have a timer precision API like Windows
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
