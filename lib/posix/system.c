@@ -84,7 +84,7 @@ typedef int asciichat_error_t;
 #include <termios.h>
 // execinfo.h provides backtrace functions - available in glibc
 // For musl, libexecinfo provides it but may not be available during compile
-#ifndef USE_MUSL
+#if !defined(USE_MUSL) && (!defined(__has_include) || __has_include(<execinfo.h>))
 #include <execinfo.h>
 #else
 // Forward declarations for backtrace functions when execinfo.h is not available
