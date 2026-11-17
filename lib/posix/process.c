@@ -13,10 +13,67 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 #include <sys/resource.h>
 #ifdef __APPLE__
 #include <mach/mach.h>
 #endif
+
+struct platform_process { pid_t pid; };
+
+int platform_process_spawn(platform_process_t **out, const char *path, const char *const *argv,
+                           int stdin_fd, int stdout_fd, int stderr_fd) {
+  if (!out || !path || !argv) return -1;
+  *out = NULL;
+  pid_t pid = fork();
+  if (pid < 0) return -1;
+  if (pid == 0) {
+    if (stdin_fd >= 0) dup2(stdin_fd, STDIN_FILENO);
+    if (stdout_fd >= 0) dup2(stdout_fd, STDOUT_FILENO);
+    if (stderr_fd >= 0) dup2(stderr_fd, STDERR_FILENO);
+    execv(path, (char *const *)argv);
+    _exit(127);
+  }
+  platform_process_t *process = calloc(1, sizeof(*process));
+  if (!process) { kill(pid, SIGKILL); waitpid(pid, NULL, 0); return -1; }
+  process->pid = pid;
+  *out = process;
+  return 0;
+}
+
+int platform_process_wait(platform_process_t *process, int timeout_ms, int *exit_code_out) {
+  if (!process) return -1;
+  int status = 0;
+  if (timeout_ms < 0) {
+    if (waitpid(process->pid, &status, 0) < 0) return -1;
+  } else {
+    int elapsed = 0;
+    while (elapsed < timeout_ms) {
+      pid_t result = waitpid(process->pid, &status, WNOHANG);
+      if (result == process->pid) goto done;
+      if (result < 0) return -1;
+      usleep(10000); elapsed += 10;
+    }
+    return 1;
+  }
+done:
+  if (exit_code_out) *exit_code_out = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+  return 0;
+}
+
+bool platform_process_is_alive(platform_process_t *process) {
+  if (!process) return false;
+  int status = 0;
+  return waitpid(process->pid, &status, WNOHANG) == 0;
+}
+
+int platform_process_kill(platform_process_t *process) {
+  return process && kill(process->pid, SIGTERM) == 0 ? 0 : -1;
+}
+
+void platform_process_destroy(platform_process_t *process) { free(process); }
 
 int process_utf8_arguments(int *argc, char ***argv) {
   (void)argc;
