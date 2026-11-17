@@ -117,6 +117,10 @@ extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((we
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <netdb.h>
+#ifndef ASCIICHAT_OK
+#define ASCIICHAT_OK 0
+typedef int asciichat_error_t;
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
