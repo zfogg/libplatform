@@ -25,6 +25,7 @@ set(LIBPLATFORM_UTF8PROC_TARGET "" CACHE STRING
 set(LIBPLATFORM_UTF8PROC_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/utf8proc" CACHE PATH
   "utf8proc source directory used when LIBPLATFORM_UTF8PROC_TARGET is not supplied")
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   find_package(PkgConfig REQUIRED)
@@ -283,6 +284,23 @@ if(PROJECT_IS_TOP_LEVEL)
   endif()
   install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
   install(EXPORT libplatformTargets NAMESPACE libplatform:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libplatform)
+  configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libplatformConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/libplatformConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libplatform")
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/libplatformConfigVersion.cmake"
+    COMPATIBILITY SameMajorVersion)
+  install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/libplatformConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/libplatformConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libplatform")
+  install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/libplatform")
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libplatform.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/libplatform.pc" @ONLY)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libplatform.pc"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 endif()
 
 if(LIBPLATFORM_BUILD_TESTS)
