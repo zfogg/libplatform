@@ -87,7 +87,11 @@ jobs:
           cp -R stage-static/lib/* package/lib/ || true
           cp -R stage-shared/lib/* package/lib/ || true
           cp -R stage-shared/bin/* package/bin/ 2>/dev/null || true
-          7z a "libplatform-${{ matrix.os }}-${{ matrix.arch }}.zip" package
+          if [ '${{ matrix.os }}' = windows ]; then
+            7z a "libplatform-${{ matrix.os }}-${{ matrix.arch }}.zip" package
+          else
+            zip -r "libplatform-${{ matrix.os }}-${{ matrix.arch }}.zip" package
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: libplatform-${{ matrix.os }}-${{ matrix.arch }}
