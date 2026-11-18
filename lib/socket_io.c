@@ -16,6 +16,10 @@
 #ifdef __linux__
 #include <sys/mman.h>
 #include <unistd.h>
+#if defined(__has_include) && __has_include(<linux/errqueue.h>)
+#include <linux/errqueue.h>
+#define LIBPLATFORM_HAS_LINUX_ERRQUEUE 1
+#endif
 #endif
 
 static _Thread_local socket_io_stats_t io_stats;
@@ -235,7 +239,7 @@ int socket_zerocopy_try(socket_t sock, const socket_send_buffer_t *buffer, size_
     return -1;
   *sent = 0;
   *supported = false;
-#if defined(__linux__) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
+#if defined(LIBPLATFORM_HAS_LINUX_ERRQUEUE) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
   if (!buffer->mapped || length < SOCKET_ZEROCOPY_THRESHOLD)
     return 0;
   int one = 1;
@@ -268,7 +272,7 @@ int socket_zerocopy_poll(socket_t sock, bool *completed, bool *copied) {
   if (!completed || !copied)
     return -1;
   *completed = *copied = false;
-#if defined(__linux__) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
+#if defined(LIBPLATFORM_HAS_LINUX_ERRQUEUE) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
   union {
     struct cmsghdr align;
     char bytes[PLATFORM_SOCKET_IO_BYTES_BUFFER_SIZE];
@@ -311,7 +315,7 @@ int socket_send_zerocopy(socket_t sock, const socket_send_buffer_t *buffer, size
     return -1;
   *supported = false;
   *copied = false;
-#if defined(__linux__) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
+#if defined(LIBPLATFORM_HAS_LINUX_ERRQUEUE) && defined(SO_ZEROCOPY) && defined(MSG_ZEROCOPY)
   if (!buffer->mapped || len < SOCKET_ZEROCOPY_THRESHOLD)
     return 0;
   int one = 1;

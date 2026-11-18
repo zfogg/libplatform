@@ -9,7 +9,12 @@
 #include <libplatform/symbols.h>
 #include "util/string.h"
 #include "util/path.h"
+#ifndef USE_MUSL
 #include <execinfo.h>
+#else
+extern int backtrace(void **buffer, int size) __attribute__((weak));
+extern char **backtrace_symbols(void *const *buffer, int size) __attribute__((weak));
+#endif
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
