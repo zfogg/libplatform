@@ -15,6 +15,8 @@ if(NOT DEFINED CMAKE_C_COMPILER)
 endif()
 
 project(libplatform VERSION 0.1.0 LANGUAGES C)
+include(${CMAKE_CURRENT_SOURCE_DIR}/deps/cmake-utils/CacheLauncher.cmake)
+cmake_utils_configure_cache_launcher()
 
 option(LIBPLATFORM_BUILD_TESTS "Build libplatform tests" ON)
 option(LIBPLATFORM_BUILD_SHARED "Build libplatform as a shared library" ${BUILD_SHARED_LIBS})
