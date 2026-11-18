@@ -58,6 +58,7 @@ jobs:
                   cmake --install "build-$linkage" --prefix "stage-$linkage"
                 done
                 mkdir -p package/include package/lib package/bin
+                cp RELEASE.md package/README.md
                 cp -R stage-static/include/* package/include/
                 cp -R stage-static/lib/* package/lib/ || true
                 cp -R stage-shared/lib/* package/lib/ || true
@@ -83,6 +84,7 @@ jobs:
             fi
           done
           mkdir -p package/include package/lib package/bin
+          cp RELEASE.md package/README.md
           cp -R stage-static/include/* package/include/
           cp -R stage-static/lib/* package/lib/ || true
           cp -R stage-shared/lib/* package/lib/ || true
