@@ -30,7 +30,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#ifndef __cplusplus
 #include <stdatomic.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
