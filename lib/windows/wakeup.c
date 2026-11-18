@@ -1,7 +1,7 @@
 #ifdef _WIN32
 #include <libplatform/wakeup.h>
 #include <windows.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #include <stdlib.h>
 struct platform_wakeup { HANDLE event; atomic_bool pending; };
 int platform_wakeup_create(platform_wakeup_t **out) {

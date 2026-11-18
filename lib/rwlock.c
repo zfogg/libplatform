@@ -20,7 +20,7 @@
 #include <libplatform/rwlock.h>
 #include <libplatform/thread.h>
 #include <libplatform/time.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 
 #include <stdio.h>
 
