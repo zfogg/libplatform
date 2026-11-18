@@ -765,6 +765,7 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
  * @param pem_size_out Pointer to receive size of PEM data
  * @return 0 on success, -1 on failure
  */
+#if !defined(PLATFORM_IOS) || !PLATFORM_IOS
 int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
   if (!pem_data_out || !pem_size_out) {
     return SET_ERRNO(ERROR_INVALID_PARAM, "Invalid parameters for CA cert loading");
@@ -837,6 +838,7 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
   // No CA bundle found
   return SET_ERRNO(ERROR_CRYPTO, "No CA certificate bundle found in standard locations");
 }
+#endif
 
 /**
  * @brief Get the system temporary directory path (POSIX implementation)

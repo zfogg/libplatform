@@ -172,10 +172,9 @@ elseif(APPLE)
     lib/macos/font.c
     lib/macos/process.c
   )
+  target_sources(libplatform-objects PRIVATE lib/posix/system.c)
   if(PLATFORM_IOS)
     target_sources(libplatform-objects PRIVATE lib/ios/system.m)
-  else()
-    target_sources(libplatform-objects PRIVATE lib/posix/system.c)
   endif()
 elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_sources(libplatform-objects PRIVATE
