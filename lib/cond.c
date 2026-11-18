@@ -22,7 +22,7 @@
 #include <libplatform/time.h>
 #include <stdint.h>
 #include <time.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #include <stdio.h>
 #include <stdio.h>
 

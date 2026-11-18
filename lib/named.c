@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #define UNTRACKED_MALLOC(size, type) ((type)malloc(size))
 #define UNTRACKED_FREE(ptr) free(ptr)
 #define log_error(...) ((void)0)

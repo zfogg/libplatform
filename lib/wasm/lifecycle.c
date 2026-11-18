@@ -4,7 +4,7 @@
  */
 
 #include <libplatform/lifecycle.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #include <stdbool.h>
 
 #ifdef __EMSCRIPTEN__

@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <poll.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #include <stdlib.h>
 #include <unistd.h>
 

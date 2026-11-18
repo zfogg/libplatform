@@ -43,7 +43,7 @@
 #include <ctype.h>
 #include <libplatform/lifecycle.h>
 #include <libplatform/uthash.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/stat.h>
