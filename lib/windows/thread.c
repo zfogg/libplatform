@@ -27,6 +27,17 @@
 
 #include "context_regs.h"
 
+/* MinGW GCC can use the Windows APIs but does not implement MSVC's SEH
+ * language extension. Keep the diagnostic path buildable there: MSVC and
+ * clang-cl retain structured exception handling, while GCC executes the
+ * protected bodies without a compiler-level handler. */
+#if defined(__GNUC__) && !defined(__clang__) && !defined(_MSC_VER)
+#define __try if (1)
+#define __except(condition) if (0)
+#define GetExceptionInformation() ((EXCEPTION_POINTERS *)NULL)
+#define GetExceptionCode() ((DWORD)0)
+#endif
+
 // Thread wrapper structure to bridge POSIX and Windows thread APIs
 typedef struct {
   void *(*posix_func)(void *);
