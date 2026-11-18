@@ -28,7 +28,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <libplatform/mutex.h>
+#ifndef __cplusplus
 #include <stdatomic.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
