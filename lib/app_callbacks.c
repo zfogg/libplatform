@@ -11,9 +11,9 @@ void platform_app_callbacks_register(const platform_app_callbacks_t *callbacks) 
     return;
   }
   g_callbacks_storage = *callbacks;
-  atomic_ptr_store(&g_callbacks, &g_callbacks_storage);
+  atomic_ptr_store(&g_callbacks, (void *)&g_callbacks_storage);
 }
 
 const platform_app_callbacks_t *platform_app_callbacks_get(void) {
-  return atomic_ptr_load(&g_callbacks);
+  return (const platform_app_callbacks_t *)atomic_ptr_load(&g_callbacks);
 }

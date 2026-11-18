@@ -14,7 +14,6 @@
  */
 
 #include <libplatform/atomic.h>
-#include <libplatform/atomic.h>
 #include <libplatform/time.h>
 
 // ============================================================================
