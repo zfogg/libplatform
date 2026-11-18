@@ -37,12 +37,20 @@
 
 #pragma once
 
-#ifndef __cplusplus
+#ifdef __cplusplus
+#include <atomic>
+#else
 #include <stdatomic.h>
 #endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+
+#ifdef __cplusplus
+typedef std::atomic_uint_fast64_t libplatform_atomic_uint_fast64_t;
+#else
+typedef atomic_uint_fast64_t libplatform_atomic_uint_fast64_t;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
