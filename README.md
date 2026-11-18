@@ -1,5 +1,7 @@
 # libplatform
 
+[Releases](https://github.com/zfogg/libplatform/releases)
+
 [Read the documentation](https://zfogg.github.io/libplatform/)
 
 libplatform is the part of a C or C++ application that you usually end up
