@@ -2,6 +2,12 @@ name: release
 on:
   push:
     tags: ['v*.*.*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
@@ -17,6 +23,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Enable ARM64 emulation
         if: matrix.os == 'linux' && matrix.arch == 'arm64'
         uses: docker/setup-qemu-action@v3
@@ -24,7 +32,10 @@ jobs:
           platforms: arm64
       - name: Install Linux static toolchain
         if: matrix.os == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
+        run: bash scripts/install-deps.sh linux
+      - name: Install macOS build tools
+        if: matrix.os == 'macos'
+        run: bash scripts/install-deps.sh macos
       - name: Build static and shared packages
         shell: bash
         run: |
