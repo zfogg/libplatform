@@ -150,7 +150,6 @@ elseif(APPLE)
   target_sources(libplatform-objects PRIVATE
     lib/posix/thread.c
     lib/posix/string.c
-    lib/posix/system.c
     lib/posix/filesystem.c
     lib/posix/clipboard.c
     lib/posix/keepawake.c
@@ -175,6 +174,8 @@ elseif(APPLE)
   )
   if(PLATFORM_IOS)
     target_sources(libplatform-objects PRIVATE lib/ios/system.m)
+  else()
+    target_sources(libplatform-objects PRIVATE lib/posix/system.c)
   endif()
 elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_sources(libplatform-objects PRIVATE
