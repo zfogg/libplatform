@@ -33,7 +33,9 @@
 #include <atomic>
 #define LIBPLATFORM_ATOMIC(type) std::atomic<type>
 #else
+#ifndef __cplusplus
 #include <stdatomic.h>
+#endif
 #define LIBPLATFORM_ATOMIC(type) _Atomic(type)
 #endif
 

@@ -1,6 +1,8 @@
 #pragma once
 
+#ifndef __cplusplus
 #include <stdatomic.h>
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <libplatform/rwlock.h>
