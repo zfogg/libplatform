@@ -8,6 +8,7 @@
 #include <psapi.h>
 #include <fcntl.h>
 #include <io.h>
+#include <share.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -42,7 +43,8 @@ int platform_open(const char *name, const char *pathname, int flags, ...) {
   }
   if (!(flags & _O_TEXT))
     flags |= _O_BINARY;
-  return _open(pathname, flags, mode);
+  int fd = -1;
+  return _sopen_s(&fd, pathname, flags, _SH_DENYNO, mode) == 0 ? fd : -1;
 }
 
 int get_binary_file_address_offsets(const void *addr, platform_binary_match_t *matches, int max_matches) {
@@ -166,7 +168,8 @@ ssize_t platform_write(int fd, const void *buf, size_t count) {
   return _write(fd, buf, (unsigned int)count);
 }
 FILE *platform_tmpfile(void) {
-  return tmpfile();
+  FILE *stream = NULL;
+  return tmpfile_s(&stream) == 0 ? stream : NULL;
 }
 void platform_force_exit(int exit_code) {
   ExitProcess((UINT)exit_code);
@@ -191,7 +194,8 @@ void platform_stdout_stderr_restore(platform_stderr_redirect_handle_t handle) {
 }
 FILE *platform_fopen(const char *name, const char *filename, const char *mode) {
   (void)name;
-  return filename && mode ? fopen(filename, mode) : NULL;
+  FILE *stream = NULL;
+  return filename && mode && fopen_s(&stream, filename, mode) == 0 ? stream : NULL;
 }
 FILE *platform_fdopen(const char *name, int fd, const char *mode) {
   (void)name;
@@ -219,7 +223,8 @@ int platform_unsetenv(const char *name) {
   return name ? _putenv_s(name, "") : -1;
 }
 const char *platform_strerror(int errnum) {
-  return strerror(errnum);
+  static _Thread_local char buffer[256];
+  return strerror_s(buffer, sizeof(buffer), errnum) == 0 ? buffer : "unknown error";
 }
 bool platform_get_cwd(char *cwd, size_t path_size) {
   return cwd && path_size && _getcwd(cwd, (int)path_size) != NULL;

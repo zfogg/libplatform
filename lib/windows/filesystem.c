@@ -116,7 +116,7 @@ int platform_mkdir_recursive(const char *path, int mode) {
     return -1;
   }
 
-  strncpy(tmp, path, sizeof(tmp) - 1);
+  platform_strlcpy(tmp, path, sizeof(tmp));
   tmp[sizeof(tmp) - 1] = '\0';
 
   // Create each directory in the path
@@ -229,7 +229,7 @@ int platform_create_temp_file(char *path_out, size_t path_size, const char *pref
     return -1;
   }
 
-  strncpy(path_out, temp_file, path_size);
+  platform_strlcpy(path_out, temp_file, path_size);
 
   // Open the file and get the file descriptor
   int temp_fd = -1;
@@ -822,7 +822,7 @@ static bool convert_unix_path_to_windows(const char *unix_path, char *win_path, 
     return true;
   }
 
-  strncpy(win_path, unix_path, win_path_size);
+  platform_strlcpy(win_path, unix_path, win_path_size);
   return false;
 }
 
@@ -836,7 +836,7 @@ bool check_binary_in_path_uncached(const char *bin_name) {
   if (strstr(bin_name, ".exe") == NULL) {
     snprintf(bin_with_suffix, sizeof(bin_with_suffix), "%s%s", bin_name, BIN_SUFFIX);
   } else {
-    strncpy(bin_with_suffix, bin_name, sizeof(bin_with_suffix));
+    platform_strlcpy(bin_with_suffix, bin_name, sizeof(bin_with_suffix));
   }
 
   const char *path_env = platform_getenv("PATH");
@@ -849,7 +849,7 @@ bool check_binary_in_path_uncached(const char *bin_name) {
   if (!path_copy) {
     return false;
   }
-  strncpy(path_copy, path_env, path_len + 1);
+  platform_strlcpy(path_copy, path_env, path_len + 1);
 
   bool found = false;
   char *saveptr = NULL;
