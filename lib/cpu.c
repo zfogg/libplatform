@@ -11,7 +11,11 @@
 
 #if defined(__linux__) && (defined(__aarch64__) || defined(__arm__))
 #include <sys/auxv.h>
+#if defined(__has_include)
+#if __has_include(<asm/hwcap.h>)
 #include <asm/hwcap.h>
+#endif
+#endif
 #elif defined(__APPLE__) && defined(__aarch64__)
 #include <sys/types.h>
 #include <sys/sysctl.h>
@@ -39,15 +43,23 @@ uint32_t platform_cpu_features(void) {
   }
 #elif defined(__linux__) && defined(__aarch64__)
   unsigned long hwcap = getauxval(AT_HWCAP);
+#ifdef HWCAP_ASIMD
   if (hwcap & HWCAP_ASIMD)
     features |= CPU_FEATURE_NEON;
+#endif
+#ifdef HWCAP_SVE
   if (hwcap & HWCAP_SVE)
     features |= CPU_FEATURE_SVE;
+#endif
+#ifdef HWCAP_CRC32
   if (hwcap & HWCAP_CRC32)
     features |= CPU_FEATURE_CRC32;
+#endif
 #elif defined(__linux__) && defined(__arm__)
+#ifdef HWCAP_NEON
   if (getauxval(AT_HWCAP) & HWCAP_NEON)
     features |= CPU_FEATURE_NEON;
+#endif
 #elif defined(__APPLE__) && defined(__aarch64__)
   features |= CPU_FEATURE_NEON;
   int crc32 = 0;
