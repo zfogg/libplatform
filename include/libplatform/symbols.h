@@ -124,7 +124,7 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
  *
  * @ingroup platform
  */
-int symbol_cache_init(void);
+int symbol_cache_init(const char *executable_name, const char *const *library_names);
 
 /**
  * @brief Clean up the symbol cache and free all resources

@@ -104,6 +104,9 @@ static bool source_path_is_absolute(const char *path) {
                   path[0] == '/' || path[0] == '\\');
 }
 
+static const char *g_project_executable_name = NULL;
+static const char *const *g_project_library_names = NULL;
+
 int symbol_format_source_path(const char *module_name, const char *source_path, char *output, size_t output_size,
                               bool *external, const char *const *owned_dirs) {
   if (!output || output_size == 0 || !external) {
@@ -111,8 +114,20 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
   }
 
   const char *path = source_path ? source_path : "unknown";
+  bool project_module = false;
+  if (g_project_executable_name && module_name) {
+    project_module = ascii_case_equal(module_name, g_project_executable_name);
+  }
+  if (!project_module && g_project_library_names) {
+    for (size_t i = 0; g_project_library_names[i]; i++) {
+      if (ascii_case_equal(module_name, g_project_library_names[i])) {
+        project_module = true;
+        break;
+      }
+    }
+  }
   if (!owned_dirs) {
-    *external = source_path_is_absolute(path);
+    *external = source_path_is_absolute(path) && !project_module;
     size_t required_size = strlen(path) + 1;
     if (required_size > output_size) {
       return EOVERFLOW;
@@ -133,7 +148,7 @@ int symbol_format_source_path(const char *module_name, const char *source_path, 
       }
     }
   }
-  *external = project_relative == path ||
+  *external = (!project_module && project_relative == path) ||
               (owned_prefix && owned_dirs && owned_prefix != owned_dirs[0] && source_path_is_absolute(path));
   const char *display_path =
       owned_prefix ? path + owned_prefix_length + 1 : (*external ? path_last_components(path, 5) : project_relative);
@@ -403,7 +418,9 @@ static symbolizer_type_t detect_symbolizer(void) {
 // Public API Implementation
 // ============================================================================
 
-int symbol_cache_init(void) {
+int symbol_cache_init(const char *executable_name, const char *const *library_names) {
+  g_project_executable_name = executable_name;
+  g_project_library_names = library_names;
   if (!lifecycle_init(&g_symbol_cache_lc, "symbol_cache")) {
     return 0; // Already initialized
   }

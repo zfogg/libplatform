@@ -129,7 +129,7 @@ const char *get_username_env(void) {
  */
 asciichat_error_t platform_init(void) {
   // Initialize symbol cache for backtrace resolution
-  if (symbol_cache_init() != ASCIICHAT_OK) {
+  if (symbol_cache_init(NULL, NULL) != ASCIICHAT_OK) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Symbol cache initialization failed");
   }
 
