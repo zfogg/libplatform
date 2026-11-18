@@ -9,6 +9,7 @@
 #define PLATFORM_WINDOWS_BACKTRACE_SOURCE_PATH_BUFFER_SIZE 512
 
 #include <libplatform/backtrace.h>
+#include <libplatform/util/string.h>
 #include "backtrace_internal.h"
 #include <libplatform/symbols.h>
 #include "util/path.h"
