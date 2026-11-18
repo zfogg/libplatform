@@ -173,6 +173,9 @@ elseif(APPLE)
     lib/macos/font.c
     lib/macos/process.c
   )
+  if(PLATFORM_IOS)
+    target_sources(libplatform-objects PRIVATE lib/ios/system.m)
+  endif()
 elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
   target_sources(libplatform-objects PRIVATE
     lib/keyboard.c

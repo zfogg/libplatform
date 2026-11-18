@@ -686,6 +686,14 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
  */
 int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out);
 
+/**
+ * @brief Return the bundled system CA certificate path when available.
+ *
+ * iOS applications provide the CA bundle as a resource in the application
+ * bundle. Other platforms may return NULL.
+ */
+const char *platform_system_ca_certs_path(void);
+
 // ============================================================================
 // Subprocess Execution
 // ============================================================================
