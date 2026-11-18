@@ -23,7 +23,7 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 
 bool terminal_supports_utf8(void) {
   return GetConsoleOutputCP() == CP_UTF8 || GetConsoleCP() == CP_UTF8;

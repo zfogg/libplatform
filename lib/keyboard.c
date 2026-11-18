@@ -12,7 +12,7 @@
 #include <utf8proc.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #define NS_PER_MS_INT 1000000ULL
 
 keyboard_key_t keyboard_read_with_timeout(uint32_t timeout_ms) {

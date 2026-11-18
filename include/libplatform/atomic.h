@@ -39,6 +39,8 @@
 
 #ifdef __cplusplus
 #include <atomic>
+#define _Atomic(T) std::atomic<T>
+using atomic_uint_fast64_t = std::atomic_uint_fast64_t;
 #else
 #include <stdatomic.h>
 #endif
