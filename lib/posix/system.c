@@ -21,14 +21,7 @@
 #include "util/ip.h"
 #include "util/utf8.h"
 #include <libplatform/symbols.h>
-#include <sqlite3.h>
-#include <gotel/gotel.h>
-#include <ascii-chat/common.h>
-#include <ascii-chat/log/log.h>
-#include <ascii-chat/otel.h>
 #include <libplatform/socket.h>
-#include <ascii-chat/util/time.h>
-#include <ascii-chat/util/url.h>
 #include <unistd.h>
 #include <poll.h>
 #include <fcntl.h>
@@ -53,40 +46,6 @@
 #ifndef HOSTNAME_BUFFER_SIZE
 #define HOSTNAME_BUFFER_SIZE 256
 #endif
-#ifndef SAFE_MALLOC
-#define SAFE_MALLOC(size, type) ((type)malloc(size))
-#endif
-#ifndef SAFE_FREE
-#define SAFE_FREE(ptr) free(ptr)
-#endif
-#ifndef SAFE_STRERROR
-#define SAFE_STRERROR(err) strerror(err)
-#endif
-#ifndef log_debug
-#define log_debug(...) ((void)0)
-#endif
-#ifndef log_dev
-#define log_dev(...) ((void)0)
-#endif
-#ifndef log_warn
-#define log_warn(...) ((void)0)
-#endif
-#ifndef log_error
-#define log_error(...) ((void)0)
-#endif
-
-#ifndef SAFE_MALLOC
-#define SAFE_MALLOC(size, type) ((type)malloc(size))
-#endif
-#ifndef SAFE_FREE
-#define SAFE_FREE(ptr) free(ptr)
-#endif
-#ifndef SAFE_STRERROR
-#define SAFE_STRERROR(err) strerror(err)
-#endif
-#ifndef SAFE_STRNCPY
-#define SAFE_STRNCPY(dst, src, size) (strncpy((dst), (src), (size)), (dst)[(size)-1] = '\0')
-#endif
 #ifndef NS_PER_SEC_INT
 #define NS_PER_SEC_INT 1000000000LL
 #endif
@@ -101,12 +60,6 @@
 #endif
 #ifndef socket_init
 #define socket_init() 0
-#endif
-#ifndef log_debug
-#define log_debug(...) ((void)0)
-#define log_dev(...) ((void)0)
-#define log_warn(...) ((void)0)
-#define log_error(...) ((void)0)
 #endif
 // execinfo.h provides backtrace functions - available in glibc
 // For musl, libexecinfo provides it but may not be available during compile
@@ -155,18 +108,18 @@ const char *get_username_env(void) {
  */
 int platform_init(void) {
   // Initialize symbol cache for backtrace resolution
-  if (symbol_cache_init() != ASCIICHAT_OK) {
+  if (symbol_cache_init() != 0) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Symbol cache initialization failed");
   }
 
   // Initialize Winsock (required before getaddrinfo and socket operations)
-  if (socket_init() != ASCIICHAT_OK) {
+  if (socket_init() != 0) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Network operation failed");
   }
 
   // Install crash handlers for automatic backtrace on crashes
   platform_install_crash_handler();
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -181,7 +134,6 @@ void platform_destroy(void) {
   symbol_cache_print_stats();
 
   // Clean up symbol cache
-  log_debug("Platform cleanup: calling symbol_cache_destroy()");
   symbol_cache_destroy();
 }
 
@@ -256,7 +208,7 @@ int platform_localtime(const time_t *timer, struct tm *result) {
   if (!tm_result) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Failed to convert time to local time");
   }
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 int platform_gtime(const time_t *timer, struct tm *result) {
@@ -269,7 +221,7 @@ int platform_gtime(const time_t *timer, struct tm *result) {
     return SET_ERRNO_SYS(ERROR_PLATFORM_INIT, "Failed to convert time to UTC");
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -410,7 +362,6 @@ void platform_raise_fd_limit(unsigned int limit) {
 
   rl.rlim_cur = target;
   if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
-    log_warn("Failed to raise fd limit to %llu: %s", (unsigned long long)target, strerror(errno));
   }
 #endif
 }
@@ -445,7 +396,7 @@ void *platform_aligned_alloc(size_t alignment, size_t size) {
  */
 void platform_aligned_free(void *ptr) {
   // Regular free works for aligned memory on POSIX
-  SAFE_FREE(ptr);
+  free(ptr);
 }
 
 /**
@@ -532,7 +483,6 @@ FILE *platform_fdopen(const char *name, int fd, const char *mode) {
   FILE *stream = fdopen(fd, mode);
   if (stream && fd >= 0) {
     NAMED_REGISTER_FD(fd, name);
-    log_dev("Wrapped file descriptor %d with stream for %s", fd, name);
   }
   return stream;
 }
@@ -557,7 +507,6 @@ ssize_t platform_read(int fd, void *buf, size_t count) {
  */
 ssize_t platform_write(int fd, const void *buf, size_t count) {
   if (!buf || count == 0) {
-    log_warn("Invalid parameters: fd=%d, buf=%p, count=%zu", fd, buf, count);
   }
   return write(fd, buf, count);
 }
@@ -588,7 +537,6 @@ FILE *platform_fopen(const char *name, const char *filename, const char *mode) {
     int fd = fileno(stream);
     if (fd >= 0) {
       NAMED_REGISTER_FD(fd, name);
-      log_dev("Opened file stream with file descriptor %d for %s", fd, name);
     }
   }
   return stream;
@@ -647,24 +595,11 @@ static void crash_handler(int sig, siginfo_t *info, void *context) {
   const char *signal_name = get_signal_name(sig);
   if (info) {
 #ifndef NDEBUG
-    // Only capture backtraces in Debug builds
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p", sig, signal_name,
-              info->si_code, info->si_addr);
-    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
-    backtrace_log_frames(4, 0, 1);
 #else
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nSignal Info: si_code=%d, si_addr=%p\nBacktrace disabled in "
-              "Release builds",
-              sig, signal_name, info->si_code, info->si_addr);
 #endif
   } else {
 #ifndef NDEBUG
-    // Only capture backtraces in Debug builds
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)", sig, signal_name);
-    // Keep libplatform independent of ascii-chat's logging enum; error is level 4.
-    backtrace_log_frames(4, 0, 1);
 #else
-    log_error("*** CRASH DETECTED ***\nSignal: %d (%s)\nBacktrace disabled in Release builds", sig, signal_name);
 #endif
   }
 
@@ -712,7 +647,7 @@ int platform_memcpy(void *dest, size_t dest_size, const void *src, size_t count)
 
   // Use standard memcpy with bounds checking already done
   memcpy(dest, src, count);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
@@ -727,7 +662,7 @@ int platform_memset(void *dest, size_t dest_size, int ch, size_t count) {
 
   // Use standard memset with bounds checking already done
   memset(dest, ch, count);
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 int platform_memmove(void *dest, size_t dest_size, const void *src, size_t count) {
@@ -742,7 +677,7 @@ int platform_memmove(void *dest, size_t dest_size, const void *src, size_t count
 
   // Use standard memmove with bounds checking already done
   memmove(dest, src, count);
-  return ASCIICHAT_OK; // Success
+  return 0; // Success
 }
 
 /**
@@ -773,7 +708,7 @@ int platform_strcpy(char *dest, size_t dest_size, const char *src) {
   // Use strncpy with bounds checking and ensure null termination
   strncpy(dest, src, dest_size - 1);
   dest[dest_size - 1] = '\0'; // Ensure null termination
-  return ASCIICHAT_OK;        // Success
+  return 0;        // Success
 }
 
 /**
@@ -810,14 +745,14 @@ int platform_resolve_hostname_to_ipv4(const char *hostname, char *ipv4_out, size
   }
 
   // Extract IPv4 address from first result
-  asciichat_error_t format_result = format_ip_address(result->ai_family, result->ai_addr, ipv4_out, ipv4_out_size);
+  int format_result = format_ip_address(result->ai_family, result->ai_addr, ipv4_out, ipv4_out_size);
   freeaddrinfo(result);
 
-  if (format_result != ASCIICHAT_OK) {
+  if (format_result != 0) {
     return format_result;
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -872,7 +807,7 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
     }
 
     // Allocate buffer for PEM data
-    char *pem_data = SAFE_MALLOC(file_size + 1, char *);
+    char *pem_data = malloc(file_size + 1);
     if (!pem_data) {
       fclose(f);
       return SET_ERRNO(ERROR_MEMORY, "Failed to allocate memory for CA certificates");
@@ -883,7 +818,7 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
     fclose(f);
 
     if (bytes_read != (size_t)file_size) {
-      SAFE_FREE(pem_data);
+      free(pem_data);
       return SET_ERRNO(ERROR_CRYPTO, "Failed to read complete CA certificate file");
     }
 
@@ -896,8 +831,7 @@ int platform_load_system_ca_certs(char **pem_data_out, size_t *pem_size_out) {
     // Success!
     *pem_data_out = pem_data;
     *pem_size_out = bytes_read;
-    log_debug("Loaded CA certificates from: %s (%zu bytes)", ca_paths[i], bytes_read);
-    return ASCIICHAT_OK;
+    return 0;
   }
 
   // No CA bundle found
@@ -934,7 +868,8 @@ bool platform_get_temp_dir(char *temp_dir, size_t path_size) {
   }
 
   // Copy the path
-  SAFE_STRNCPY(temp_dir, tmp, path_size);
+  strncpy(temp_dir, tmp, path_size);
+  temp_dir[path_size - 1] = '\0';
   return true;
 }
 
@@ -1113,7 +1048,7 @@ void platform_force_exit(int exit_code) {
  * @brief Register multiple signal handlers at once (POSIX)
  * @param handlers Array of signal handler descriptors
  * @param count Number of handlers
- * @return ASCIICHAT_OK on success, error code on failure
+ * @return 0 on success, a negative value on failure
  *
  * POSIX implementation registers each signal using platform_signal().
  * Windows implementation handles this differently via console control handlers.
@@ -1126,12 +1061,10 @@ int platform_register_signal_handlers(const platform_signal_handler_t *handlers,
   for (int i = 0; i < count; i++) {
     signal_handler_t old_handler = platform_signal(handlers[i].sig, handlers[i].handler);
     if (old_handler == SIG_ERR) {
-      log_warn("Failed to register signal handler for signal %d", handlers[i].sig);
-      // Continue registering others instead of failing completely
     }
   }
 
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -1140,7 +1073,7 @@ int platform_register_signal_handlers(const platform_signal_handler_t *handlers,
 int platform_request_timer_precision(int precision) {
   (void)precision; // Unused on POSIX
   // POSIX systems don't have a timer precision API like Windows
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -1148,7 +1081,7 @@ int platform_request_timer_precision(int precision) {
  */
 int platform_restore_timer_resolution(void) {
   // POSIX systems don't have a timer precision API like Windows
-  return ASCIICHAT_OK;
+  return 0;
 }
 
 /**
@@ -1194,7 +1127,6 @@ bool terminal_release_subprocess_gate(int fd) {
 int platform_execute_subprocess(const char *executable, const char **argv, char *output_buffer, size_t output_size,
                                 bool (*cancel)(void *), void *data) {
   if (!executable || !argv || !argv[0]) {
-    log_error("Invalid subprocess parameters");
     return -1;
   }
   bool capture = output_buffer && output_size > 0;
@@ -1243,7 +1175,6 @@ int platform_execute_subprocess(const char *executable, const char **argv, char 
     }
     if (tty >= 0)
       close(tty);
-    log_error("Failed to fork process: %s", SAFE_STRERROR(errno));
     return -1;
   }
   if (pid == 0) {
