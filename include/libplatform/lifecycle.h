@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <libplatform/rwlock.h>

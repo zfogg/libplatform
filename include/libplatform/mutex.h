@@ -33,7 +33,7 @@
 #include <atomic>
 #define LIBPLATFORM_ATOMIC(type) std::atomic<type>
 #else
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #define LIBPLATFORM_ATOMIC(type) _Atomic(type)
 #endif
 

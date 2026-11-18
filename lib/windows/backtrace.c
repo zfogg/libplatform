@@ -9,6 +9,7 @@
 #define PLATFORM_WINDOWS_BACKTRACE_SOURCE_PATH_BUFFER_SIZE 512
 
 #include <libplatform/backtrace.h>
+#include <libplatform/util/string.h>
 #include "backtrace_internal.h"
 #include <libplatform/symbols.h>
 #include "util/path.h"
@@ -42,7 +43,8 @@ static const char *module_name_for_address(HANDLE process, DWORD64 address, char
   if (!basename) {
     basename = strrchr(module_path, '/');
   }
-  strncpy(module_name, basename ? basename + 1 : module_path, module_name_size);
+  (void)platform_strncpy(module_name, module_name_size,
+                         basename ? basename + 1 : module_path, module_name_size - 1);
   module_name[module_name_size - 1] = '\0';
   return module_name;
 }
@@ -195,7 +197,7 @@ char **platform_backtrace_symbols(void *const *buffer, int size, const char *con
         bool external = false;
         if (symbol_format_source_path(resolved_module, line_info.FileName, source_path, sizeof(source_path),
                                       &external, owned_dirs) != 0) {
-          strncpy(source_path, "unknown", sizeof(source_path));
+          (void)platform_strncpy(source_path, sizeof(source_path), "unknown", sizeof(source_path) - 1);
         }
         snprintf(symbol_buffer, sizeof(symbol_buffer), "%s%s%s%s() (%s:%ld)%s", resolved_module ? "[" : "",
                  resolved_module ? resolved_module : "", resolved_module ? "] " : "", symbol_info->Name, source_path,

@@ -25,13 +25,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 #define UNTRACKED_MALLOC(size, type) ((type)malloc(size))
 #define UNTRACKED_FREE(ptr) free(ptr)
 #define log_error(...) ((void)0)
 #define log_dev(...) ((void)0)
 #define log_plain(...) ((void)0)
-#define SAFE_STRCPY(dst, size, src) (strncpy((dst), (src), (size)), 0)
+#define SAFE_STRCPY(dst, size, src) (platform_strncpy((dst), (size), (src), (size) - 1), 0)
 extern int platform_vasprintf(char **strp, const char *format, va_list ap);
 
 // Hash table growth runs under entries_lock. Memory tracking looks up names

@@ -13,7 +13,6 @@
  * after the atomic operation completes.
  */
 
-#include <stdatomic.h>
 #include <libplatform/atomic.h>
 #include <libplatform/time.h>
 
