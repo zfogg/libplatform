@@ -294,6 +294,11 @@ if(WIN32)
   target_compile_options(libplatform-objects PRIVATE -Wno-deprecated-declarations)
 endif()
 set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+if(APPLE AND PLATFORM_IOS)
+  target_link_libraries(libplatform PUBLIC
+    "-framework Foundation"
+    "-framework Security")
+endif()
 if(WIN32)
   target_link_libraries(libplatform PUBLIC dbghelp)
 elseif(NOT EMSCRIPTEN)
