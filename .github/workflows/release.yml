@@ -49,7 +49,7 @@ jobs:
             docker run --rm --platform linux/arm64 \
               -v "$PWD:/src" -w /src arm64v8/ubuntu:24.04 bash -euxo pipefail -c '
                 apt-get update
-                DEBIAN_FRONTEND=noninteractive apt-get install -y cmake ninja-build gcc musl-tools linux-libc-dev zip
+                DEBIAN_FRONTEND=noninteractive apt-get install -y cmake ninja-build gcc musl-tools zip
                 for linkage in static shared; do
                   shared=OFF; [ "$linkage" = shared ] && shared=ON
                   cmake -S . -B "build-$linkage" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=$shared -DLIBPLATFORM_BUILD_TESTS=ON -DCMAKE_C_COMPILER=musl-gcc -DCMAKE_C_FLAGS=-mno-outline-atomics

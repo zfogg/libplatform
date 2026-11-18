@@ -16,7 +16,6 @@
 #ifdef __linux__
 #include <sys/mman.h>
 #include <unistd.h>
-#include <linux/errqueue.h>
 #endif
 
 static _Thread_local socket_io_stats_t io_stats;
