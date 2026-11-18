@@ -34,8 +34,12 @@
 #if defined(__GNUC__) && !defined(__clang__) && !defined(_MSC_VER)
 #define __try if (1)
 #define __except(condition) if (0)
+#ifndef GetExceptionInformation
 #define GetExceptionInformation() ((EXCEPTION_POINTERS *)NULL)
+#endif
+#ifndef GetExceptionCode
 #define GetExceptionCode() ((DWORD)0)
+#endif
 #endif
 
 // Thread wrapper structure to bridge POSIX and Windows thread APIs
