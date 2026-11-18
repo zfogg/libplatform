@@ -28,7 +28,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <libplatform/mutex.h>
-#include <stdatomic.h>
+#include <libplatform/atomic.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -39,9 +39,9 @@
 typedef struct {
   CONDITION_VARIABLE impl; ///< Underlying Windows condition variable
   const char *name;        ///< Human-readable name for named registry (all builds)
-  atomic_uint_fast64_t waiting_count;  ///< Number of threads currently waiting
+  LIBPLATFORM_ATOMIC(uint_fast64_t) waiting_count;  ///< Number of threads currently waiting
 #ifndef NDEBUG
-  _Atomic(uint64_t) last_signal_time_ns;    ///< Timestamp of last signal (nanoseconds)
+  LIBPLATFORM_ATOMIC(uint64_t) last_signal_time_ns;    ///< Timestamp of last signal (nanoseconds)
   _Atomic(uint64_t) last_broadcast_time_ns; ///< Timestamp of last broadcast (nanoseconds)
   _Atomic(uint64_t) last_wait_time_ns;      ///< Timestamp of last wait (nanoseconds)
   _Atomic(uintptr_t) last_waiting_key;      ///< Registry key of most recent waiter

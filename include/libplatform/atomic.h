@@ -37,10 +37,22 @@
 
 #pragma once
 
-#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+
+#ifdef __cplusplus
+#include <atomic>
+#define LIBPLATFORM_ATOMIC(type) std::atomic<type>
+// Keep the public headers' C11 spelling source-compatible in C++ translation
+// units. The implementation remains compiled as C and uses the native C11
+// atomic objects with the same storage layout.
+#define _Atomic(type) std::atomic<type>
+#define atomic_uint_fast64_t std::atomic_uint_fast64_t
+#else
+#include <stdatomic.h>
+#define LIBPLATFORM_ATOMIC(type) _Atomic(type)
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,16 +86,16 @@ extern "C" {
  * @endcode
  */
 typedef struct {
-  _Atomic(uint64_t) impl; ///< Underlying C11 atomic value
+  LIBPLATFORM_ATOMIC(uint64_t) impl; ///< Underlying C11 atomic value
 #ifndef NDEBUG
-  _Atomic(uint64_t) change_count;
-  _Atomic(uint64_t) last_store_time_ns;
-  _Atomic(uint64_t) last_load_time_ns;
-  _Atomic(uint64_t) store_count;
-  _Atomic(uint64_t) load_count;
-  _Atomic(uint64_t) cas_count;
-  _Atomic(uint64_t) cas_success_count;
-  _Atomic(uint64_t) fetch_count;
+  LIBPLATFORM_ATOMIC(uint64_t) change_count;
+  LIBPLATFORM_ATOMIC(uint64_t) last_store_time_ns;
+  LIBPLATFORM_ATOMIC(uint64_t) last_load_time_ns;
+  LIBPLATFORM_ATOMIC(uint64_t) store_count;
+  LIBPLATFORM_ATOMIC(uint64_t) load_count;
+  LIBPLATFORM_ATOMIC(uint64_t) cas_count;
+  LIBPLATFORM_ATOMIC(uint64_t) cas_success_count;
+  LIBPLATFORM_ATOMIC(uint64_t) fetch_count;
 #endif
 /**
  */
@@ -108,16 +120,16 @@ typedef struct {
  * @endcode
  */
 typedef struct {
-  _Atomic(void *) impl; ///< Underlying C11 atomic pointer
+  LIBPLATFORM_ATOMIC(void *) impl; ///< Underlying C11 atomic pointer
 #ifndef NDEBUG
-  _Atomic(uint64_t) change_count;
-  _Atomic(uint64_t) last_store_time_ns;
-  _Atomic(uint64_t) last_load_time_ns;
-  _Atomic(uint64_t) store_count;
-  _Atomic(uint64_t) load_count;
-  _Atomic(uint64_t) cas_count;
-  _Atomic(uint64_t) cas_success_count;
-  _Atomic(uint64_t) exchange_count;
+  LIBPLATFORM_ATOMIC(uint64_t) change_count;
+  LIBPLATFORM_ATOMIC(uint64_t) last_store_time_ns;
+  LIBPLATFORM_ATOMIC(uint64_t) last_load_time_ns;
+  LIBPLATFORM_ATOMIC(uint64_t) store_count;
+  LIBPLATFORM_ATOMIC(uint64_t) load_count;
+  LIBPLATFORM_ATOMIC(uint64_t) cas_count;
+  LIBPLATFORM_ATOMIC(uint64_t) cas_success_count;
+  LIBPLATFORM_ATOMIC(uint64_t) exchange_count;
 #endif
 /**
  */
