@@ -14,6 +14,71 @@
 #include <shellapi.h>
 #include <psapi.h>
 #include <tlhelp32.h>
+#include <io.h>
+
+struct platform_process {
+  PROCESS_INFORMATION info;
+};
+
+static char *windows_command_line(const char *path, const char *const *argv) {
+  size_t size = strlen(path) + 3;
+  for (size_t i = 0; argv && argv[i]; ++i) size += strlen(argv[i]) + 4;
+  char *line = malloc(size);
+  if (!line) return NULL;
+  size_t used = 0;
+  used += (size_t)snprintf(line + used, size - used, "\"%s\"", path);
+  for (size_t i = 1; argv && argv[i]; ++i)
+    used += (size_t)snprintf(line + used, size - used, " \"%s\"", argv[i]);
+  return line;
+}
+
+int platform_process_spawn(platform_process_t **out, const char *path, const char *const *argv,
+                           int stdin_fd, int stdout_fd, int stderr_fd) {
+  if (!out || !path || !argv) return -1;
+  *out = NULL;
+  char *command_line = windows_command_line(path, argv);
+  if (!command_line) return -1;
+  STARTUPINFOA startup = {.cb = sizeof(startup)};
+  startup.dwFlags = STARTF_USESTDHANDLES;
+  startup.hStdInput = stdin_fd >= 0 ? (HANDLE)_get_osfhandle(stdin_fd) : GetStdHandle(STD_INPUT_HANDLE);
+  startup.hStdOutput = stdout_fd >= 0 ? (HANDLE)_get_osfhandle(stdout_fd) : GetStdHandle(STD_OUTPUT_HANDLE);
+  startup.hStdError = stderr_fd >= 0 ? (HANDLE)_get_osfhandle(stderr_fd) : GetStdHandle(STD_ERROR_HANDLE);
+  PROCESS_INFORMATION info = {0};
+  BOOL ok = CreateProcessA(NULL, command_line, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &startup, &info);
+  free(command_line);
+  if (!ok) return -1;
+  platform_process_t *process = calloc(1, sizeof(*process));
+  if (!process) { CloseHandle(info.hThread); CloseHandle(info.hProcess); return -1; }
+  process->info = info;
+  *out = process;
+  return 0;
+}
+
+int platform_process_wait(platform_process_t *process, int timeout_ms, int *exit_code_out) {
+  if (!process) return -1;
+  DWORD result = WaitForSingleObject(process->info.hProcess, timeout_ms < 0 ? INFINITE : (DWORD)timeout_ms);
+  if (result == WAIT_TIMEOUT) return 1;
+  if (result != WAIT_OBJECT_0) return -1;
+  if (exit_code_out) { DWORD code = 0; GetExitCodeProcess(process->info.hProcess, &code); *exit_code_out = (int)code; }
+  return 0;
+}
+
+bool platform_process_is_alive(platform_process_t *process) {
+  if (!process) return false;
+  return WaitForSingleObject(process->info.hProcess, 0) == WAIT_TIMEOUT;
+}
+
+int platform_process_kill(platform_process_t *process) {
+  if (!process || !TerminateProcess(process->info.hProcess, 1)) return -1;
+  return 0;
+}
+
+void platform_process_destroy(platform_process_t *process) {
+  if (!process) return;
+  CloseHandle(process->info.hThread);
+  CloseHandle(process->info.hProcess);
+  free(process);
+}
 // Windows passes a UTF-16 command line, while the narrow CRT argv uses the
 // system code page. Keep UTF-8 arguments alive for the lifetime of the app.
 static char windows_arg_data[131072];
