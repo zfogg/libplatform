@@ -296,7 +296,7 @@ if(PROJECT_IS_TOP_LEVEL)
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libplatform")
   install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/libplatform")
   configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libplatform.pc.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pkgconfig/libplatform.pc.in"
     "${CMAKE_CURRENT_BINARY_DIR}/libplatform.pc" @ONLY)
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libplatform.pc"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
