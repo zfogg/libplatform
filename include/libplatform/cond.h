@@ -39,7 +39,7 @@
 typedef struct {
   CONDITION_VARIABLE impl; ///< Underlying Windows condition variable
   const char *name;        ///< Human-readable name for named registry (all builds)
-  libplatform_atomic_uint_fast64_t waiting_count;  ///< Number of threads currently waiting
+  atomic_uint_fast64_t waiting_count;  ///< Number of threads currently waiting
 #ifndef NDEBUG
   _Atomic(uint64_t) last_signal_time_ns;    ///< Timestamp of last signal (nanoseconds)
   _Atomic(uint64_t) last_broadcast_time_ns; ///< Timestamp of last broadcast (nanoseconds)
@@ -69,7 +69,7 @@ typedef struct {
 typedef struct {
   pthread_cond_t impl;    ///< Underlying POSIX condition variable
   const char *name;       ///< Human-readable name for named registry (all builds)
-  libplatform_atomic_uint_fast64_t waiting_count; ///< Number of threads currently waiting
+  atomic_uint_fast64_t waiting_count; ///< Number of threads currently waiting
 #ifndef NDEBUG
   _Atomic(uint64_t) last_signal_time_ns;    ///< Timestamp of last signal (nanoseconds)
   _Atomic(uint64_t) last_broadcast_time_ns; ///< Timestamp of last broadcast (nanoseconds)

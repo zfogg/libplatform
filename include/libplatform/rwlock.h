@@ -47,7 +47,7 @@ typedef struct {
   _Atomic(uint64_t) last_wrlock_time_ns; ///< Timestamp of last write lock acquisition (nanoseconds)
   _Atomic(uint64_t) last_unlock_time_ns; ///< Timestamp of last unlock (nanoseconds)
   _Atomic(uintptr_t) write_held_by_key;  ///< Registry key of thread holding write lock (0 if not held)
-  libplatform_atomic_uint_fast64_t read_lock_count;  ///< Number of threads holding read locks (thread-safe atomic)
+  atomic_uint_fast64_t read_lock_count;  ///< Number of threads holding read locks (thread-safe atomic)
   _Atomic(uint64_t) rdlock_count;        ///< Total read lock acquisitions
   _Atomic(uint64_t) wrlock_count;        ///< Total write lock acquisitions
   _Atomic(uint64_t) unlock_count;        ///< Total unlocks
@@ -67,7 +67,7 @@ typedef struct {
   _Atomic(uint64_t) last_wrlock_time_ns; ///< Timestamp of last write lock acquisition (nanoseconds)
   _Atomic(uint64_t) last_unlock_time_ns; ///< Timestamp of last unlock (nanoseconds)
   _Atomic(uintptr_t) write_held_by_key;  ///< Registry key of thread holding write lock (0 if not held)
-  libplatform_atomic_uint_fast64_t read_lock_count;  ///< Number of threads holding read locks (thread-safe atomic)
+  atomic_uint_fast64_t read_lock_count;  ///< Number of threads holding read locks (thread-safe atomic)
   _Atomic(uint64_t) rdlock_count;        ///< Total read lock acquisitions
   _Atomic(uint64_t) wrlock_count;        ///< Total write lock acquisitions
   _Atomic(uint64_t) unlock_count;        ///< Total unlocks
