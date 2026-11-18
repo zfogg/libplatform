@@ -7,13 +7,6 @@ if(TARGET libplatform OR TARGET libplatform-objects OR TARGET libplatform::libpl
   return()
 endif()
 
-# libplatform is tested with LLVM/Clang.  Keep the compiler selectable by a
-# toolchain or an explicit -D override, but make Clang the default for a
-# normal standalone configure.
-if(NOT DEFINED CMAKE_C_COMPILER)
-  set(CMAKE_C_COMPILER clang CACHE FILEPATH "C compiler")
-endif()
-
 project(libplatform VERSION 0.1.0 LANGUAGES C)
 include(${CMAKE_CURRENT_SOURCE_DIR}/deps/cmake-utils/CacheLauncher.cmake)
 cmake_utils_configure_cache_launcher()
