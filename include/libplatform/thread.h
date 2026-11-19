@@ -66,8 +66,8 @@ extern "C" {
  * initialized once per thread with zero/null value.
  *
  * Platform-specific behavior:
- *   - Windows: Uses __declspec(thread)
- *   - POSIX: Uses __thread
+ *   - MSVC: Uses __declspec(thread)
+ *   - GCC/Clang: Uses __thread
  *
  * @par Example:
  * @code{.c}
@@ -80,7 +80,7 @@ extern "C" {
  *
  * @ingroup platform
  */
-#ifdef _WIN32
+#if defined(_WIN32) && defined(_MSC_VER)
 #define PLATFORM_THREAD_LOCAL __declspec(thread)
 #else
 #define PLATFORM_THREAD_LOCAL __thread
