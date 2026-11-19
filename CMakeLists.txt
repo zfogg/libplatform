@@ -269,6 +269,13 @@ endif()
 set_target_properties(libplatform PROPERTIES OUTPUT_NAME platform WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 if(WIN32)
   target_link_libraries(libplatform PUBLIC dbghelp ws2_32)
+  if(MINGW)
+    # The shared target is assembled from an object library.  MinGW's linker
+    # must be told to export those object-library symbols explicitly; CMake's
+    # generated export list covers the MSVC path but does not populate the
+    # MinGW import library in this layout.
+    target_link_options(libplatform PRIVATE -Wl,--export-all-symbols)
+  endif()
 elseif(NOT EMSCRIPTEN)
   target_link_libraries(libplatform PUBLIC ${CMAKE_DL_LIBS})
 endif()
