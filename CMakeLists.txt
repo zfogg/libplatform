@@ -7,7 +7,7 @@ if(TARGET libplatform OR TARGET libplatform-objects OR TARGET libplatform::libpl
   return()
 endif()
 
-project(libplatform VERSION 0.1.32 LANGUAGES C)
+project(libplatform VERSION 0.1.34 LANGUAGES C)
 include(${CMAKE_CURRENT_SOURCE_DIR}/deps/cmake-utils/CacheLauncher.cmake)
 cmake_utils_configure_cache_launcher()
 
